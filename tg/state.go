@@ -1,6 +1,8 @@
 package tg
 
 import (
+	"log"
+
 	"github.com/gruntwork-io/terragrunt/config"
 	"go.lsp.dev/protocol"
 )
@@ -14,40 +16,28 @@ func NewState() State {
 	return State{Documents: map[string]*config.TerragruntConfig{}}
 }
 
-func (s *State) OpenDocument(uri protocol.DocumentURI, text string) []protocol.Diagnostic {
-	diags := []protocol.Diagnostic{}
+func (s *State) OpenDocument(l *log.Logger, uri protocol.DocumentURI, text string) []protocol.Diagnostic {
+	cfg, diags := parseTerragruntBuffer(uri.Filename(), text)
 
-	cfg, hclDiags := parseTerragruntBuffer(uri.Filename(), text)
-	for _, diag := range hclDiags {
-		diags = append(diags, protocol.Diagnostic{
-			Range: protocol.Range{
-				Start: protocol.Position{
-					Line:      uint32(diag.Subject.Start.Line) - 1,
-					Character: uint32(diag.Subject.Start.Column) - 1,
-				},
-				End: protocol.Position{
-					Line:      uint32(diag.Subject.End.Line) - 1,
-					Character: uint32(diag.Subject.End.Column) - 1,
-				},
-			},
-			Severity: protocol.DiagnosticSeverityError,
-			Source:   "HCL",
-			Message:  diag.Summary,
-		})
-	}
+	l.Printf("Opened document: %s", uri.Filename())
+	l.Printf("Config: %v", cfg)
 
 	s.Documents[uri.Filename()] = cfg
 
 	return diags
 }
 
-//
-// func (s *State) UpdateDocument(uri, text string) []lsp.Diagnostic {
-// 	s.Documents[uri] = text
-//
-// 	return getDiagnosticsForFile(text)
-// }
-//
+func (s *State) UpdateDocument(l *log.Logger, uri protocol.DocumentURI, text string) []protocol.Diagnostic {
+	cfg, diags := parseTerragruntBuffer(uri.Filename(), text)
+
+	l.Printf("Updated document: %s", uri.Filename())
+	l.Printf("Config: %v", cfg)
+
+	s.Documents[uri.Filename()] = cfg
+
+	return diags
+}
+
 // func (s *State) Hover(id int, uri string, position lsp.Position) lsp.HoverResponse {
 // 	// In real life, this would look up the type in our type analysis code...
 //

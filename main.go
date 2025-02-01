@@ -15,8 +15,8 @@ import (
 
 func main() {
 	logfile := os.Getenv("TG_LS_LOG")
-	logger := getLogger(logfile)
-	logger.Println("Initializing terragrunt-ls")
+	l := getLogger(logfile)
+	l.Println("Initializing terragrunt-ls")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
@@ -29,41 +29,42 @@ func main() {
 		msg := scanner.Bytes()
 		method, contents, err := rpc.DecodeMessage(msg)
 		if err != nil {
-			logger.Printf("Got an error: %s", err)
+			l.Printf("Got an error: %s", err)
 			continue
 		}
 
-		handleMessage(logger, writer, state, method, contents)
+		handleMessage(l, writer, state, method, contents)
 	}
 }
 
-func handleMessage(logger *log.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
-	logger.Printf("Received msg with method: %s", method)
+func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
+	l.Printf("Received msg with method: %s", method)
 
 	switch method {
 	case protocol.MethodInitialize:
 		var request lsp.InitializeRequest
 		if err := json.Unmarshal(contents, &request); err != nil {
-			logger.Printf("Failed to parse initialize request: %s", err)
+			l.Printf("Failed to parse initialize request: %s", err)
 		}
 
-		logger.Printf("Connected to: %s %s",
+		l.Printf("Connected to: %s %s",
 			request.Params.ClientInfo.Name,
 			request.Params.ClientInfo.Version)
 
 		msg := lsp.NewInitializeResponse(request.ID)
 		writeResponse(writer, msg)
 
-		logger.Print("Initialized")
+		l.Print("Initialized")
+
 	case protocol.MethodTextDocumentDidOpen:
 		var notification lsp.DidOpenTextDocumentNotification
 		if err := json.Unmarshal(contents, &notification); err != nil {
-			logger.Printf("Failed to parse didOpen request: %s", err)
+			l.Printf("Failed to parse didOpen request: %s", err)
 		}
 
-		logger.Printf("Opened: %s", notification.Params.TextDocument.URI)
+		l.Printf("Opened: %s", notification.Params.TextDocument.URI)
 
-		diagnostics := state.OpenDocument(notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
+		diagnostics := state.OpenDocument(l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
 		writeResponse(writer, lsp.PublishDiagnosticsNotification{
 			Notification: lsp.Notification{
 				RPC:    lsp.RPCVersion,
@@ -75,9 +76,35 @@ func handleMessage(logger *log.Logger, writer io.Writer, state tg.State, method 
 			},
 		})
 
-		logger.Print(state.Documents)
+		l.Print(state.Documents)
 
-		logger.Print("Document opened")
+		l.Print("Document opened")
+
+	case protocol.MethodTextDocumentDidChange:
+		var notification lsp.DidChangeTextDocumentNotification
+		if err := json.Unmarshal(contents, &notification); err != nil {
+			l.Printf("Failed to parse didChange request: %s", err)
+		}
+
+		l.Printf("Changed: %s", notification.Params.TextDocument.URI)
+
+		for _, change := range notification.Params.ContentChanges {
+			l.Printf("Change: %s", change.Text)
+
+			diagnostics := state.UpdateDocument(l, notification.Params.TextDocument.URI, change.Text)
+			writeResponse(writer, lsp.PublishDiagnosticsNotification{
+				Notification: lsp.Notification{
+					RPC:    lsp.RPCVersion,
+					Method: protocol.MethodTextDocumentPublishDiagnostics,
+				},
+				Params: protocol.PublishDiagnosticsParams{
+					URI:         notification.Params.TextDocument.URI,
+					Diagnostics: diagnostics,
+				},
+			})
+		}
+
+		l.Print("Document changed")
 	}
 }
 
