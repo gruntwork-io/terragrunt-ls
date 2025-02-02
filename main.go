@@ -76,7 +76,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 			},
 		})
 
-		l.Print(state.Documents)
+		l.Print(state.Configs)
 
 		l.Print("Document opened")
 
@@ -105,6 +105,18 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 		}
 
 		l.Print("Document changed")
+
+	case protocol.MethodTextDocumentHover:
+		var request lsp.HoverRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Printf("Failed to parse hover request: %s", err)
+		}
+
+		l.Printf("Hover: %s", request.Params.TextDocument.URI)
+
+		response := state.Hover(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		writeResponse(writer, response)
 	}
 }
 

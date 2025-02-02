@@ -2,18 +2,24 @@ package tg
 
 import (
 	"log"
+	"strings"
+	"terragrunt-ls/lsp"
+	"terragrunt-ls/tg/hover"
+	"terragrunt-ls/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/config"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
 )
 
 type State struct {
-	// Map of file names to contents
-	Documents map[string]*config.TerragruntConfig
+	// Map of file names to Terragrunt configs
+	Configs map[string]store.Store
 }
 
 func NewState() State {
-	return State{Documents: map[string]*config.TerragruntConfig{}}
+	return State{Configs: map[string]store.Store{}}
 }
 
 func (s *State) OpenDocument(l *log.Logger, uri protocol.DocumentURI, text string) []protocol.Diagnostic {
@@ -22,7 +28,19 @@ func (s *State) OpenDocument(l *log.Logger, uri protocol.DocumentURI, text strin
 	l.Printf("Opened document: %s", uri.Filename())
 	l.Printf("Config: %v", cfg)
 
-	s.Documents[uri.Filename()] = cfg
+	cfgAsCty := cty.NilVal
+
+	if cfg != nil {
+		if converted, err := config.TerragruntConfigAsCty(cfg); err == nil {
+			cfgAsCty = converted
+		}
+	}
+
+	s.Configs[uri.Filename()] = store.Store{
+		Cfg:      cfg,
+		CfgAsCty: cfgAsCty,
+		Document: text,
+	}
 
 	return diags
 }
@@ -33,27 +51,88 @@ func (s *State) UpdateDocument(l *log.Logger, uri protocol.DocumentURI, text str
 	l.Printf("Updated document: %s", uri.Filename())
 	l.Printf("Config: %v", cfg)
 
-	s.Documents[uri.Filename()] = cfg
+	cfgAsCty := cty.NilVal
+
+	if cfg != nil {
+		if converted, err := config.TerragruntConfigAsCty(cfg); err == nil {
+			cfgAsCty = converted
+		}
+	}
+
+	s.Configs[uri.Filename()] = store.Store{
+		Cfg:      cfg,
+		CfgAsCty: cfgAsCty,
+		Document: text,
+	}
 
 	return diags
 }
 
-// func (s *State) Hover(id int, uri string, position lsp.Position) lsp.HoverResponse {
-// 	// In real life, this would look up the type in our type analysis code...
-//
-// 	document := s.Documents[uri]
-//
-// 	return lsp.HoverResponse{
-// 		Response: lsp.Response{
-// 			RPC: "2.0",
-// 			ID:  &id,
-// 		},
-// 		Result: lsp.HoverResult{
-// 			Contents: fmt.Sprintf("File: %s, Characters: %d", uri, len(document)),
-// 		},
-// 	}
-// }
-//
+func (s *State) Hover(l *log.Logger, id int, uri protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+	store := s.Configs[uri.Filename()]
+
+	l.Printf("Hovering over %s at %d:%d", uri, position.Line, position.Character)
+	l.Printf("Config: %v", store.Document)
+
+	word, context := hover.GetHoverTargetWithContext(l, store, position)
+
+	l.Printf("Word: %s, Context: %s", word, context)
+
+	switch context {
+	case hover.HoverContextLocal:
+		if store.Cfg == nil {
+			return buildEmptyHoverResponse(id)
+		}
+
+		if _, ok := store.Cfg.Locals[word]; !ok {
+			return buildEmptyHoverResponse(id)
+		}
+
+		if store.CfgAsCty.IsNull() {
+			return buildEmptyHoverResponse(id)
+		}
+
+		locals := store.CfgAsCty.GetAttr("locals")
+		localVal := locals.GetAttr(word)
+
+		f := hclwrite.NewEmptyFile()
+		rootBody := f.Body()
+		rootBody.SetAttributeValue(word, localVal)
+
+		return lsp.HoverResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: lsp.HoverResult{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.Markdown,
+					Value: wrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
+				},
+			},
+		}
+
+	case hover.HoverContextNull:
+		return buildEmptyHoverResponse(id)
+
+	}
+
+	return buildEmptyHoverResponse(id)
+}
+
+func buildEmptyHoverResponse(id int) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+	}
+}
+
+func wrapAsHCLCodeFence(s string) string {
+	return "```hcl\n" + s + "\n```"
+}
+
 // func (s *State) Definition(id int, uri string, position lsp.Position) lsp.DefinitionResponse {
 // 	// In real life, this would look up the definition
 //
