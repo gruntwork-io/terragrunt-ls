@@ -23,6 +23,7 @@ func parseTerragruntBuffer(filename, text string) (*config.TerragruntConfig, []p
 	opts := options.NewTerragruntOptions()
 	opts.SkipOutput = true
 	opts.NonInteractive = true
+	opts.TerragruntConfigPath = filename
 
 	ctx := config.NewParsingContext(context.TODO(), opts)
 	ctx.ParserOptions = parseOptions

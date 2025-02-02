@@ -156,6 +156,7 @@ func wrapAsHCLCodeFence(s string) string {
 // 		},
 // 	}
 // }
+
 // func (s *State) TextDocumentCodeAction(id int, uri string) lsp.TextDocumentCodeActionResponse {
 // 	text := s.Documents[uri]
 //
