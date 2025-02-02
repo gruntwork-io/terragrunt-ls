@@ -1,6 +1,7 @@
 package hover
 
 import (
+	"bufio"
 	"log"
 	"strings"
 	"terragrunt-ls/tg/store"
@@ -43,12 +44,12 @@ func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protoc
 }
 
 func getHoveredWord(document string, position protocol.Position) string {
-	lines := strings.SplitN(document, "\n", int(position.Line)+1)
-	if len(lines) == 0 {
-		return ""
+	scanner := bufio.NewScanner(strings.NewReader(document))
+	for i := 0; i <= int(position.Line); i++ {
+		scanner.Scan()
 	}
 
-	line := lines[position.Line]
+	line := scanner.Text()
 
 	// Find the start of the word
 	start := position.Character

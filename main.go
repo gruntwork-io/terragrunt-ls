@@ -117,6 +117,18 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 		response := state.Hover(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
 		writeResponse(writer, response)
+
+	case protocol.MethodTextDocumentDefinition:
+		var request lsp.DefinitionRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Printf("Failed to parse definition request: %s", err)
+		}
+
+		l.Printf("Definition: %s", request.Params.TextDocument.URI)
+
+		response := state.Definition(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		writeResponse(writer, response)
 	}
 }
 
