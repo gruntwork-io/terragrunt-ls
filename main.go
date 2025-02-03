@@ -39,6 +39,7 @@ func main() {
 
 func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
 	l.Printf("Received msg with method: %s", method)
+	l.Printf("Contents: %s", contents)
 
 	switch method {
 	case protocol.MethodInitialize:
@@ -127,6 +128,20 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 		l.Printf("Definition: %s", request.Params.TextDocument.URI)
 
 		response := state.Definition(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		writeResponse(writer, response)
+
+	case protocol.MethodTextDocumentCompletion:
+		var request lsp.CompletionRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Printf("Failed to parse completion request: %s", err)
+		}
+
+		l.Printf("Completion: %s", request.Params.TextDocument.URI)
+
+		response := state.TextDocumentCompletion(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		l.Printf("Completion response: %v", response)
 
 		writeResponse(writer, response)
 	}

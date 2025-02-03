@@ -1,10 +1,10 @@
 package hover
 
 import (
-	"bufio"
 	"log"
 	"strings"
 	"terragrunt-ls/tg/store"
+	"terragrunt-ls/tg/text"
 
 	"go.lsp.dev/protocol"
 )
@@ -20,7 +20,7 @@ const (
 )
 
 func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protocol.Position) (string, string) {
-	word := getHoveredWord(store.Document, position)
+	word := text.GetCursorWord(store.Document, position)
 	if len(word) == 0 {
 		l.Printf("No word found at %d:%d", position.Line, position.Character)
 
@@ -41,31 +41,4 @@ func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protoc
 	}
 
 	return "", HoverContextNull
-}
-
-func getHoveredWord(document string, position protocol.Position) string {
-	scanner := bufio.NewScanner(strings.NewReader(document))
-	for i := 0; i <= int(position.Line); i++ {
-		scanner.Scan()
-	}
-
-	line := scanner.Text()
-
-	// Find the start of the word
-	start := position.Character
-	for start > 0 && isWordChar(line[start-1]) {
-		start--
-	}
-
-	// Find the end of the word
-	end := position.Character
-	for int(end) < len(line) && isWordChar(line[end]) {
-		end++
-	}
-
-	return line[start:end]
-}
-
-func isWordChar(c byte) bool {
-	return c == '_' || c == '.' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
