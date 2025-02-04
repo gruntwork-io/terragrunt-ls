@@ -105,7 +105,6 @@ func (s *State) Hover(l *log.Logger, id int, docURI protocol.DocumentURI, positi
 
 	case hover.HoverContextNull:
 		return buildEmptyHoverResponse(id)
-
 	}
 
 	return buildEmptyHoverResponse(id)

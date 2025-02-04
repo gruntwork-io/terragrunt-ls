@@ -1,3 +1,4 @@
+// Package text provides generic utilities for working with text.
 package text
 
 import (

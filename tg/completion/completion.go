@@ -1,3 +1,4 @@
+// Package completion provides the logic for providing completions to the LSP client.
 package completion
 
 import (

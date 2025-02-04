@@ -1,3 +1,4 @@
+// Package hover provides the logic for determining the target of a hover.
 package hover
 
 import (
@@ -28,7 +29,10 @@ func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protoc
 	}
 
 	splitExpression := strings.Split(word, ".")
-	if len(splitExpression) != 2 {
+
+	const localPartsLen = 2
+
+	if len(splitExpression) != localPartsLen {
 		l.Printf("Invalid word found at %d:%d: %s", position.Line, position.Character, word)
 
 		return "", HoverContextNull

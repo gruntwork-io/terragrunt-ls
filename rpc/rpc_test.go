@@ -10,6 +10,8 @@ type EncodingExample struct {
 }
 
 func TestEncode(t *testing.T) {
+	t.Parallel()
+
 	expected := "Content-Length: 16\r\n\r\n{\"Testing\":true}"
 	actual := rpc.EncodeMessage(EncodingExample{Testing: true})
 	if expected != actual {
@@ -18,6 +20,8 @@ func TestEncode(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
+	t.Parallel()
+
 	incomingMessage := "Content-Length: 15\r\n\r\n{\"Method\":\"hi\"}"
 	method, content, err := rpc.DecodeMessage([]byte(incomingMessage))
 	contentLength := len(content)

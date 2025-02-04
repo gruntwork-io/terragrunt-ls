@@ -1,3 +1,5 @@
+// Package definition provides the logic for finding
+// definitions in Terragrunt configurations.
 package definition
 
 import (
@@ -92,12 +94,16 @@ func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position p
 	}
 
 	l.Printf("No target found at %d:%d", position.Line, position.Character)
+
 	return "", DefinitionContextNull
 }
 
 func isConfigBlockLine(line string) (string, []string, bool) {
 	fields := strings.Fields(line)
-	if len(fields) < 2 {
+
+	const minConfigBlockLen = 2
+
+	if len(fields) < minConfigBlockLen {
 		return "", nil, false
 	}
 

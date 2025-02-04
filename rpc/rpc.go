@@ -1,3 +1,5 @@
+// Package rpc provides the logic for encoding and decoding messages
+// sent between the Terragrunt Language Server and the LSP client.
 package rpc
 
 import (
@@ -24,11 +26,12 @@ type BaseMessage struct {
 func DecodeMessage(msg []byte) (string, []byte, error) {
 	header, content, found := bytes.Cut(msg, []byte{'\r', '\n', '\r', '\n'})
 	if !found {
-		return "", nil, errors.New("Did not find separator")
+		return "", nil, errors.New("did not find separator")
 	}
 
 	// Content-Length: <number>
 	contentLengthBytes := header[len("Content-Length: "):]
+
 	contentLength, err := strconv.Atoi(string(contentLengthBytes))
 	if err != nil {
 		return "", nil, err
@@ -42,7 +45,9 @@ func DecodeMessage(msg []byte) (string, []byte, error) {
 	return baseMessage.Method, content[:contentLength], nil
 }
 
-// type SplitFunc func(data []byte, atEOF bool) (advance int, token []byte, err error)
+// Split is a bufio.SplitFunc that splits on the Content-Length header.
+//
+// This is used to split the headers from the payload in LSP requests.
 func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	header, content, found := bytes.Cut(data, []byte{'\r', '\n', '\r', '\n'})
 	if !found {
@@ -51,6 +56,7 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 
 	// Content-Length: <number>
 	contentLengthBytes := header[len("Content-Length: "):]
+
 	contentLength, err := strconv.Atoi(string(contentLengthBytes))
 	if err != nil {
 		return 0, nil, err
@@ -60,6 +66,9 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 		return 0, nil, nil
 	}
 
-	totalLength := len(header) + 4 + contentLength
+	const lenOfTwoRNs = 4
+
+	totalLength := len(header) + lenOfTwoRNs + contentLength
+
 	return totalLength, data[:totalLength], nil
 }

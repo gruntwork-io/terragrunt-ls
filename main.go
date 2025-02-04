@@ -27,6 +27,7 @@ func main() {
 
 	for scanner.Scan() {
 		msg := scanner.Bytes()
+
 		method, contents, err := rpc.DecodeMessage(msg)
 		if err != nil {
 			l.Printf("Got an error: %s", err)
@@ -53,7 +54,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 			request.Params.ClientInfo.Version)
 
 		msg := lsp.NewInitializeResponse(request.ID)
-		writeResponse(writer, msg)
+		writeResponse(l, writer, msg)
 
 		l.Print("Initialized")
 
@@ -66,7 +67,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 		l.Printf("Opened: %s", notification.Params.TextDocument.URI)
 
 		diagnostics := state.OpenDocument(l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
-		writeResponse(writer, lsp.PublishDiagnosticsNotification{
+		writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 			Notification: lsp.Notification{
 				RPC:    lsp.RPCVersion,
 				Method: protocol.MethodTextDocumentPublishDiagnostics,
@@ -93,7 +94,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 			l.Printf("Change: %s", change.Text)
 
 			diagnostics := state.UpdateDocument(l, notification.Params.TextDocument.URI, change.Text)
-			writeResponse(writer, lsp.PublishDiagnosticsNotification{
+			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 				Notification: lsp.Notification{
 					RPC:    lsp.RPCVersion,
 					Method: protocol.MethodTextDocumentPublishDiagnostics,
@@ -117,7 +118,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 
 		response := state.Hover(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
-		writeResponse(writer, response)
+		writeResponse(l, writer, response)
 
 	case protocol.MethodTextDocumentDefinition:
 		var request lsp.DefinitionRequest
@@ -129,7 +130,7 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 
 		response := state.Definition(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
-		writeResponse(writer, response)
+		writeResponse(l, writer, response)
 
 	case protocol.MethodTextDocumentCompletion:
 		var request lsp.CompletionRequest
@@ -143,14 +144,17 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 
 		l.Printf("Completion response: %v", response)
 
-		writeResponse(writer, response)
+		writeResponse(l, writer, response)
 	}
 }
 
-func writeResponse(writer io.Writer, msg any) {
+func writeResponse(l *log.Logger, writer io.Writer, msg any) {
 	reply := rpc.EncodeMessage(msg)
-	writer.Write([]byte(reply))
 
+	_, err := writer.Write([]byte(reply))
+	if err != nil {
+		l.Printf("Failed to write response: %s", err)
+	}
 }
 
 func getLogger(filename string) *log.Logger {
@@ -158,7 +162,9 @@ func getLogger(filename string) *log.Logger {
 		return log.New(os.Stderr, "[terragrunt-ls] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
 
-	logfile, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	const globalReadWrite = 0666
+
+	logfile, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, globalReadWrite)
 	if err != nil {
 		panic("Failed to open log file: " + err.Error())
 	}
