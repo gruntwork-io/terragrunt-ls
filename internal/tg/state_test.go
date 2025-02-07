@@ -223,13 +223,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"terragrunt-ls/internal/state"
+	"terragrunt-ls/internal/logger"
+	"terragrunt-ls/internal/tg"
 )
 
 func TestNewState(t *testing.T) {
 	t.Parallel()
 
-	state := state.NewState()
+	state := tg.NewState()
 
 	assert.NotNil(t, state.Configs)
 }
@@ -237,9 +238,10 @@ func TestNewState(t *testing.T) {
 func TestState_OpenDocument(t *testing.T) {
 	t.Parallel()
 
-	state := NewState()
+	state := tg.NewState()
 
-	diags := state.OpenDocument(nil, "file:///foo/bar.tf", "foo = bar")
+	l := logger.BuildTestLogger()
+	diags := state.OpenDocument(l, "file:///foo/bar.hcl", "locals { foo = \"bar\" }")
 
 	assert.Empty(t, diags)
 	assert.Len(t, state.Configs, 1)

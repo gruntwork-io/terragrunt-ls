@@ -1,7 +1,7 @@
 package rpc_test
 
 import (
-	"terragrunt-ls/rpc"
+	"terragrunt-ls/internal/rpc"
 	"testing"
 )
 

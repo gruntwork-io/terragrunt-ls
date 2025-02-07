@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/rpc"
 	"terragrunt-ls/internal/tg"
@@ -15,7 +16,7 @@ import (
 
 func main() {
 	logfile := os.Getenv("TG_LS_LOG")
-	l := getLogger(logfile)
+	l := logger.BuildLogger(logfile)
 	l.Println("Initializing terragrunt-ls")
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -155,19 +156,4 @@ func writeResponse(l *log.Logger, writer io.Writer, msg any) {
 	if err != nil {
 		l.Printf("Failed to write response: %s", err)
 	}
-}
-
-func getLogger(filename string) *log.Logger {
-	if filename == "" {
-		return log.New(os.Stderr, "[terragrunt-ls] ", log.Ldate|log.Ltime|log.Lshortfile)
-	}
-
-	const globalReadWrite = 0666
-
-	logfile, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, globalReadWrite)
-	if err != nil {
-		panic("Failed to open log file: " + err.Error())
-	}
-
-	return log.New(logfile, "[terragrunt-ls] ", log.Ldate|log.Ltime|log.Lshortfile)
 }
