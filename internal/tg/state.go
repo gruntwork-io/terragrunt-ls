@@ -3,11 +3,11 @@ package tg
 import (
 	"log"
 	"strings"
-	"terragrunt-ls/lsp"
-	"terragrunt-ls/tg/completion"
-	"terragrunt-ls/tg/definition"
-	"terragrunt-ls/tg/hover"
-	"terragrunt-ls/tg/store"
+	"terragrunt-ls/internal/lsp"
+	"terragrunt-ls/internal/tg/completion"
+	"terragrunt-ls/internal/tg/definition"
+	"terragrunt-ls/internal/tg/hover"
+	"terragrunt-ls/internal/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/hashicorp/hcl/v2/hclwrite"

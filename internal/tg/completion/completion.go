@@ -4,8 +4,8 @@ package completion
 import (
 	"log"
 	"strings"
-	"terragrunt-ls/tg/store"
-	"terragrunt-ls/tg/text"
+	"terragrunt-ls/internal/tg/store"
+	"terragrunt-ls/internal/tg/text"
 
 	"go.lsp.dev/protocol"
 )

@@ -6,7 +6,7 @@ import (
 	"bufio"
 	"log"
 	"strings"
-	"terragrunt-ls/tg/store"
+	"terragrunt-ls/internal/tg/store"
 
 	"go.lsp.dev/protocol"
 )

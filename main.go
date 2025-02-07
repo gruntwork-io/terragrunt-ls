@@ -6,9 +6,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"terragrunt-ls/lsp"
-	"terragrunt-ls/rpc"
-	"terragrunt-ls/tg"
+	"terragrunt-ls/internal/lsp"
+	"terragrunt-ls/internal/rpc"
+	"terragrunt-ls/internal/tg"
 
 	"go.lsp.dev/protocol"
 )
