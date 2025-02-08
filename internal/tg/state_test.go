@@ -222,8 +222,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 
-	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg"
 )
 
@@ -240,9 +241,22 @@ func TestState_OpenDocument(t *testing.T) {
 
 	state := tg.NewState()
 
-	l := logger.BuildTestLogger()
+	l := newTestLogger(t)
 	diags := state.OpenDocument(l, "file:///foo/bar.hcl", "locals { foo = \"bar\" }")
 
 	assert.Empty(t, diags)
 	assert.Len(t, state.Configs, 1)
+
+	expectedLocals := map[string]interface{}{
+		"foo": "bar",
+	}
+
+	assert.Equal(t, expectedLocals, state.Configs["/foo/bar.hcl"].Cfg.Locals)
+}
+
+func newTestLogger(t *testing.T) *zap.SugaredLogger {
+	t.Helper()
+
+	l := zaptest.NewLogger(t)
+	return zap.New(l.Core(), zap.AddCaller()).Sugar()
 }

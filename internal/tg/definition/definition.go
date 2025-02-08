@@ -4,11 +4,11 @@ package definition
 
 import (
 	"bufio"
-	"log"
 	"strings"
 	"terragrunt-ls/internal/tg/store"
 
 	"go.lsp.dev/protocol"
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 	DefinitionContextNull = "null"
 )
 
-func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position protocol.Position) (string, string) {
+func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, position protocol.Position) (string, string) {
 	document := store.Document
 
 	scanner := bufio.NewScanner(strings.NewReader(document))
@@ -50,7 +50,7 @@ func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position p
 		// Identify configuration blocks
 		block, labels, isBlock := isConfigBlockLine(line)
 		if isBlock {
-			l.Printf("Found block: %s", block)
+			l.Debugf("Found block: %s", block)
 
 			if block == DefinitionContextInclude {
 				definitionContext = DefinitionContextInclude
@@ -64,7 +64,7 @@ func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position p
 
 		// Check if the current line is the one we're looking for
 		if scannedLines == int(position.Line) {
-			l.Printf("Hit line %d: %s", position.Line, line)
+			l.Debugf("Hit line %d: %s", position.Line, line)
 
 			lineHit = true
 		}
@@ -78,10 +78,10 @@ func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position p
 		// The reason we do both checks is that we need to
 		// account for single line block definitions.
 		if line == "}" || (strings.HasSuffix(line, "}") && isBlock) {
-			l.Printf("End of block: %s, line: %d", block, scannedLines)
+			l.Debugf("End of block: %s, line: %d", block, scannedLines)
 
 			if lineHit && target != "" {
-				l.Printf("Found target: %s, context: %s", target, definitionContext)
+				l.Debugf("Found target: %s, context: %s", target, definitionContext)
 
 				return target, definitionContext
 			}
@@ -93,7 +93,7 @@ func GetDefinitionTargetWithContext(l *log.Logger, store store.Store, position p
 		scannedLines++
 	}
 
-	l.Printf("No target found at %d:%d", position.Line, position.Character)
+	l.Debugf("No target found at %d:%d", position.Line, position.Character)
 
 	return "", DefinitionContextNull
 }

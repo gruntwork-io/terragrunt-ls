@@ -2,12 +2,12 @@
 package hover
 
 import (
-	"log"
 	"strings"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
 	"go.lsp.dev/protocol"
+	"go.uber.org/zap"
 )
 
 const (
@@ -20,10 +20,10 @@ const (
 	HoverContextNull = "null"
 )
 
-func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protocol.Position) (string, string) {
+func GetHoverTargetWithContext(l *zap.SugaredLogger, store store.Store, position protocol.Position) (string, string) {
 	word := text.GetCursorWord(store.Document, position)
 	if len(word) == 0 {
-		l.Printf("No word found at %d:%d", position.Line, position.Character)
+		l.Debugf("No word found at %d:%d", position.Line, position.Character)
 
 		return "", HoverContextNull
 	}
@@ -33,13 +33,13 @@ func GetHoverTargetWithContext(l *log.Logger, store store.Store, position protoc
 	const localPartsLen = 2
 
 	if len(splitExpression) != localPartsLen {
-		l.Printf("Invalid word found at %d:%d: %s", position.Line, position.Character, word)
+		l.Debugf("Invalid word found at %d:%d: %s", position.Line, position.Character, word)
 
 		return "", HoverContextNull
 	}
 
 	if splitExpression[0] == "local" {
-		l.Printf("Found local variable: %s", splitExpression[1])
+		l.Debugf("Found local variable: %s", splitExpression[1])
 
 		return splitExpression[1], HoverContextLocal
 	}

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
-	"log"
 	"os"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
@@ -12,12 +11,18 @@ import (
 	"terragrunt-ls/internal/tg"
 
 	"go.lsp.dev/protocol"
+	"go.uber.org/zap"
 )
 
 func main() {
 	logfile := os.Getenv("TG_LS_LOG")
-	l := logger.BuildLogger(logfile)
-	l.Println("Initializing terragrunt-ls")
+
+	logger := logger.BuildLogger(logfile)
+
+	l := logger.Sugar()
+	defer logger.Sync()
+
+	l.Info("Initializing terragrunt-ls")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
@@ -31,7 +36,7 @@ func main() {
 
 		method, contents, err := rpc.DecodeMessage(msg)
 		if err != nil {
-			l.Printf("Got an error: %s", err)
+			l.Errorf("Got an error decoding the message: %w", err)
 			continue
 		}
 
@@ -39,33 +44,33 @@ func main() {
 	}
 }
 
-func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
-	l.Printf("Received msg with method: %s", method)
-	l.Printf("Contents: %s", contents)
+func handleMessage(l *zap.SugaredLogger, writer io.Writer, state tg.State, method string, contents []byte) {
+	l.Debugf("Received msg with method: %s", method)
+	l.Debugf("Contents: %s", contents)
 
 	switch method {
 	case protocol.MethodInitialize:
 		var request lsp.InitializeRequest
 		if err := json.Unmarshal(contents, &request); err != nil {
-			l.Printf("Failed to parse initialize request: %s", err)
+			l.Errorf("Failed to parse initialize request: %w", err)
 		}
 
-		l.Printf("Connected to: %s %s",
+		l.Debugf("Connected to: %s %s",
 			request.Params.ClientInfo.Name,
 			request.Params.ClientInfo.Version)
 
 		msg := lsp.NewInitializeResponse(request.ID)
 		writeResponse(l, writer, msg)
 
-		l.Print("Initialized")
+		l.Debugf("Initialized")
 
 	case protocol.MethodTextDocumentDidOpen:
 		var notification lsp.DidOpenTextDocumentNotification
 		if err := json.Unmarshal(contents, &notification); err != nil {
-			l.Printf("Failed to parse didOpen request: %s", err)
+			l.Errorf("Failed to parse didOpen request: %s", err)
 		}
 
-		l.Printf("Opened: %s", notification.Params.TextDocument.URI)
+		l.Debugf("Opened: %s", notification.Params.TextDocument.URI)
 
 		diagnostics := state.OpenDocument(l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
 		writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
@@ -79,20 +84,20 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 			},
 		})
 
-		l.Print(state.Configs)
+		l.Debug(state.Configs)
 
-		l.Print("Document opened")
+		l.Debug("Document opened")
 
 	case protocol.MethodTextDocumentDidChange:
 		var notification lsp.DidChangeTextDocumentNotification
 		if err := json.Unmarshal(contents, &notification); err != nil {
-			l.Printf("Failed to parse didChange request: %s", err)
+			l.Errorf("Failed to parse didChange request: %w", err)
 		}
 
-		l.Printf("Changed: %s", notification.Params.TextDocument.URI)
+		l.Debugf("Changed: %s", notification.Params.TextDocument.URI)
 
 		for _, change := range notification.Params.ContentChanges {
-			l.Printf("Change: %s", change.Text)
+			l.Debugf("Change: %s", change.Text)
 
 			diagnostics := state.UpdateDocument(l, notification.Params.TextDocument.URI, change.Text)
 			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
@@ -107,15 +112,15 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 			})
 		}
 
-		l.Print("Document changed")
+		l.Debugf("Document changed")
 
 	case protocol.MethodTextDocumentHover:
 		var request lsp.HoverRequest
 		if err := json.Unmarshal(contents, &request); err != nil {
-			l.Printf("Failed to parse hover request: %s", err)
+			l.Debugf("Failed to parse hover request: %s", err)
 		}
 
-		l.Printf("Hover: %s", request.Params.TextDocument.URI)
+		l.Debugf("Hover: %s", request.Params.TextDocument.URI)
 
 		response := state.Hover(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
@@ -124,10 +129,10 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 	case protocol.MethodTextDocumentDefinition:
 		var request lsp.DefinitionRequest
 		if err := json.Unmarshal(contents, &request); err != nil {
-			l.Printf("Failed to parse definition request: %s", err)
+			l.Errorf("Failed to parse definition request: %s", err)
 		}
 
-		l.Printf("Definition: %s", request.Params.TextDocument.URI)
+		l.Debugf("Definition: %s", request.Params.TextDocument.URI)
 
 		response := state.Definition(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
@@ -136,24 +141,24 @@ func handleMessage(l *log.Logger, writer io.Writer, state tg.State, method strin
 	case protocol.MethodTextDocumentCompletion:
 		var request lsp.CompletionRequest
 		if err := json.Unmarshal(contents, &request); err != nil {
-			l.Printf("Failed to parse completion request: %s", err)
+			l.Errorf("Failed to parse completion request: %s", err)
 		}
 
-		l.Printf("Completion: %s", request.Params.TextDocument.URI)
+		l.Debugf("Completion: %s", request.Params.TextDocument.URI)
 
 		response := state.TextDocumentCompletion(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
-		l.Printf("Completion response: %v", response)
+		l.Debugf("Completion response: %v", response)
 
 		writeResponse(l, writer, response)
 	}
 }
 
-func writeResponse(l *log.Logger, writer io.Writer, msg any) {
+func writeResponse(l *zap.SugaredLogger, writer io.Writer, msg any) {
 	reply := rpc.EncodeMessage(msg)
 
 	_, err := writer.Write([]byte(reply))
 	if err != nil {
-		l.Printf("Failed to write response: %s", err)
+		l.Errorf("Failed to write response: %s", err)
 	}
 }

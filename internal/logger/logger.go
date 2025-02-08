@@ -3,29 +3,31 @@ package logger
 
 import (
 	"log"
-	"os"
+
+	"go.uber.org/zap"
 )
 
-// BuildLogger builds the standard logger for terragrunt-ls.
+// NewLogger builds the standard logger for terragrunt-ls.
 //
 // When supplied with a filename, it'll create a new file and write logs to it.
 // Otherwise, it'll write logs to stderr.
-func BuildLogger(filename string) *log.Logger {
-	if filename == "" {
-		return log.New(os.Stderr, "[terragrunt-ls] ", log.Ldate|log.Ltime|log.Lshortfile)
+func NewLogger(filename string) *zap.Logger {
+	if filename != "" {
+		config := zap.NewDevelopmentConfig()
+		config.OutputPaths = []string{filename}
+
+		logger, err := config.Build()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return logger
 	}
 
-	const globalReadWrite = 0666
-
-	logfile, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, globalReadWrite)
+	logger, err := zap.NewProduction()
 	if err != nil {
-		panic("Failed to open log file: " + err.Error())
+		log.Fatal(err)
 	}
 
-	return log.New(logfile, "[terragrunt-ls] ", log.Ldate|log.Ltime|log.Lshortfile)
-}
-
-// BuildTestLogger builds a logger for testing purposes.
-func BuildTestLogger() *log.Logger {
-	return BuildLogger("")
+	return logger
 }
