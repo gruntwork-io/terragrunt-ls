@@ -228,6 +228,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 
 	// "go.lsp.dev/uri"
 	"go.uber.org/zap"
@@ -247,6 +248,25 @@ func TestNewState(t *testing.T) {
 
 func TestState_OpenDocument(t *testing.T) {
 	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	_, err := createFile(tmpDir, "root.hcl", "")
+	require.NoError(t, err)
+
+	rootPath := filepath.Join(tmpDir, "root.hcl")
+
+	// rootURI := uri.File(rootPath)
+
+	unitDir := filepath.Join(tmpDir, "foo")
+
+	err = os.MkdirAll(unitDir, 0755)
+	require.NoError(t, err)
+
+	// Create the URI for the unit file
+	unitPath := filepath.Join(unitDir, "bar.hcl")
+
+	unitURI := uri.File(unitPath)
 
 	tc := []struct {
 		name     string
@@ -274,7 +294,7 @@ func TestState_OpenDocument(t *testing.T) {
 				ProcessedIncludes: config.IncludeConfigsMap{},
 				FieldsMetadata: map[string]map[string]interface{}{
 					"locals-foo": {
-						"found_in_file": "/foo/bar.hcl",
+						"found_in_file": unitPath,
 					},
 				},
 			},
@@ -294,12 +314,28 @@ func TestState_OpenDocument(t *testing.T) {
 				ProcessedIncludes: config.IncludeConfigsMap{},
 				FieldsMetadata: map[string]map[string]interface{}{
 					"locals-baz": {
-						"found_in_file": "/foo/bar.hcl",
+						"found_in_file": unitPath,
 					},
 					"locals-foo": {
-						"found_in_file": "/foo/bar.hcl",
+						"found_in_file": unitPath,
 					},
 				},
+			},
+		},
+		{
+			name: "root include",
+			document: `include "root" {
+	path = find_in_parent_folders("root.hcl")
+}`,
+			expected: &config.TerragruntConfig{
+				GenerateConfigs: map[string]codegen.GenerateConfig{},
+				ProcessedIncludes: config.IncludeConfigsMap{
+					"root": {
+						Name: "root",
+						Path: rootPath,
+					},
+				},
+				TerragruntDependencies: config.Dependencies{},
 			},
 		},
 	}
@@ -312,12 +348,12 @@ func TestState_OpenDocument(t *testing.T) {
 
 			l := newTestLogger(t)
 
-			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
+			diags := state.OpenDocument(l, unitURI, tt.document)
 			require.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
 
-			assert.Equal(t, tt.expected, state.Configs["/foo/bar.hcl"].Cfg)
+			assert.Equal(t, tt.expected, state.Configs[unitPath].Cfg)
 		})
 	}
 }
@@ -478,140 +514,111 @@ func TestState_Hover(t *testing.T) {
 	}
 }
 
-// func TestState_Definition(t *testing.T) {
-// 	t.Parallel()
-//
-// 	tmpDir := t.TempDir()
-//
-// 	_, err := createFile(tmpDir, "root.hcl", "")
-// 	require.NoError(t, err)
-//
-// 	rootURI := uri.File(filepath.Join(tmpDir, "root.hcl"))
-//
-// 	unitDir := filepath.Join(tmpDir, "foo")
-//
-// 	err = os.MkdirAll(unitDir, 0755)
-// 	require.NoError(t, err)
-//
-// 	// Create the URI for the unit file
-// 	unitPath := filepath.Join(unitDir, "bar.hcl")
-//
-// 	unitURI := uri.File(unitPath)
-//
-// 	tc := []struct {
-// 		name     string
-// 		document string
-// 		position protocol.Position
-// 		expected lsp.DefinitionResponse
-// 	}{
-// 		{
-// 			name: "nothing to jump to",
-// 			document: `locals {
-// 	foo = "bar"
-// 	bar = local.foo
-// }`,
-// 			position: protocol.Position{
-// 				Line:      0,
-// 				Character: 0,
-// 			},
-// 			expected: lsp.DefinitionResponse{
-// 				Response: lsp.Response{
-// 					RPC: "2.0",
-// 					ID:  pointerOfInt(1),
-// 				},
-// 				Result: protocol.Location{
-// 					URI: unitURI,
-// 					Range: protocol.Range{
-// 						Start: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 						End: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "jump to root include",
-// 			document: `include "root" {
-// 	path = find_in_parent_folders("root.hcl")
-// }`,
-// 			position: protocol.Position{
-// 				Line:      0,
-// 				Character: 0,
-// 			},
-// 			expected: lsp.DefinitionResponse{
-// 				Response: lsp.Response{
-// 					RPC: "2.0",
-// 					ID:  pointerOfInt(1),
-// 				},
-// 				Result: protocol.Location{
-// 					URI: rootURI,
-// 					Range: protocol.Range{
-// 						Start: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 						End: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "jump to root include using legacy syntax",
-// 			document: `include {
-// 	path = find_in_parent_folders("root.hcl")
-// }`,
-// 			position: protocol.Position{
-// 				Line:      0,
-// 				Character: 0,
-// 			},
-// 			expected: lsp.DefinitionResponse{
-// 				Response: lsp.Response{
-// 					RPC: "2.0",
-// 					ID:  pointerOfInt(1),
-// 				},
-// 				Result: protocol.Location{
-// 					URI: rootURI,
-// 					Range: protocol.Range{
-// 						Start: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 						End: protocol.Position{
-// 							Line:      0,
-// 							Character: 0,
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	for _, tt := range tc {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			t.Parallel()
-//
-// 			state := tg.NewState()
-//
-// 			l := newTestLogger(t)
-//
-// 			diags := state.OpenDocument(l, unitURI, tt.document)
-// 			assert.Empty(t, diags)
-//
-// 			require.Len(t, state.Configs, 1)
-//
-// 			definition := state.Definition(l, 1, unitURI, tt.position)
-// 			assert.Equal(t, tt.expected, definition)
-// 		})
-// 	}
-// }
+func TestState_Definition(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	_, err := createFile(tmpDir, "root.hcl", "")
+	require.NoError(t, err)
+
+	rootURI := uri.File(filepath.Join(tmpDir, "root.hcl"))
+
+	unitDir := filepath.Join(tmpDir, "foo")
+
+	err = os.MkdirAll(unitDir, 0755)
+	require.NoError(t, err)
+
+	// Create the URI for the unit file
+	unitPath := filepath.Join(unitDir, "bar.hcl")
+
+	unitURI := uri.File(unitPath)
+
+	tc := []struct {
+		name     string
+		document string
+		position protocol.Position
+		expected lsp.DefinitionResponse
+	}{
+		{
+			name: "nothing to jump to",
+			document: `locals {
+	foo = "bar"
+	bar = local.foo
+}`,
+			position: protocol.Position{
+				Line:      0,
+				Character: 0,
+			},
+			expected: lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: "2.0",
+					ID:  pointerOfInt(1),
+				},
+				Result: protocol.Location{
+					URI: unitURI,
+					Range: protocol.Range{
+						Start: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+						End: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "go to root include",
+			document: `include "root" {
+	path = find_in_parent_folders("root.hcl")
+}`,
+			position: protocol.Position{
+				Line:      0,
+				Character: 0,
+			},
+			expected: lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: "2.0",
+					ID:  pointerOfInt(1),
+				},
+				Result: protocol.Location{
+					URI: rootURI,
+					Range: protocol.Range{
+						Start: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+						End: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			state := tg.NewState()
+
+			l := newTestLogger(t)
+
+			diags := state.OpenDocument(l, unitURI, tt.document)
+			assert.Empty(t, diags)
+
+			require.Len(t, state.Configs, 1)
+
+			definition := state.Definition(l, 1, unitURI, tt.position)
+			assert.Equal(t, tt.expected, definition)
+		})
+	}
+}
 
 func newTestLogger(t *testing.T) *zap.SugaredLogger {
 	t.Helper()
