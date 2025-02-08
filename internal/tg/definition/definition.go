@@ -80,7 +80,7 @@ func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, pos
 		if line == "}" || (strings.HasSuffix(line, "}") && isBlock) {
 			l.Debugf("End of block: %s, line: %d", block, scannedLines)
 
-			if lineHit && target != "" {
+			if lineHit && definitionContext != "" {
 				l.Debugf("Found target: %s, context: %s", target, definitionContext)
 
 				return target, definitionContext

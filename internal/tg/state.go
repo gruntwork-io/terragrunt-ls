@@ -134,9 +134,13 @@ func (s *State) Definition(l *zap.SugaredLogger, id int, docURI protocol.Documen
 
 	switch context {
 	case definition.DefinitionContextInclude:
+		l.Debugf("Store: %v", store)
+
 		if store.Cfg == nil {
 			return buildEmptyDefinitionResponse(id, docURI, position)
 		}
+
+		l.Debugf("Includes: %v", store.Cfg.ProcessedIncludes)
 
 		for _, include := range store.Cfg.ProcessedIncludes {
 			if include.Name == target {
