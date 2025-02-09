@@ -2,9 +2,15 @@
 
 This is a simple language server for [Terragrunt](https://terragrunt.gruntwork.io/).
 
+It's a work in progress, and we're looking to start coordination with the Terragrunt community to make this the best possible language server for Terragrunt.
+
 ## Capabilities
 
 The capabilities of this language server are documented in the [server capabilities documentation](./docs/server-capabilities.md).
+
+## Setup
+
+For instructions on how to setup the Terragrunt Language Server in your editor, see the [setup documentation](./docs/setup.md).
 
 ## Contributions
 
