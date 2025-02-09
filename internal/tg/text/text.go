@@ -18,7 +18,7 @@ func GetCursorWord(document string, position protocol.Position) string {
 
 	// Find the start of the word
 	start := position.Character
-	for start > 0 && isWordChar(line[start-1]) {
+	for start > 0 && int(start) <= len(line) && isWordChar(line[start-1]) {
 		start--
 	}
 
