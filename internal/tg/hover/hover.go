@@ -25,7 +25,7 @@ func GetHoverTargetWithContext(l *zap.SugaredLogger, store store.Store, position
 	if len(word) == 0 {
 		l.Debugf("No word found at %d:%d", position.Line, position.Character)
 
-		return "", HoverContextNull
+		return word, HoverContextNull
 	}
 
 	splitExpression := strings.Split(word, ".")
@@ -35,7 +35,7 @@ func GetHoverTargetWithContext(l *zap.SugaredLogger, store store.Store, position
 	if len(splitExpression) != localPartsLen {
 		l.Debugf("Invalid word found at %d:%d: %s", position.Line, position.Character, word)
 
-		return "", HoverContextNull
+		return word, HoverContextNull
 	}
 
 	if splitExpression[0] == "local" {
@@ -44,5 +44,5 @@ func GetHoverTargetWithContext(l *zap.SugaredLogger, store store.Store, position
 		return splitExpression[1], HoverContextLocal
 	}
 
-	return "", HoverContextNull
+	return word, HoverContextNull
 }
