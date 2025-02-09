@@ -28,7 +28,6 @@ func NewInitializeResponse(id int) InitializeResponse {
 				TextDocumentSync:   1,
 				HoverProvider:      true,
 				DefinitionProvider: true,
-				CodeActionProvider: true,
 				CompletionProvider: &protocol.CompletionOptions{},
 			},
 			ServerInfo: &protocol.ServerInfo{
