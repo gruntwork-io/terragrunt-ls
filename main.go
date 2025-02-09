@@ -17,10 +17,16 @@ import (
 func main() {
 	logfile := os.Getenv("TG_LS_LOG")
 
-	logger := logger.BuildLogger(logfile)
+	logger := logger.NewLogger(logfile)
 
 	l := logger.Sugar()
-	defer logger.Sync()
+
+	defer func() {
+		err := logger.Sync()
+		if err != nil {
+			l.Errorf("Failed to sync logger: %s", err)
+		}
+	}()
 
 	l.Info("Initializing terragrunt-ls")
 
