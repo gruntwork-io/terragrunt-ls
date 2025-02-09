@@ -14,18 +14,6 @@ func GetCompletions(l *zap.SugaredLogger, store store.Store, position protocol.P
 	cursorWord := text.GetCursorWord(store.Document, position)
 	completions := []protocol.CompletionItem{}
 
-	if strings.HasPrefix(cursorWord, "local.") {
-		locals := localsAsWords(store)
-
-		for _, local := range locals {
-			if strings.HasPrefix(local, cursorWord) {
-				completions = append(completions, protocol.CompletionItem{
-					Label: local,
-				})
-			}
-		}
-	}
-
 	for _, word := range defaultCompletionWords() {
 		if strings.HasPrefix(word, cursorWord) {
 			completions = append(completions, protocol.CompletionItem{
@@ -35,24 +23,6 @@ func GetCompletions(l *zap.SugaredLogger, store store.Store, position protocol.P
 	}
 
 	return completions
-}
-
-func localsAsWords(store store.Store) []string {
-	locals := []string{}
-
-	if store.Cfg == nil {
-		return locals
-	}
-
-	if store.Cfg.Locals == nil {
-		return locals
-	}
-
-	for key := range store.Cfg.Locals {
-		locals = append(locals, "local."+key)
-	}
-
-	return locals
 }
 
 func defaultCompletionWords() []string {
