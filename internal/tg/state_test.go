@@ -12,10 +12,8 @@ import (
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
-
 	"terragrunt-ls/internal/lsp"
+	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 )
 
@@ -32,7 +30,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	_, err := createFile(tmpDir, "root.hcl", "")
+	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
 	require.NoError(t, err)
 
 	rootPath := filepath.Join(tmpDir, "root.hcl")
@@ -127,7 +125,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			state := tg.NewState()
 
-			l := newTestLogger(t)
+			l := testutils.NewTestLogger(t)
 
 			diags := state.OpenDocument(l, unitURI, tt.document)
 			require.Empty(t, diags)
@@ -195,7 +193,7 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			state := tg.NewState()
 
-			l := newTestLogger(t)
+			l := testutils.NewTestLogger(t)
 
 			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
@@ -240,7 +238,7 @@ func TestState_Hover(t *testing.T) {
 			expected: lsp.HoverResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  pointerOfInt(1),
+					ID:  testutils.PointerOfInt(1),
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
@@ -264,7 +262,7 @@ func TestState_Hover(t *testing.T) {
 			expected: lsp.HoverResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  pointerOfInt(1),
+					ID:  testutils.PointerOfInt(1),
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
@@ -282,7 +280,7 @@ func TestState_Hover(t *testing.T) {
 
 			state := tg.NewState()
 
-			l := newTestLogger(t)
+			l := testutils.NewTestLogger(t)
 
 			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
@@ -300,7 +298,7 @@ func TestState_Definition(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	_, err := createFile(tmpDir, "root.hcl", "")
+	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
 	require.NoError(t, err)
 
 	rootURI := uri.File(filepath.Join(tmpDir, "root.hcl"))
@@ -334,7 +332,7 @@ func TestState_Definition(t *testing.T) {
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  pointerOfInt(1),
+					ID:  testutils.PointerOfInt(1),
 				},
 				Result: protocol.Location{
 					URI: unitURI,
@@ -363,7 +361,7 @@ func TestState_Definition(t *testing.T) {
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  pointerOfInt(1),
+					ID:  testutils.PointerOfInt(1),
 				},
 				Result: protocol.Location{
 					URI: rootURI,
@@ -388,7 +386,7 @@ func TestState_Definition(t *testing.T) {
 
 			state := tg.NewState()
 
-			l := newTestLogger(t)
+			l := testutils.NewTestLogger(t)
 
 			diags := state.OpenDocument(l, unitURI, tt.document)
 			assert.Empty(t, diags)
@@ -421,7 +419,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			expected: lsp.CompletionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  pointerOfInt(1),
+					ID:  testutils.PointerOfInt(1),
 				},
 				Result: []protocol.CompletionItem{
 					{
@@ -524,7 +522,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 
 			state := tg.NewState()
 
-			l := newTestLogger(t)
+			l := testutils.NewTestLogger(t)
 
 			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.initial)
 			require.Empty(t, diags)
@@ -537,29 +535,4 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			assert.Equal(t, tt.expected, completion)
 		})
 	}
-}
-
-func newTestLogger(t *testing.T) *zap.SugaredLogger {
-	t.Helper()
-
-	l := zaptest.NewLogger(t)
-	return zap.New(l.Core(), zap.AddCaller()).Sugar()
-}
-
-func pointerOfInt(i int) *int {
-	return &i
-}
-
-func createFile(dir, name, content string) (string, error) {
-	return createFileWithMode(dir, name, content, 0644)
-}
-
-func createFileWithMode(dir, name, content string, mode os.FileMode) (string, error) {
-	path := filepath.Join(dir, name)
-
-	if err := os.WriteFile(path, []byte(content), mode); err != nil {
-		return "", err
-	}
-
-	return path, nil
 }
