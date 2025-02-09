@@ -51,4 +51,3 @@ go install
 ```
 
 This will install the `terragrunt-ls` binary to your `$GOBIN`, which defaults to `$GOPATH/bin` see [GOPATH](https://go.dev/wiki/GOPATH) for more info.
-

@@ -8,6 +8,8 @@ The server supports full text document sync.
 
 Every time a document is opened or changed, the server will receive an event with the full document.
 
+When loading a document, the server will use Terragrunt's configuration parsing to parse the HCL file, and then provide the same diagnostics that Terragrunt would provide.
+
 ## HoverProvider
 
 The server provides hover information.
