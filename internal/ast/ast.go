@@ -161,11 +161,11 @@ func IsLocalAttribute(node *IndexedNode) bool {
 	if _, ok := node.Parent.Parent.Node.(*hclsyntax.Body); !ok {
 		return false
 	}
-	return IsLocalBlock(node.Parent.Parent.Parent.Node)
+	return IsLocalsBlock(node.Parent.Parent.Parent.Node)
 }
 
-// IsLocalBlock returns TRUE if the node is an HCL block of type "locals".
-func IsLocalBlock(node hclsyntax.Node) bool {
+// IsLocalsBlock returns TRUE if the node is an HCL block of type "locals".
+func IsLocalsBlock(node hclsyntax.Node) bool {
 	block, ok := node.(*hclsyntax.Block)
 	return ok && block.Type == "locals"
 }
@@ -176,15 +176,37 @@ func IsIncludeBlock(node hclsyntax.Node) bool {
 	return ok && block.Type == "include" && len(block.Labels) > 0
 }
 
-func IsAttributeNode(node hclsyntax.Node) bool {
+// IsAttribute returns TRUE if the node is an hclsyntax.Attribute.
+func IsAttribute(node hclsyntax.Node) bool {
 	_, ok := node.(*hclsyntax.Attribute)
 	return ok
+}
+
+// GetNodeIncludeLabel returns the label of the given node, if it is an include block.
+// If the node is not an include block, returns an empty string and false.
+func GetNodeIncludeLabel(inode *IndexedNode) (string, bool) {
+	attr := FindFirstParentMatch(inode, IsAttribute)
+	if attr == nil {
+		return "", false
+	}
+
+	local := FindFirstParentMatch(attr, IsIncludeBlock)
+	if local == nil {
+		return "", false
+	}
+
+	name := ""
+	if labels := local.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
+		name = labels[0]
+	}
+
+	return name, true
 }
 
 // IsInIncludePathExpr returns whether the node is part of an include block's path expression. If it is, returns
 // the name of the include block and TRUE, otherwise returns "" and FALSE.
 func IsInIncludePathExpr(inode *IndexedNode) (string, bool) {
-	attr := FindFirstParentMatch(inode, IsAttributeNode)
+	attr := FindFirstParentMatch(inode, IsAttribute)
 	if attr == nil {
 		return "", false
 	}
