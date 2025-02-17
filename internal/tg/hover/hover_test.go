@@ -1,12 +1,14 @@
 package hover_test
 
 import (
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg/hover"
 	"terragrunt-ls/internal/tg/store"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
 )
 
@@ -28,8 +30,8 @@ func TestGetHoverTargetWithContext(t *testing.T) {
 		},
 		{
 			name:            "local variable",
-			store:           store.Store{Document: "local.var"},
-			position:        protocol.Position{Line: 0, Character: 0},
+			store:           store.Store{Document: "foo = local.var"},
+			position:        protocol.Position{Line: 0, Character: 6},
 			expectedTarget:  "var",
 			expectedContext: "local",
 		},
@@ -39,9 +41,16 @@ func TestGetHoverTargetWithContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			store := tt.store
+
+			fileAST, err := ast.IndexFileAST("test.hcl", []byte(store.Document))
+			require.NoError(t, err)
+
+			store.AST = fileAST
+
 			l := testutils.NewTestLogger(t)
 
-			target, context := hover.GetHoverTargetWithContext(l, tt.store, tt.position)
+			target, context := hover.GetHoverTargetWithContext(l, store, tt.position)
 
 			assert.Equal(t, tt.expectedTarget, target)
 			assert.Equal(t, tt.expectedContext, context)

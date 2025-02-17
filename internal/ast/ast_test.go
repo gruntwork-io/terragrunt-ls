@@ -57,6 +57,7 @@ inputs = {
 `,
 			expectedNodesAt: map[protocol.Position]string{
 				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
+				{Line: 1, Character: 8}: "[2:9-2:24] *hclsyntax.ScopeTraversalExpr",
 				{Line: 5, Character: 0}: "[5:8-7:2] *hclsyntax.Body",
 				{Line: 8, Character: 0}: "[9:1-11:2] *hclsyntax.Attribute",
 				{Line: 9, Character: 0}: "[9:10-11:2] *hclsyntax.ObjectConsExpr",
@@ -313,6 +314,61 @@ func TestGetNodeIncludePath(t *testing.T) {
 
 			assert.True(t, ok)
 			assert.Equal(t, tt.expected, path)
+		})
+	}
+}
+
+func TestGetLocalVariableName(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name     string
+		content  string
+		pos      protocol.Position
+		expected string
+	}{
+		{
+			name: "not a local variable",
+			content: `inputs = {
+	foo = "bar"
+}`,
+			pos:      protocol.Position{Line: 0, Character: 0},
+			expected: "",
+		},
+		{
+			name: "local variable",
+			content: `locals {
+	foo = "bar"
+}
+
+inputs = {
+	foo = local.foo
+}`,
+
+			pos:      protocol.Position{Line: 5, Character: 7},
+			expected: "foo",
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			indexed, err := ast.IndexFileAST("test.hcl", []byte(tt.content))
+			require.NoError(t, err)
+
+			require.NotNil(t, indexed)
+
+			node := indexed.FindNodeAt(tt.pos)
+
+			name, ok := ast.GetLocalVariableName(node.Node)
+			if tt.expected == "" {
+				assert.False(t, ok)
+				return
+			}
+
+			assert.True(t, ok)
+			assert.Equal(t, tt.expected, name)
 		})
 	}
 }

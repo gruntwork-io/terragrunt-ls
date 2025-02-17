@@ -245,6 +245,32 @@ func IsAttribute(node hclsyntax.Node) bool {
 	return ok
 }
 
+// GetLocalVariableName returns the name of the local variable that the given node is a part of.
+// If the node is not a local attribute, returns an empty string and false.
+func GetLocalVariableName(node hclsyntax.Node) (string, bool) {
+	expr, ok := node.(*hclsyntax.ScopeTraversalExpr)
+	if !ok {
+		return "", false
+	}
+
+	variables := expr.Variables()
+	for _, v := range variables {
+		if v.RootName() == "local" {
+			parts := v.SimpleSplit()
+
+			if len(parts.Rel) == 0 {
+				continue
+			}
+
+			namePart := parts.Rel[0].(hcl.TraverseAttr).Name
+
+			return namePart, true
+		}
+	}
+
+	return "", false
+}
+
 // GetNodeIncludePath returns the include path of the given node, if it is an include block.
 // If the node is not an include block, returns an empty string and false.
 func GetNodeIncludePath(inode *IndexedNode) (string, bool) {
