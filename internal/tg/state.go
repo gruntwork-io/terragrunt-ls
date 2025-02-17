@@ -2,6 +2,7 @@ package tg
 
 import (
 	"strings"
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
@@ -38,6 +39,11 @@ func (s *State) UpdateDocument(l *zap.SugaredLogger, docURI protocol.DocumentURI
 }
 
 func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	ast, err := ast.IndexFileAST(docURI.Filename(), []byte(text))
+	if err != nil {
+		l.Errorf("Error indexing AST: %v", err)
+	}
+
 	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
 
 	l.Debugf("Config: %v", cfg)
@@ -51,6 +57,7 @@ func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, t
 	}
 
 	s.Configs[docURI.Filename()] = store.Store{
+		AST:      ast,
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,
@@ -63,7 +70,6 @@ func (s *State) Hover(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI,
 	store := s.Configs[docURI.Filename()]
 
 	l.Debugf("Hovering over %s at %d:%d", docURI, position.Line, position.Character)
-	l.Debugf("Config: %v", store.Document)
 
 	word, context := hover.GetHoverTargetWithContext(l, store, position)
 

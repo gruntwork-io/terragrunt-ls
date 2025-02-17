@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"go.lsp.dev/protocol"
 )
 
 // IndexFileAST parses a Terragrunt HCL file
@@ -51,9 +52,11 @@ type IndexedAST struct {
 
 // FindNodeAt attempts to find the node at the given position in the AST.
 // If no node is found, returns nil.
-func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
+func (d *IndexedAST) FindNodeAt(pos protocol.Position) *IndexedNode {
+	hclPos := ToHclPos(pos)
+
 	// Iterate backwards to find a node that starts before the position.
-	nodes, ok := d.Index[pos.Line]
+	nodes, ok := d.Index[hclPos.Line]
 	if !ok {
 		return nil
 	}
@@ -62,14 +65,14 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 
 	// First try finding a matching node on the same line.
 	for _, node := range nodes {
-		if node.Range().Start.Column <= pos.Column {
+		if node.Range().Start.Column <= hclPos.Column {
 			closest = node
 		}
 	}
 
 	if closest == nil {
 		// Iterate backwards, line by line.
-		for i := pos.Line - 1; i >= 1; i-- {
+		for i := hclPos.Line - 1; i >= 1; i-- {
 			nodes, ok = d.Index[i]
 			if !ok || len(nodes) == 0 {
 				continue
@@ -90,7 +93,7 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 	node := closest
 	for node != nil {
 		end := node.Range().End
-		if isPosBeforeEnd(pos, end) {
+		if isPosBeforeEnd(hclPos, end) {
 			return node
 		}
 

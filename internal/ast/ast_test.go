@@ -4,9 +4,9 @@ import (
 	"terragrunt-ls/internal/ast"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 func TestIndexFileAST(t *testing.T) {
@@ -15,7 +15,7 @@ func TestIndexFileAST(t *testing.T) {
 	tc := []struct {
 		name            string
 		contents        string
-		expectedNodesAt map[hcl.Pos]string
+		expectedNodesAt map[protocol.Position]string
 	}{
 		{
 			name:     "empty hcl",
@@ -27,8 +27,8 @@ func TestIndexFileAST(t *testing.T) {
 	foo = "bar"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}: "[1:1-3:2] *hclsyntax.Block",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
 			},
 		},
 		{
@@ -37,8 +37,8 @@ func TestIndexFileAST(t *testing.T) {
 	path = "root.hcl"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}: "[1:1-3:2] *hclsyntax.Block",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
 			},
 		},
 		{
@@ -55,11 +55,11 @@ inputs = {
 	foo = "bar"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}:  "[1:1-3:2] *hclsyntax.Block",
-				{Line: 6, Column: 1}:  "[5:8-7:2] *hclsyntax.Body",
-				{Line: 9, Column: 1}:  "[9:1-11:2] *hclsyntax.Attribute",
-				{Line: 10, Column: 1}: "[9:10-11:2] *hclsyntax.ObjectConsExpr",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
+				{Line: 5, Character: 0}: "[5:8-7:2] *hclsyntax.Body",
+				{Line: 8, Character: 0}: "[9:1-11:2] *hclsyntax.Attribute",
+				{Line: 9, Character: 0}: "[9:10-11:2] *hclsyntax.ObjectConsExpr",
 			},
 		},
 	}
@@ -93,7 +93,7 @@ func TestIsLocalAttribute(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -101,7 +101,7 @@ func TestIsLocalAttribute(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: false,
 		},
 		{
@@ -109,7 +109,7 @@ func TestIsLocalAttribute(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: true,
 		},
 	}
@@ -136,7 +136,7 @@ func TestIsLocalsBlock(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -144,7 +144,7 @@ func TestIsLocalsBlock(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -152,7 +152,7 @@ func TestIsLocalsBlock(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -179,7 +179,7 @@ func TestIsIncludeBlock(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -187,7 +187,7 @@ func TestIsIncludeBlock(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -195,7 +195,7 @@ func TestIsIncludeBlock(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -222,7 +222,7 @@ func TestIsAttribute(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -230,7 +230,7 @@ func TestIsAttribute(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -238,7 +238,7 @@ func TestIsAttribute(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -265,7 +265,7 @@ func TestGetNodeIncludePath(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected string
 	}{
 		{
@@ -273,7 +273,7 @@ func TestGetNodeIncludePath(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: "",
 		},
 		{
@@ -281,7 +281,7 @@ func TestGetNodeIncludePath(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: "root",
 		},
 		{
@@ -289,7 +289,7 @@ func TestGetNodeIncludePath(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
+			pos:      protocol.Position{Line: 1, Character: 17},
 			expected: "root",
 		},
 	}
