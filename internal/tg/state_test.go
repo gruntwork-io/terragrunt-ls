@@ -355,8 +355,8 @@ func TestState_Definition(t *testing.T) {
 	path = find_in_parent_folders("root.hcl")
 }`,
 			position: protocol.Position{
-				Line:      0,
-				Character: 0,
+				Line:      1,
+				Character: 8,
 			},
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
