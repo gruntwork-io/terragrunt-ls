@@ -271,9 +271,9 @@ func GetLocalVariableName(node hclsyntax.Node) (string, bool) {
 	return "", false
 }
 
-// GetNodeIncludePath returns the include path of the given node, if it is an include block.
+// GetNodeIncludeLabel returns the label of the given node, if it is an include block.
 // If the node is not an include block, returns an empty string and false.
-func GetNodeIncludePath(inode *IndexedNode) (string, bool) {
+func GetNodeIncludeLabel(inode *IndexedNode) (string, bool) {
 	attr := FindFirstParentMatch(inode, IsAttribute)
 	if attr == nil {
 		return "", false
