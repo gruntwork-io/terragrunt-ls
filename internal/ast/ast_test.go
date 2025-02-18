@@ -306,7 +306,7 @@ func TestGetNodeIncludePath(t *testing.T) {
 
 			node := indexed.FindNodeAt(tt.pos)
 
-			path, ok := ast.GetNodeIncludePath(node)
+			path, ok := ast.GetNodeIncludeLabel(node)
 			if tt.expected == "" {
 				assert.False(t, ok)
 				return

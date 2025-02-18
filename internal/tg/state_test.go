@@ -22,7 +22,7 @@ func TestNewState(t *testing.T) {
 
 	state := tg.NewState()
 
-	assert.NotNil(t, state.Configs)
+	assert.NotNil(t, state.Stores)
 }
 
 func TestState_OpenDocument(t *testing.T) {
@@ -130,9 +130,9 @@ func TestState_OpenDocument(t *testing.T) {
 			diags := state.OpenDocument(l, unitURI, tt.document)
 			require.Empty(t, diags)
 
-			assert.Len(t, state.Configs, 1)
+			assert.Len(t, state.Stores, 1)
 
-			assert.Equal(t, tt.expected, state.Configs[unitPath].Cfg)
+			assert.Equal(t, tt.expected, state.Stores[unitPath].Cfg)
 		})
 	}
 }
@@ -198,19 +198,19 @@ func TestState_UpdateDocument(t *testing.T) {
 			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
 
-			require.Len(t, state.Configs, 1)
+			require.Len(t, state.Stores, 1)
 
 			if len(tt.expected) != 0 {
-				assert.Equal(t, tt.expected, state.Configs["/foo/bar.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expected, state.Stores["/foo/bar.hcl"].Cfg.Locals)
 			}
 
 			diags = state.UpdateDocument(l, "file:///foo/bar.hcl", tt.updated)
 			assert.Empty(t, diags)
 
-			assert.Len(t, state.Configs, 1)
+			assert.Len(t, state.Stores, 1)
 
 			if len(tt.expectedUpdated) != 0 {
-				assert.Equal(t, tt.expectedUpdated, state.Configs["/foo/bar.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expectedUpdated, state.Stores["/foo/bar.hcl"].Cfg.Locals)
 			}
 		})
 	}
@@ -285,7 +285,7 @@ func TestState_Hover(t *testing.T) {
 			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
 
-			require.Len(t, state.Configs, 1)
+			require.Len(t, state.Stores, 1)
 
 			hover := state.Hover(l, 1, "file:///foo/bar.hcl", tt.position)
 			assert.Equal(t, tt.expected, hover)
@@ -391,7 +391,7 @@ func TestState_Definition(t *testing.T) {
 			diags := state.OpenDocument(l, unitURI, tt.document)
 			assert.Empty(t, diags)
 
-			require.Len(t, state.Configs, 1)
+			require.Len(t, state.Stores, 1)
 
 			definition := state.Definition(l, 1, unitURI, tt.position)
 			assert.Equal(t, tt.expected, definition)
@@ -529,7 +529,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 
 			_ = state.UpdateDocument(l, "file:///foo/bar.hcl", tt.document)
 
-			require.Len(t, state.Configs, 1)
+			require.Len(t, state.Stores, 1)
 
 			completion := state.TextDocumentCompletion(l, 1, "file:///foo/bar.hcl", tt.position)
 			assert.Equal(t, tt.expected, completion)
