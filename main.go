@@ -90,7 +90,7 @@ func handleMessage(l *zap.SugaredLogger, writer io.Writer, state tg.State, metho
 			},
 		})
 
-		l.Debug(state.Configs)
+		l.Debug(state.Stores)
 
 		l.Debug("Document opened")
 
