@@ -2,6 +2,7 @@ package tg
 
 import (
 	"strings"
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
@@ -18,11 +19,11 @@ import (
 
 type State struct {
 	// Map of file names to Terragrunt configs
-	Configs map[string]store.Store
+	Stores map[string]store.Store
 }
 
 func NewState() State {
-	return State{Configs: map[string]store.Store{}}
+	return State{Stores: map[string]store.Store{}}
 }
 
 func (s *State) OpenDocument(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
@@ -38,6 +39,11 @@ func (s *State) UpdateDocument(l *zap.SugaredLogger, docURI protocol.DocumentURI
 }
 
 func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	ast, err := ast.IndexFileAST(docURI.Filename(), []byte(text))
+	if err != nil {
+		l.Errorf("Error indexing AST: %v", err)
+	}
+
 	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
 
 	l.Debugf("Config: %v", cfg)
@@ -50,7 +56,8 @@ func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, t
 		}
 	}
 
-	s.Configs[docURI.Filename()] = store.Store{
+	s.Stores[docURI.Filename()] = store.Store{
+		AST:      ast,
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,
@@ -60,10 +67,9 @@ func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, t
 }
 
 func (s *State) Hover(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	store := s.Configs[docURI.Filename()]
+	store := s.Stores[docURI.Filename()]
 
 	l.Debugf("Hovering over %s at %d:%d", docURI, position.Line, position.Character)
-	l.Debugf("Config: %v", store.Document)
 
 	word, context := hover.GetHoverTargetWithContext(l, store, position)
 
@@ -124,7 +130,7 @@ func wrapAsHCLCodeFence(s string) string {
 }
 
 func (s *State) Definition(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	store := s.Configs[docURI.Filename()]
+	store := s.Stores[docURI.Filename()]
 
 	l.Debugf("Jumping to definition from %s at %d:%d", docURI, position.Line, position.Character)
 
@@ -205,7 +211,7 @@ func buildEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position 
 }
 
 func (s *State) TextDocumentCompletion(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
-	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position)
+	items := completion.GetCompletions(l, s.Stores[docURI.Filename()], position)
 
 	response := lsp.CompletionResponse{
 		Response: lsp.Response{
