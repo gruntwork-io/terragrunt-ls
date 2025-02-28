@@ -2,20 +2,37 @@
 package testutils
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
+	"terragrunt-ls/internal/logger"
 	"testing"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 )
 
-func NewTestLogger(t *testing.T) *zap.SugaredLogger {
+func NewTestLogger(t *testing.T) *logger.Logger {
 	t.Helper()
 
-	l := zaptest.NewLogger(t)
+	// Create a test logger that writes to the test log
+	testWriter := testWriter{t}
+	handler := slog.NewJSONHandler(testWriter, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+	slogger := slog.New(handler)
 
-	return zap.New(l.Core(), zap.AddCaller()).Sugar()
+	// Create a new logger with the test writer
+	return &logger.Logger{
+		Logger: slogger,
+	}
+}
+
+// testWriter implements io.Writer and writes to the test log
+type testWriter struct {
+	t *testing.T
+}
+
+func (tw testWriter) Write(p []byte) (n int, err error) {
+	tw.t.Log(string(p))
+	return len(p), nil
 }
 
 func PointerOfInt(i int) *int {

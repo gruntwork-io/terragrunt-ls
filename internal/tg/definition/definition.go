@@ -5,10 +5,10 @@ package definition
 import (
 	"bufio"
 	"strings"
+	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
 	"go.lsp.dev/protocol"
-	"go.uber.org/zap"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 	DefinitionContextNull = "null"
 )
 
-func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, position protocol.Position) (string, string) {
+func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, position protocol.Position) (string, string) {
 	document := store.Document
 
 	scanner := bufio.NewScanner(strings.NewReader(document))

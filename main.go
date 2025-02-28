@@ -11,29 +11,19 @@ import (
 	"terragrunt-ls/internal/tg"
 
 	"go.lsp.dev/protocol"
-	"go.uber.org/zap"
 )
 
 func main() {
 	logfile := os.Getenv("TG_LS_LOG")
 
-	logger := logger.NewLogger(logfile)
-
-	l := logger.Sugar()
-
-	defer func() {
-		err := logger.Sync()
-		if err != nil {
-			l.Errorf("Failed to sync logger: %s", err)
-		}
-	}()
+	l := logger.NewLogger(logfile)
+	defer l.Close()
 
 	l.Info("Initializing terragrunt-ls")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
 
-	// state := analysis.NewState()
 	state := tg.NewState()
 	writer := os.Stdout
 
@@ -50,7 +40,7 @@ func main() {
 	}
 }
 
-func handleMessage(l *zap.SugaredLogger, writer io.Writer, state tg.State, method string, contents []byte) {
+func handleMessage(l *logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
 	l.Debugf("Received msg with method: %s", method)
 	l.Debugf("Contents: %s", contents)
 
@@ -160,7 +150,7 @@ func handleMessage(l *zap.SugaredLogger, writer io.Writer, state tg.State, metho
 	}
 }
 
-func writeResponse(l *zap.SugaredLogger, writer io.Writer, msg any) {
+func writeResponse(l *logger.Logger, writer io.Writer, msg any) {
 	reply := rpc.EncodeMessage(msg)
 
 	_, err := writer.Write([]byte(reply))
