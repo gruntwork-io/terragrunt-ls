@@ -26,13 +26,21 @@ func NewState() State {
 }
 
 func (s *State) OpenDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	l.Debugf("Opening document: %s", docURI.Filename())
+	l.Debug(
+		"Opening document",
+		"uri", docURI,
+		"text", text,
+	)
 
 	return s.updateState(l, docURI, text)
 }
 
 func (s *State) UpdateDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	l.Debugf("Updating document: %s", docURI.Filename())
+	l.Debug(
+		"Updating document",
+		"uri", docURI,
+		"text", text,
+	)
 
 	return s.updateState(l, docURI, text)
 }
@@ -40,7 +48,11 @@ func (s *State) UpdateDocument(l *logger.Logger, docURI protocol.DocumentURI, te
 func (s *State) updateState(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
 
-	l.Debugf("Config: %v", cfg)
+	l.Debug(
+		"Config",
+		"uri", docURI,
+		"config", cfg,
+	)
 
 	cfgAsCty := cty.NilVal
 
@@ -62,17 +74,31 @@ func (s *State) updateState(l *logger.Logger, docURI protocol.DocumentURI, text 
 func (s *State) Hover(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debugf("Hovering over %s at %d:%d", docURI, position.Line, position.Character)
-	l.Debugf("Config: %v", store.Document)
+	l.Debug(
+		"Hovering over character",
+		"uri", docURI,
+		"position", position,
+	)
+
+	l.Debug(
+		"Config",
+		"uri", docURI,
+		"config", store.Cfg,
+	)
 
 	word, context := hover.GetHoverTargetWithContext(l, store, position)
 
-	l.Debugf("Hovering over %s with context %s", word, context)
+	l.Debug(
+		"Hovering with context",
+		"word", word,
+		"context", context,
+	)
 
 	if word == "" {
 		return buildEmptyHoverResponse(id)
 	}
 
+	//nolint:gocritic
 	switch context {
 	case hover.HoverContextLocal:
 		if store.Cfg == nil {
@@ -127,33 +153,54 @@ func wrapAsHCLCodeFence(s string) string {
 func (s *State) Definition(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debugf("Definition for %s at %d:%d", docURI, position.Line, position.Character)
+	l.Debug(
+		"Definition requested",
+		"uri", docURI,
+		"position", position,
+	)
 
 	target, context := definition.GetDefinitionTargetWithContext(l, store, position)
 
-	l.Debugf("Definition for %s with context %s", target, context)
+	l.Debug(
+		"Definition discovered",
+		"target", target,
+		"context", context,
+	)
 
 	if target == "" {
 		return buildEmptyDefinitionResponse(id, docURI, position)
 	}
 
+	//nolint:gocritic
 	switch context {
 	case definition.DefinitionContextInclude:
-		l.Debugf("Store: %v", store)
+		l.Debug(
+			"Store content",
+			"store", store,
+		)
 
 		if store.Cfg == nil {
 			return buildEmptyDefinitionResponse(id, docURI, position)
 		}
 
-		l.Debugf("Includes: %v", store.Cfg.ProcessedIncludes)
+		l.Debug(
+			"Includes",
+			"includes", store.Cfg.ProcessedIncludes,
+		)
 
 		for _, include := range store.Cfg.ProcessedIncludes {
 			if include.Name == target {
-				l.Debugf("Jumping to %s %s", include.Name, include.Path)
+				l.Debug(
+					"Jumping to target",
+					"include", include,
+				)
 
 				defURI := uri.File(include.Path)
 
-				l.Debugf("URI: %s", defURI)
+				l.Debug(
+					"URI of target",
+					"URI", defURI,
+				)
 
 				return lsp.DefinitionResponse{
 					Response: lsp.Response{

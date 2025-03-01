@@ -18,37 +18,33 @@ type Logger struct {
 // When supplied with a filename, it'll create a new file and write logs to it.
 // Otherwise, it'll write logs to stderr.
 func NewLogger(filename string) *Logger {
-	var (
-		logWriter io.Writer
-		closer    io.Closer
-	)
+	if filename == "" {
+		handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+		logger := slog.New(handler)
 
-	if filename != "" {
-		const readWritePerm = 0666
-
-		file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, readWritePerm)
-		if err != nil {
-			slog.Error("Failed to open log file", "error", err)
-			os.Exit(1)
+		return &Logger{
+			Logger: logger,
 		}
-
-		logWriter = file
-		closer = file
-	} else {
-		logWriter = os.Stderr
-		closer = nil
 	}
 
-	// Create a JSON handler for structured logging
-	handler := slog.NewJSONHandler(logWriter, &slog.HandlerOptions{
+	const readWritePerm = 0666
+
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, readWritePerm)
+	if err != nil {
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
+	}
+
+	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
-
 	logger := slog.New(handler)
 
 	return &Logger{
 		Logger: logger,
-		closer: closer,
+		closer: file,
 	}
 }
 
@@ -62,31 +58,16 @@ func (l *Logger) Close() error {
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(args ...interface{}) {
-	l.Logger.Debug("debug", "msg", args)
-}
-
-// Debugf logs a formatted debug message
-func (l *Logger) Debugf(format string, args ...interface{}) {
-	l.Logger.Debug(format, args...)
+func (l *Logger) Debug(msg string, args ...interface{}) {
+	l.Logger.Debug(msg, args...)
 }
 
 // Info logs an info message
-func (l *Logger) Info(args ...interface{}) {
-	l.Logger.Info("info", "msg", args)
-}
-
-// Infof logs a formatted info message
-func (l *Logger) Infof(format string, args ...interface{}) {
-	l.Logger.Info(format, args...)
+func (l *Logger) Info(msg string, args ...interface{}) {
+	l.Logger.Info(msg, args...)
 }
 
 // Error logs an error message
-func (l *Logger) Error(args ...interface{}) {
-	l.Logger.Error("error", "msg", args)
-}
-
-// Errorf logs a formatted error message
-func (l *Logger) Errorf(format string, args ...interface{}) {
-	l.Logger.Error(format, args...)
+func (l *Logger) Error(msg string, args ...interface{}) {
+	l.Logger.Error(msg, args...)
 }

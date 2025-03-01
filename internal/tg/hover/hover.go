@@ -23,7 +23,11 @@ const (
 func GetHoverTargetWithContext(l *logger.Logger, store store.Store, position protocol.Position) (string, string) {
 	word := text.GetCursorWord(store.Document, position)
 	if len(word) == 0 {
-		l.Debugf("No word found at %d:%d", position.Line, position.Character)
+		l.Debug(
+			"No word found",
+			"line", position.Line,
+			"character", position.Character,
+		)
 
 		return word, HoverContextNull
 	}
@@ -33,13 +37,23 @@ func GetHoverTargetWithContext(l *logger.Logger, store store.Store, position pro
 	const localPartsLen = 2
 
 	if len(splitExpression) != localPartsLen {
-		l.Debugf("Invalid word found at %d:%d: %s", position.Line, position.Character, word)
+		l.Debug(
+			"Invalid word found",
+			"line", position.Line,
+			"character", position.Character,
+			"word", word,
+		)
 
 		return word, HoverContextNull
 	}
 
 	if splitExpression[0] == "local" {
-		l.Debugf("Found local variable: %s", splitExpression[1])
+		l.Debug(
+			"Found local variable",
+			"line", position.Line,
+			"character", position.Character,
+			"local", splitExpression[1],
+		)
 
 		return splitExpression[1], HoverContextLocal
 	}

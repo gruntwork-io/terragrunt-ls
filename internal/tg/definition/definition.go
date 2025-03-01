@@ -50,7 +50,12 @@ func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, positio
 		// Identify configuration blocks
 		block, labels, isBlock := isConfigBlockLine(line)
 		if isBlock {
-			l.Debugf("Found block: %s", block)
+			l.Debug(
+				"Found block",
+				"block", block,
+				"labels", labels,
+				"line", scannedLines,
+			)
 
 			if block == DefinitionContextInclude {
 				definitionContext = DefinitionContextInclude
@@ -64,7 +69,11 @@ func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, positio
 
 		// Check if the current line is the one we're looking for
 		if scannedLines == int(position.Line) {
-			l.Debugf("Hit line %d: %s", position.Line, line)
+			l.Debug(
+				"Hit line",
+				"line", scannedLines,
+				"position", position.Line,
+			)
 
 			lineHit = true
 		}
@@ -78,10 +87,18 @@ func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, positio
 		// The reason we do both checks is that we need to
 		// account for single line block definitions.
 		if line == "}" || (strings.HasSuffix(line, "}") && isBlock) {
-			l.Debugf("End of block: %s, line: %d", block, scannedLines)
+			l.Debug(
+				"End of block",
+				"block", block,
+				"line", scannedLines,
+			)
 
 			if lineHit && definitionContext != "" {
-				l.Debugf("Found target: %s, context: %s", target, definitionContext)
+				l.Debug(
+					"Found target",
+					"target", target,
+					"context", definitionContext,
+				)
 
 				return target, definitionContext
 			}
@@ -93,7 +110,11 @@ func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, positio
 		scannedLines++
 	}
 
-	l.Debugf("No target found at %d:%d", position.Line, position.Character)
+	l.Debug(
+		"No target found",
+		"line", position.Line,
+		"character", position.Character,
+	)
 
 	return "", DefinitionContextNull
 }
