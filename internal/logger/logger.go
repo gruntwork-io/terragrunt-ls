@@ -7,24 +7,33 @@ import (
 	"os"
 )
 
-// Logger is a wrapper around slog.Logger that provides additional methods
-type Logger struct {
+var _ Logger = &slogLogger{}
+
+// slogLogger is a wrapper around slog.Logger that provides additional methods
+type slogLogger struct {
 	*slog.Logger
 	closer io.Closer
+}
+
+type Logger interface {
+	Close() error
+	Debug(msg string, args ...interface{})
+	Info(msg string, args ...interface{})
+	Error(msg string, args ...interface{})
 }
 
 // NewLogger builds the standard logger for terragrunt-ls.
 //
 // When supplied with a filename, it'll create a new file and write logs to it.
 // Otherwise, it'll write logs to stderr.
-func NewLogger(filename string) *Logger {
+func NewLogger(filename string) *slogLogger {
 	if filename == "" {
-		handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		})
 		logger := slog.New(handler)
 
-		return &Logger{
+		return &slogLogger{
 			Logger: logger,
 		}
 	}
@@ -42,14 +51,14 @@ func NewLogger(filename string) *Logger {
 	})
 	logger := slog.New(handler)
 
-	return &Logger{
+	return &slogLogger{
 		Logger: logger,
 		closer: file,
 	}
 }
 
 // Close closes the logger
-func (l *Logger) Close() error {
+func (l *slogLogger) Close() error {
 	if l.closer != nil {
 		return l.closer.Close()
 	}
@@ -58,16 +67,16 @@ func (l *Logger) Close() error {
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(msg string, args ...interface{}) {
+func (l *slogLogger) Debug(msg string, args ...interface{}) {
 	l.Logger.Debug(msg, args...)
 }
 
 // Info logs an info message
-func (l *Logger) Info(msg string, args ...interface{}) {
+func (l *slogLogger) Info(msg string, args ...interface{}) {
 	l.Logger.Info(msg, args...)
 }
 
 // Error logs an error message
-func (l *Logger) Error(msg string, args ...interface{}) {
+func (l *slogLogger) Error(msg string, args ...interface{}) {
 	l.Logger.Error(msg, args...)
 }

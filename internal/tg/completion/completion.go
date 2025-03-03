@@ -10,7 +10,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func GetCompletions(l *logger.Logger, store store.Store, position protocol.Position) []protocol.CompletionItem {
+func GetCompletions(l logger.Logger, store store.Store, position protocol.Position) []protocol.CompletionItem {
 	cursorWord := text.GetCursorWord(store.Document, position)
 	completions := []protocol.CompletionItem{}
 

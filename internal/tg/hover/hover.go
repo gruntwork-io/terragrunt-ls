@@ -20,7 +20,7 @@ const (
 	HoverContextNull = "null"
 )
 
-func GetHoverTargetWithContext(l *logger.Logger, store store.Store, position protocol.Position) (string, string) {
+func GetHoverTargetWithContext(l logger.Logger, store store.Store, position protocol.Position) (string, string) {
 	word := text.GetCursorWord(store.Document, position)
 	if len(word) == 0 {
 		l.Debug(
