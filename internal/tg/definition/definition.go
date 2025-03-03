@@ -5,10 +5,10 @@ package definition
 import (
 	"bufio"
 	"strings"
+	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
 	"go.lsp.dev/protocol"
-	"go.uber.org/zap"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 	DefinitionContextNull = "null"
 )
 
-func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, position protocol.Position) (string, string) {
+func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, position protocol.Position) (string, string) {
 	document := store.Document
 
 	scanner := bufio.NewScanner(strings.NewReader(document))
@@ -50,7 +50,12 @@ func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, pos
 		// Identify configuration blocks
 		block, labels, isBlock := isConfigBlockLine(line)
 		if isBlock {
-			l.Debugf("Found block: %s", block)
+			l.Debug(
+				"Found block",
+				"block", block,
+				"labels", labels,
+				"line", scannedLines,
+			)
 
 			if block == DefinitionContextInclude {
 				definitionContext = DefinitionContextInclude
@@ -64,7 +69,11 @@ func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, pos
 
 		// Check if the current line is the one we're looking for
 		if scannedLines == int(position.Line) {
-			l.Debugf("Hit line %d: %s", position.Line, line)
+			l.Debug(
+				"Hit line",
+				"line", scannedLines,
+				"position", position.Line,
+			)
 
 			lineHit = true
 		}
@@ -78,10 +87,18 @@ func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, pos
 		// The reason we do both checks is that we need to
 		// account for single line block definitions.
 		if line == "}" || (strings.HasSuffix(line, "}") && isBlock) {
-			l.Debugf("End of block: %s, line: %d", block, scannedLines)
+			l.Debug(
+				"End of block",
+				"block", block,
+				"line", scannedLines,
+			)
 
 			if lineHit && definitionContext != "" {
-				l.Debugf("Found target: %s, context: %s", target, definitionContext)
+				l.Debug(
+					"Found target",
+					"target", target,
+					"context", definitionContext,
+				)
 
 				return target, definitionContext
 			}
@@ -93,7 +110,11 @@ func GetDefinitionTargetWithContext(l *zap.SugaredLogger, store store.Store, pos
 		scannedLines++
 	}
 
-	l.Debugf("No target found at %d:%d", position.Line, position.Character)
+	l.Debug(
+		"No target found",
+		"line", position.Line,
+		"character", position.Character,
+	)
 
 	return "", DefinitionContextNull
 }

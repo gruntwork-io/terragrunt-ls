@@ -3,14 +3,14 @@ package completion
 
 import (
 	"strings"
+	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
 	"go.lsp.dev/protocol"
-	"go.uber.org/zap"
 )
 
-func GetCompletions(l *zap.SugaredLogger, store store.Store, position protocol.Position) []protocol.CompletionItem {
+func GetCompletions(l *logger.Logger, store store.Store, position protocol.Position) []protocol.CompletionItem {
 	cursorWord := text.GetCursorWord(store.Document, position)
 	completions := []protocol.CompletionItem{}
 

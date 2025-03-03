@@ -2,32 +2,72 @@
 package logger
 
 import (
-	"log"
-
-	"go.uber.org/zap"
+	"io"
+	"log/slog"
+	"os"
 )
+
+// Logger is a wrapper around slog.Logger that provides additional methods
+type Logger struct {
+	*slog.Logger
+	closer io.Closer
+}
 
 // NewLogger builds the standard logger for terragrunt-ls.
 //
 // When supplied with a filename, it'll create a new file and write logs to it.
 // Otherwise, it'll write logs to stderr.
-func NewLogger(filename string) *zap.Logger {
-	if filename != "" {
-		config := zap.NewDevelopmentConfig()
-		config.OutputPaths = []string{filename}
+func NewLogger(filename string) *Logger {
+	if filename == "" {
+		handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+		logger := slog.New(handler)
 
-		logger, err := config.Build()
-		if err != nil {
-			log.Fatal(err)
+		return &Logger{
+			Logger: logger,
 		}
-
-		return logger
 	}
 
-	logger, err := zap.NewProduction()
+	const readWritePerm = 0666
+
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, readWritePerm)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
 	}
 
-	return logger
+	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+	logger := slog.New(handler)
+
+	return &Logger{
+		Logger: logger,
+		closer: file,
+	}
+}
+
+// Close closes the logger
+func (l *Logger) Close() error {
+	if l.closer != nil {
+		return l.closer.Close()
+	}
+
+	return nil
+}
+
+// Debug logs a debug message
+func (l *Logger) Debug(msg string, args ...interface{}) {
+	l.Logger.Debug(msg, args...)
+}
+
+// Info logs an info message
+func (l *Logger) Info(msg string, args ...interface{}) {
+	l.Logger.Info(msg, args...)
+}
+
+// Error logs an error message
+func (l *Logger) Error(msg string, args ...interface{}) {
+	l.Logger.Error(msg, args...)
 }

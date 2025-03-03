@@ -2,6 +2,7 @@ package tg
 
 import (
 	"strings"
+	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
@@ -13,7 +14,6 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
-	"go.uber.org/zap"
 )
 
 type State struct {
@@ -25,22 +25,34 @@ func NewState() State {
 	return State{Configs: map[string]store.Store{}}
 }
 
-func (s *State) OpenDocument(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	l.Debugf("Opening document: %s", docURI.Filename())
+func (s *State) OpenDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	l.Debug(
+		"Opening document",
+		"uri", docURI,
+		"text", text,
+	)
 
 	return s.updateState(l, docURI, text)
 }
 
-func (s *State) UpdateDocument(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	l.Debugf("Updating document: %s", docURI.Filename())
+func (s *State) UpdateDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	l.Debug(
+		"Updating document",
+		"uri", docURI,
+		"text", text,
+	)
 
 	return s.updateState(l, docURI, text)
 }
 
-func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) updateState(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
 
-	l.Debugf("Config: %v", cfg)
+	l.Debug(
+		"Config",
+		"uri", docURI,
+		"config", cfg,
+	)
 
 	cfgAsCty := cty.NilVal
 
@@ -59,16 +71,34 @@ func (s *State) updateState(l *zap.SugaredLogger, docURI protocol.DocumentURI, t
 	return diags
 }
 
-func (s *State) Hover(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+func (s *State) Hover(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debugf("Hovering over %s at %d:%d", docURI, position.Line, position.Character)
-	l.Debugf("Config: %v", store.Document)
+	l.Debug(
+		"Hovering over character",
+		"uri", docURI,
+		"position", position,
+	)
+
+	l.Debug(
+		"Config",
+		"uri", docURI,
+		"config", store.Cfg,
+	)
 
 	word, context := hover.GetHoverTargetWithContext(l, store, position)
 
-	l.Debugf("Word: %s, Context: %s", word, context)
+	l.Debug(
+		"Hovering with context",
+		"word", word,
+		"context", context,
+	)
 
+	if word == "" {
+		return buildEmptyHoverResponse(id)
+	}
+
+	//nolint:gocritic
 	switch context {
 	case hover.HoverContextLocal:
 		if store.Cfg == nil {
@@ -102,9 +132,6 @@ func (s *State) Hover(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI,
 				},
 			},
 		}
-
-	case hover.HoverContextNull:
-		return buildEmptyHoverResponse(id)
 	}
 
 	return buildEmptyHoverResponse(id)
@@ -123,32 +150,57 @@ func wrapAsHCLCodeFence(s string) string {
 	return "```hcl\n" + s + "\n```"
 }
 
-func (s *State) Definition(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+func (s *State) Definition(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debugf("Jumping to definition from %s at %d:%d", docURI, position.Line, position.Character)
+	l.Debug(
+		"Definition requested",
+		"uri", docURI,
+		"position", position,
+	)
 
 	target, context := definition.GetDefinitionTargetWithContext(l, store, position)
 
-	l.Debugf("Target: %s, Context: %s", target, context)
+	l.Debug(
+		"Definition discovered",
+		"target", target,
+		"context", context,
+	)
 
+	if target == "" {
+		return buildEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	//nolint:gocritic
 	switch context {
 	case definition.DefinitionContextInclude:
-		l.Debugf("Store: %v", store)
+		l.Debug(
+			"Store content",
+			"store", store,
+		)
 
 		if store.Cfg == nil {
 			return buildEmptyDefinitionResponse(id, docURI, position)
 		}
 
-		l.Debugf("Includes: %v", store.Cfg.ProcessedIncludes)
+		l.Debug(
+			"Includes",
+			"includes", store.Cfg.ProcessedIncludes,
+		)
 
 		for _, include := range store.Cfg.ProcessedIncludes {
 			if include.Name == target {
-				l.Debugf("Jumping to %s %s", include.Name, include.Path)
+				l.Debug(
+					"Jumping to target",
+					"include", include,
+				)
 
 				defURI := uri.File(include.Path)
 
-				l.Debugf("URI: %s", defURI)
+				l.Debug(
+					"URI of target",
+					"URI", defURI,
+				)
 
 				return lsp.DefinitionResponse{
 					Response: lsp.Response{
@@ -171,17 +223,11 @@ func (s *State) Definition(l *zap.SugaredLogger, id int, docURI protocol.Documen
 				}
 			}
 		}
-
-	case definition.DefinitionContextNull:
-		return buildEmptyDefinitionResponse(id, docURI, position)
 	}
 
 	return buildEmptyDefinitionResponse(id, docURI, position)
 }
 
-// NOTE: I think I'm supposed to be able to return a null response here,
-// but I'm getting errors when I try to do that.
-// Instead, I'm returning the same location I started from.
 func buildEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	return lsp.DefinitionResponse{
 		Response: lsp.Response{
@@ -191,20 +237,14 @@ func buildEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position 
 		Result: protocol.Location{
 			URI: docURI,
 			Range: protocol.Range{
-				Start: protocol.Position{
-					Line:      position.Line,
-					Character: position.Character,
-				},
-				End: protocol.Position{
-					Line:      position.Line,
-					Character: position.Character,
-				},
+				Start: position,
+				End:   position,
 			},
 		},
 	}
 }
 
-func (s *State) TextDocumentCompletion(l *zap.SugaredLogger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
+func (s *State) TextDocumentCompletion(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
 	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position)
 
 	response := lsp.CompletionResponse{
