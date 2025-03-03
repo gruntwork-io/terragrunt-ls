@@ -21,7 +21,7 @@ const (
 	DefinitionContextNull = "null"
 )
 
-func GetDefinitionTargetWithContext(l *logger.Logger, store store.Store, position protocol.Position) (string, string) {
+func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position protocol.Position) (string, string) {
 	document := store.Document
 
 	scanner := bufio.NewScanner(strings.NewReader(document))

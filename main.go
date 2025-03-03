@@ -45,7 +45,7 @@ func main() {
 	}
 }
 
-func handleMessage(l *logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
+func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
 	l.Debug("Received msg", "method", method, "contents", string(contents))
 
 	switch method {
@@ -207,7 +207,7 @@ func handleMessage(l *logger.Logger, writer io.Writer, state tg.State, method st
 	}
 }
 
-func writeResponse(l *logger.Logger, writer io.Writer, msg any) {
+func writeResponse(l logger.Logger, writer io.Writer, msg any) {
 	reply := rpc.EncodeMessage(msg)
 
 	_, err := writer.Write([]byte(reply))

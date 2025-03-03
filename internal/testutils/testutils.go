@@ -2,6 +2,7 @@
 package testutils
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -9,7 +10,15 @@ import (
 	"testing"
 )
 
-func NewTestLogger(t *testing.T) *logger.Logger {
+var _ logger.Logger = &testLogger{}
+
+// Logger is a wrapper around slog.Logger that provides additional methods
+type testLogger struct {
+	*slog.Logger
+	closer io.Closer
+}
+
+func NewTestLogger(t *testing.T) *testLogger {
 	t.Helper()
 
 	// Create a test logger that writes to the test log
@@ -20,7 +29,7 @@ func NewTestLogger(t *testing.T) *logger.Logger {
 	slogger := slog.New(handler)
 
 	// Create a new logger with the test writer
-	return &logger.Logger{
+	return &testLogger{
 		Logger: slogger,
 	}
 }
@@ -53,4 +62,28 @@ func CreateFileWithMode(dir, name, content string, mode os.FileMode) (string, er
 	}
 
 	return path, nil
+}
+
+// Close closes the logger
+func (l *testLogger) Close() error {
+	if l.closer != nil {
+		return l.closer.Close()
+	}
+
+	return nil
+}
+
+// Debug logs a debug message
+func (l *testLogger) Debug(msg string, args ...interface{}) {
+	l.Logger.Debug(msg, args...)
+}
+
+// Info logs an info message
+func (l *testLogger) Info(msg string, args ...interface{}) {
+	l.Logger.Info(msg, args...)
+}
+
+// Error logs an error message
+func (l *testLogger) Error(msg string, args ...interface{}) {
+	l.Logger.Error(msg, args...)
 }

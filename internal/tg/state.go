@@ -25,7 +25,7 @@ func NewState() State {
 	return State{Configs: map[string]store.Store{}}
 }
 
-func (s *State) OpenDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) OpenDocument(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Opening document",
 		"uri", docURI,
@@ -35,7 +35,7 @@ func (s *State) OpenDocument(l *logger.Logger, docURI protocol.DocumentURI, text
 	return s.updateState(l, docURI, text)
 }
 
-func (s *State) UpdateDocument(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) UpdateDocument(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Updating document",
 		"uri", docURI,
@@ -45,7 +45,7 @@ func (s *State) UpdateDocument(l *logger.Logger, docURI protocol.DocumentURI, te
 	return s.updateState(l, docURI, text)
 }
 
-func (s *State) updateState(l *logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
 
 	l.Debug(
@@ -71,7 +71,7 @@ func (s *State) updateState(l *logger.Logger, docURI protocol.DocumentURI, text 
 	return diags
 }
 
-func (s *State) Hover(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
 	store := s.Configs[docURI.Filename()]
 
 	l.Debug(
@@ -150,7 +150,7 @@ func wrapAsHCLCodeFence(s string) string {
 	return "```hcl\n" + s + "\n```"
 }
 
-func (s *State) Definition(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	store := s.Configs[docURI.Filename()]
 
 	l.Debug(
@@ -244,7 +244,7 @@ func buildEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position 
 	}
 }
 
-func (s *State) TextDocumentCompletion(l *logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
+func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
 	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position)
 
 	response := lsp.CompletionResponse{
