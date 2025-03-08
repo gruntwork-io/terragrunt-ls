@@ -20,10 +20,23 @@ func parseTerragruntBuffer(filename, text string) (*config.TerragruntConfig, []p
 		}),
 	}
 
-	opts := options.NewTerragruntOptions()
+	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
+	if err != nil {
+		return nil, []protocol.Diagnostic{
+			{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: 0, Character: 0},
+					End:   protocol.Position{Line: 0, Character: 0},
+				},
+				Message:  err.Error(),
+				Severity: protocol.DiagnosticSeverityError,
+				Source:   "HCL",
+			},
+		}
+	}
+
 	opts.SkipOutput = true
 	opts.NonInteractive = true
-	opts.TerragruntConfigPath = filename
 
 	ctx := config.NewParsingContext(context.TODO(), opts)
 	ctx.ParserOptions = parseOptions
