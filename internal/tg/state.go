@@ -95,22 +95,22 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 	)
 
 	if word == "" {
-		return buildEmptyHoverResponse(id)
+		return newEmptyHoverResponse(id)
 	}
 
 	//nolint:gocritic
 	switch context {
 	case hover.HoverContextLocal:
 		if store.Cfg == nil {
-			return buildEmptyHoverResponse(id)
+			return newEmptyHoverResponse(id)
 		}
 
 		if _, ok := store.Cfg.Locals[word]; !ok {
-			return buildEmptyHoverResponse(id)
+			return newEmptyHoverResponse(id)
 		}
 
 		if store.CfgAsCty.IsNull() {
-			return buildEmptyHoverResponse(id)
+			return newEmptyHoverResponse(id)
 		}
 
 		locals := store.CfgAsCty.GetAttr("locals")
@@ -134,10 +134,10 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 		}
 	}
 
-	return buildEmptyHoverResponse(id)
+	return newEmptyHoverResponse(id)
 }
 
-func buildEmptyHoverResponse(id int) lsp.HoverResponse {
+func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	return lsp.HoverResponse{
 		Response: lsp.Response{
 			RPC: lsp.RPCVersion,
@@ -168,7 +168,7 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 	)
 
 	if target == "" {
-		return buildEmptyDefinitionResponse(id, docURI, position)
+		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
 	//nolint:gocritic
@@ -180,7 +180,7 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		)
 
 		if store.Cfg == nil {
-			return buildEmptyDefinitionResponse(id, docURI, position)
+			return newEmptyDefinitionResponse(id, docURI, position)
 		}
 
 		l.Debug(
@@ -225,10 +225,10 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		}
 	}
 
-	return buildEmptyDefinitionResponse(id, docURI, position)
+	return newEmptyDefinitionResponse(id, docURI, position)
 }
 
-func buildEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	return lsp.DefinitionResponse{
 		Response: lsp.Response{
 			RPC: lsp.RPCVersion,
@@ -256,4 +256,57 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 	}
 
 	return response
+}
+
+func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.DocumentURI) lsp.FormatResponse {
+	store := s.Configs[docURI.Filename()]
+
+	l.Debug(
+		"Formatting requested",
+		"uri", docURI,
+	)
+
+	if store.Cfg == nil {
+		return newEmptyFormatResponse(id)
+	}
+
+	formatted := hclwrite.Format([]byte(store.Document))
+
+	return lsp.FormatResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: []protocol.TextEdit{
+			{
+				Range: protocol.Range{
+					Start: protocol.Position{
+						Line:      0,
+						Character: 0,
+					},
+					End: getEndOfDocument(store.Document),
+				},
+				NewText: string(formatted),
+			},
+		},
+	}
+}
+
+func newEmptyFormatResponse(id int) lsp.FormatResponse {
+	return lsp.FormatResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: []protocol.TextEdit{},
+	}
+}
+
+func getEndOfDocument(doc string) protocol.Position {
+	lines := strings.Split(doc, "\n")
+
+	return protocol.Position{
+		Line:      uint32(len(lines) - 1),
+		Character: uint32(len(lines[len(lines)-1])),
+	}
 }
