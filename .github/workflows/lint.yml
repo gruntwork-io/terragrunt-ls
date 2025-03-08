@@ -21,6 +21,9 @@ jobs:
         echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
+        # TODO: Make this less brittle.
+        echo "golanci-lint-cache=/home/runner/.cache/golangci-lint" >> "$GITHUB_OUTPUT"
+
     - name: Go Build Cache
       uses: actions/cache@v4
       with:
@@ -32,6 +35,12 @@ jobs:
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: golangci-lint Cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ steps.go-cache-paths.outputs.golanci-lint-cache }}
+        key: ${{ runner.os }}-golangci-lint-${{ hashFiles('**/go.sum') }}
 
     - name: Lint
       run: golangci-lint run ./...
