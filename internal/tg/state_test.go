@@ -3,6 +3,7 @@ package tg_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terragrunt/codegen"
@@ -533,6 +534,71 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 
 			completion := state.TextDocumentCompletion(l, 1, "file:///foo/bar.hcl", tt.position)
 			assert.Equal(t, tt.expected, completion)
+		})
+	}
+}
+
+func TestState_TextDocumentFormatting(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name     string
+		document string
+		expected string
+	}{
+		{
+			name:     "empty document",
+			document: "",
+			expected: "",
+		},
+		{
+			name: "unformatted locals",
+			document: `locals{
+foo="bar"
+bar=   "baz"
+}`,
+			expected: `locals {
+  foo = "bar"
+  bar = "baz"
+}`,
+		},
+		{
+			name: "already formatted locals",
+			document: `locals {
+  foo = "bar"
+  bar = "baz"
+}`,
+			expected: `locals {
+  foo = "bar"
+  bar = "baz"
+}`,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			state := tg.NewState()
+			l := testutils.NewTestLogger(t)
+
+			// First open the document to populate the state
+			diags := state.OpenDocument(l, "file:///test.hcl", tt.document)
+			require.Empty(t, diags)
+
+			// Request formatting
+			response := state.TextDocumentFormatting(l, 1, "file:///test.hcl")
+
+			// Verify the formatting result
+			require.Len(t, response.Result, 1)
+			assert.Equal(t, tt.expected, response.Result[0].NewText)
+
+			assert.Equal(t, uint32(0), response.Result[0].Range.Start.Line)
+			assert.Equal(t, uint32(0), response.Result[0].Range.Start.Character)
+
+			lines := strings.Split(tt.document, "\n")
+			assert.Equal(t, uint32(len(lines)-1), response.Result[0].Range.End.Line)
+			assert.Equal(t, uint32(len(lines[len(lines)-1])), response.Result[0].Range.End.Character)
 		})
 	}
 }
