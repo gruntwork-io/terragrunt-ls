@@ -83,6 +83,11 @@ func (l *testLogger) Info(msg string, args ...interface{}) {
 	l.Logger.Info(msg, args...)
 }
 
+// Warn logs a warning message
+func (l *testLogger) Warn(msg string, args ...interface{}) {
+	l.Logger.Warn(msg, args...)
+}
+
 // Error logs an error message
 func (l *testLogger) Error(msg string, args ...interface{}) {
 	l.Logger.Error(msg, args...)

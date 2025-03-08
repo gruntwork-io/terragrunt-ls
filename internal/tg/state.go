@@ -1,6 +1,8 @@
 package tg
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
@@ -196,6 +198,72 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 				)
 
 				defURI := uri.File(include.Path)
+
+				l.Debug(
+					"URI of target",
+					"URI", defURI,
+				)
+
+				return lsp.DefinitionResponse{
+					Response: lsp.Response{
+						RPC: lsp.RPCVersion,
+						ID:  &id,
+					},
+					Result: protocol.Location{
+						URI: defURI,
+						Range: protocol.Range{
+							Start: protocol.Position{
+								Line:      0,
+								Character: 0,
+							},
+							End: protocol.Position{
+								Line:      0,
+								Character: 0,
+							},
+						},
+					},
+				}
+			}
+		}
+	case definition.DefinitionContextDependency:
+		l.Debug(
+			"Store content",
+			"store", store,
+		)
+
+		if store.Cfg == nil {
+			return newEmptyDefinitionResponse(id, docURI, position)
+		}
+
+		l.Debug(
+			"Dependencies",
+			"dependencies", store.Cfg.TerragruntDependencies,
+		)
+
+		for _, dep := range store.Cfg.TerragruntDependencies {
+			if dep.Name == target {
+				l.Debug(
+					"Jumping to target",
+					"dependency", dep,
+				)
+
+				path := dep.ConfigPath.AsString()
+
+				defURI := uri.File(path)
+				if !filepath.IsAbs(path) {
+					defURI = uri.File(filepath.Join(filepath.Dir(docURI.Filename()), path, "terragrunt.hcl"))
+				}
+
+				_, err := os.Stat(defURI.Filename())
+				if err != nil {
+					l.Warn(
+						"Dependency does not exist",
+						"dependency", dep,
+						"error", err,
+					)
+
+					return newEmptyDefinitionResponse(id, docURI, position)
+				}
 
 				l.Debug(
 					"URI of target",

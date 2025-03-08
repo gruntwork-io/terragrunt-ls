@@ -304,6 +304,17 @@ func TestState_Definition(t *testing.T) {
 
 	rootURI := uri.File(filepath.Join(tmpDir, "root.hcl"))
 
+	// Create a vpc directory
+	vpcDir := filepath.Join(tmpDir, "vpc")
+	err = os.MkdirAll(vpcDir, 0755)
+	require.NoError(t, err)
+
+	// Create a terragrunt.hcl file in the vpc directory
+	_, err = testutils.CreateFile(vpcDir, "terragrunt.hcl", "")
+	require.NoError(t, err)
+
+	vpcURI := uri.File(filepath.Join(vpcDir, "terragrunt.hcl"))
+
 	unitDir := filepath.Join(tmpDir, "foo")
 
 	err = os.MkdirAll(unitDir, 0755)
@@ -366,6 +377,35 @@ func TestState_Definition(t *testing.T) {
 				},
 				Result: protocol.Location{
 					URI: rootURI,
+					Range: protocol.Range{
+						Start: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+						End: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "go to dependency",
+			document: `dependency "vpc" {
+    config_path = "../vpc"
+}`,
+			position: protocol.Position{
+				Line:      1,
+				Character: 18,
+			},
+			expected: lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: "2.0",
+					ID:  testutils.PointerOfInt(1),
+				},
+				Result: protocol.Location{
+					URI: vpcURI,
 					Range: protocol.Range{
 						Start: protocol.Position{
 							Line:      0,

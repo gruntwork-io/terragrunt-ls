@@ -16,6 +16,10 @@ const (
 	// This means that the user is trying to find the definition of an include.
 	DefinitionContextInclude = "include"
 
+	// DefinitionContextDependency is the context for a dependency definition.
+	// This means that the user is trying to find the definition of a dependency.
+	DefinitionContextDependency = "dependency"
+
 	// DefinitionContextNull is the context for a null definition.
 	// This means that the user is trying to go to the definition of nothing useful.
 	DefinitionContextNull = "null"
@@ -57,10 +61,19 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 				"line", scannedLines,
 			)
 
-			if block == DefinitionContextInclude {
+			switch block {
+			case DefinitionContextInclude:
 				definitionContext = DefinitionContextInclude
 
 				// Includes can have zero labels
+				if len(labels) > 0 {
+					target = labels[0]
+				}
+			case DefinitionContextDependency:
+				definitionContext = DefinitionContextDependency
+
+				// Dependencies shouldn't have zero labels,
+				// but we'll check anyway.
 				if len(labels) > 0 {
 					target = labels[0]
 				}
@@ -89,7 +102,8 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 		if line == "}" || (strings.HasSuffix(line, "}") && isBlock) {
 			l.Debug(
 				"End of block",
-				"block", block,
+				"lineHit", lineHit,
+				"context", definitionContext,
 				"line", scannedLines,
 			)
 
