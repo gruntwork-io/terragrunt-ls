@@ -223,6 +223,56 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 				}
 			}
 		}
+	case definition.DefinitionContextDependency:
+		l.Debug(
+			"Store content",
+			"store", store,
+		)
+
+		if store.Cfg == nil {
+			return newEmptyDefinitionResponse(id, docURI, position)
+		}
+
+		l.Debug(
+			"Dependencies",
+			"dependencies", store.Cfg.TerragruntDependencies,
+		)
+
+		for _, dep := range store.Cfg.TerragruntDependencies {
+			if dep.Name == target {
+				l.Debug(
+					"Jumping to target",
+					"dependency", dep,
+				)
+
+				defURI := uri.File(dep.ConfigPath.AsString())
+
+				l.Debug(
+					"URI of target",
+					"URI", defURI,
+				)
+
+				return lsp.DefinitionResponse{
+					Response: lsp.Response{
+						RPC: lsp.RPCVersion,
+						ID:  &id,
+					},
+					Result: protocol.Location{
+						URI: defURI,
+						Range: protocol.Range{
+							Start: protocol.Position{
+								Line:      0,
+								Character: 0,
+							},
+							End: protocol.Position{
+								Line:      0,
+								Character: 0,
+							},
+						},
+					},
+				}
+			}
+		}
 	}
 
 	return newEmptyDefinitionResponse(id, docURI, position)
