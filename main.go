@@ -204,6 +204,25 @@ func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method str
 		)
 
 		writeResponse(l, writer, response)
+
+	case protocol.MethodTextDocumentFormatting:
+		var request lsp.FormatRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Error(
+				"Failed to parse format request",
+				"error",
+				err,
+			)
+		}
+
+		l.Debug(
+			"Formatting",
+			"URI", request.Params.TextDocument.URI,
+		)
+
+		response := state.TextDocumentFormatting(l, request.ID, request.Params.TextDocument.URI)
+
+		writeResponse(l, writer, response)
 	}
 }
 

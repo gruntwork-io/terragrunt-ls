@@ -25,10 +25,11 @@ func NewInitializeResponse(id int) InitializeResponse {
 		},
 		Result: protocol.InitializeResult{
 			Capabilities: protocol.ServerCapabilities{
-				TextDocumentSync:   1,
-				HoverProvider:      true,
-				DefinitionProvider: true,
-				CompletionProvider: &protocol.CompletionOptions{},
+				TextDocumentSync:           1,
+				HoverProvider:              true,
+				DefinitionProvider:         true,
+				CompletionProvider:         &protocol.CompletionOptions{},
+				DocumentFormattingProvider: true,
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    name,
