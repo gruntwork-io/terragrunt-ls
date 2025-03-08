@@ -19,6 +19,7 @@ type Logger interface {
 	Close() error
 	Debug(msg string, args ...interface{})
 	Info(msg string, args ...interface{})
+	Warn(msg string, args ...interface{})
 	Error(msg string, args ...interface{})
 }
 
@@ -74,6 +75,11 @@ func (l *slogLogger) Debug(msg string, args ...interface{}) {
 // Info logs an info message
 func (l *slogLogger) Info(msg string, args ...interface{}) {
 	l.Logger.Info(msg, args...)
+}
+
+// Warn logs a warning message
+func (l *slogLogger) Warn(msg string, args ...interface{}) {
+	l.Logger.Warn(msg, args...)
 }
 
 // Error logs an error message

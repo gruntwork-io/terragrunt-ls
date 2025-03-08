@@ -1,6 +1,8 @@
 package tg
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
@@ -245,7 +247,23 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 					"dependency", dep,
 				)
 
-				defURI := uri.File(dep.ConfigPath.AsString())
+				path := dep.ConfigPath.AsString()
+
+				defURI := uri.File(path)
+				if !filepath.IsAbs(path) {
+					defURI = uri.File(filepath.Join(filepath.Dir(docURI.Filename()), path, "terragrunt.hcl"))
+				}
+
+				_, err := os.Stat(defURI.Filename())
+				if err != nil {
+					l.Warn(
+						"Dependency does not exist",
+						"dependency", dep,
+						"error", err,
+					)
+
+					return newEmptyDefinitionResponse(id, docURI, position)
+				}
 
 				l.Debug(
 					"URI of target",
