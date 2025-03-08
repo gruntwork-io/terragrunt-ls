@@ -266,10 +266,6 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 		"uri", docURI,
 	)
 
-	if store.Cfg == nil {
-		return newEmptyFormatResponse(id)
-	}
-
 	formatted := hclwrite.Format([]byte(store.Document))
 
 	return lsp.FormatResponse{
@@ -289,16 +285,6 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 				NewText: string(formatted),
 			},
 		},
-	}
-}
-
-func newEmptyFormatResponse(id int) lsp.FormatResponse {
-	return lsp.FormatResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
-		Result: []protocol.TextEdit{},
 	}
 }
 
