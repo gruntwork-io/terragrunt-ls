@@ -38,6 +38,17 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 			expectedTarget:  "root",
 			expectedContext: "include",
 		},
+		{
+			name: "dependency definition",
+			store: store.Store{
+				Document: `dependency "vpc" {
+	config_path = "../vpc"
+}`,
+			},
+			position:        protocol.Position{Line: 0, Character: 0},
+			expectedTarget:  "vpc",
+			expectedContext: "dependency",
+		},
 	}
 
 	for _, tt := range tc {
