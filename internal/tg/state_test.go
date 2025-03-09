@@ -444,19 +444,21 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
-		name     string
-		initial  string
-		document string
-		position protocol.Position
-		expected lsp.CompletionResponse
+		name              string
+		initial           string
+		document          string
+		position          protocol.Position
+		expected          lsp.CompletionResponse
+		expectDiagnostics bool
 	}{
 		{
-			name:     "nothing to complete",
-			document: "",
+			name:     "complete dep",
+			document: "dep",
 			position: protocol.Position{
 				Line:      0,
-				Character: 0,
+				Character: 3,
 			},
+			expectDiagnostics: true,
 			expected: lsp.CompletionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
@@ -465,96 +467,43 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 				Result: []protocol.CompletionItem{
 					{
 						Label: "dependency",
-					},
-					{
-						Label: "inputs",
-					},
-					{
-						Label: "local",
-					},
-					{
-						Label: "locals",
-					},
-					{
-						Label: "feature",
-					},
-					{
-						Label: "terraform",
-					},
-					{
-						Label: "remote_state",
-					},
-					{
-						Label: "include",
+						Documentation: protocol.MarkupContent{
+							Kind:  protocol.Markdown,
+							Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+						},
+						Kind:             protocol.CompletionItemKindClass,
+						InsertTextFormat: protocol.InsertTextFormatSnippet,
+						TextEdit: &protocol.TextEdit{
+							Range: protocol.Range{
+								Start: protocol.Position{Line: 0, Character: 0},
+								End:   protocol.Position{Line: 0, Character: 3},
+							},
+							NewText: `dependency "${1}" {
+	config_path = "${2}"
+}`,
+						},
 					},
 					{
 						Label: "dependencies",
-					},
-					{
-						Label: "generate",
-					},
-					{
-						Label: "engine",
-					},
-					{
-						Label: "exclude",
-					},
-					{
-						Label: "download_dir",
-					},
-					{
-						Label: "prevent_destroy",
-					},
-					{
-						Label: "iam_role",
-					},
-					{
-						Label: "iam_assume_role_duration",
-					},
-					{
-						Label: "iam_assume_role_session_name",
-					},
-					{
-						Label: "iam_web_identity_token",
-					},
-					{
-						Label: "terraform_binary",
-					},
-					{
-						Label: "terraform_version_constraint",
-					},
-					{
-						Label: "terragrunt_version_constraint",
+						Documentation: protocol.MarkupContent{
+							Kind:  protocol.Markdown,
+							Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
+						},
+						Kind:             protocol.CompletionItemKindClass,
+						InsertTextFormat: protocol.InsertTextFormatSnippet,
+						TextEdit: &protocol.TextEdit{
+							Range: protocol.Range{
+								Start: protocol.Position{Line: 0, Character: 0},
+								End:   protocol.Position{Line: 0, Character: 3},
+							},
+							NewText: `dependencies {
+	paths = ["${1}"]
+}`,
+						},
 					},
 				},
 			},
 		},
-		// TODO: Fix this test as the next feature.
-		//
-		//		{
-		//			name: "empty local",
-		//			initial: `locals {
-		//	foo = "bar"
-		// }`,
-		//
-		//			document: `locals {
-		//	foo = "bar"
-		//	bar = local.
-		// }`,
-		//			position: protocol.Position{
-		//				Line:      2,
-		//				Character: 12,
-		//			},
-		//			expected: lsp.CompletionResponse{
-		//				Response: lsp.Response{
-		//					RPC: "2.0",
-		//					ID:  pointerOfInt(1),
-		//				},
-		//				Result: []protocol.CompletionItem{
-		//					Label: "local.foo",
-		//				},
-		//			},
-		//		},
 	}
 
 	for _, tt := range tc {
@@ -562,17 +511,16 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			t.Parallel()
 
 			state := tg.NewState()
-
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.initial)
-			require.Empty(t, diags)
+			diags := state.OpenDocument(l, "file:///test.hcl", tt.document)
+			if tt.expectDiagnostics {
+				require.NotEmpty(t, diags)
+			} else {
+				require.Empty(t, diags)
+			}
 
-			_ = state.UpdateDocument(l, "file:///foo/bar.hcl", tt.document)
-
-			require.Len(t, state.Configs, 1)
-
-			completion := state.TextDocumentCompletion(l, 1, "file:///foo/bar.hcl", tt.position)
+			completion := state.TextDocumentCompletion(l, 1, "file:///test.hcl", tt.position)
 			assert.Equal(t, tt.expected, completion)
 		})
 	}

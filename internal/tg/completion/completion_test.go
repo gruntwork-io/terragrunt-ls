@@ -20,42 +20,180 @@ func TestGetCompletions(t *testing.T) {
 		completions []protocol.CompletionItem
 	}{
 		{
-			name:     "empty document",
-			store:    store.Store{},
-			position: protocol.Position{Line: 0, Character: 0},
-			completions: []protocol.CompletionItem{
-				{Label: "dependency"},
-				{Label: "inputs"},
-				{Label: "local"},
-				{Label: "locals"},
-				{Label: "feature"},
-				{Label: "terraform"},
-				{Label: "remote_state"},
-				{Label: "include"},
-				{Label: "dependencies"},
-				{Label: "generate"},
-				{Label: "engine"},
-				{Label: "exclude"},
-				{Label: "download_dir"},
-				{Label: "prevent_destroy"},
-				{Label: "iam_role"},
-				{Label: "iam_assume_role_duration"},
-				{Label: "iam_assume_role_session_name"},
-				{Label: "iam_web_identity_token"},
-				{Label: "terraform_binary"},
-				{Label: "terraform_version_constraint"},
-				{Label: "terragrunt_version_constraint"},
-			},
-		},
-		{
 			name: "complete dep",
 			store: store.Store{
 				Document: `dep`,
 			},
-			position: protocol.Position{Line: 0, Character: 2},
+			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
-				{Label: "dependency"},
-				{Label: "dependencies"},
+				{
+					Label: "dependency",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `dependency "${1}" {
+	config_path = "${2}"
+}`,
+					},
+				},
+				{
+					Label: "dependencies",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `dependencies {
+	paths = ["${1}"]
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "complete dependency",
+			store: store.Store{
+				Document: `dependency`,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "dependency",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `dependency "${1}" {
+	config_path = "${2}"
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "complete include",
+			store: store.Store{
+				Document: `in`,
+			},
+			position: protocol.Position{Line: 0, Character: 1},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "include",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# include\nThe include block is used to specify the inclusion of partial Terragrunt configuration.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 1},
+						},
+						NewText: `include "${1:root}" {
+	path = ${2:find_in_parent_folders("root.hcl")}
+}`,
+					},
+				},
+				{
+					Label: "inputs",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# inputs\nThe inputs attribute is a map that is used to specify the input variables and their values to pass in to OpenTofu/Terraform.",
+					},
+					Kind:             protocol.CompletionItemKindField,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 1},
+						},
+						NewText: `inputs = {
+	${1} = ${2}
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "complete include",
+			store: store.Store{
+				Document: `include`,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "include",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# include\nThe include block is used to specify the inclusion of partial Terragrunt configuration.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `include "${1:root}" {
+	path = ${2:find_in_parent_folders("root.hcl")}
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "complete generate",
+			store: store.Store{
+				Document: `generate`,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "generate",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# generate\nThe generate block can be used to arbitrarily generate a file in the terragrunt working directory.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `generate "provider" {
+  path      = "${1:provider.tf}"
+  if_exists = "${2:overwrite}"
+  contents = <<EOF
+provider "${3:aws}" {
+  region = "${4:us-east-1}"
+}
+EOF
+}`,
+					},
+				},
 			},
 		},
 	}

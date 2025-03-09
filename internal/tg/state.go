@@ -10,6 +10,7 @@ import (
 	"terragrunt-ls/internal/tg/definition"
 	"terragrunt-ls/internal/tg/hover"
 	"terragrunt-ls/internal/tg/store"
+	"terragrunt-ls/internal/tg/text"
 
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -130,7 +131,7 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 			Result: lsp.HoverResult{
 				Contents: protocol.MarkupContent{
 					Kind:  protocol.Markdown,
-					Value: wrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
+					Value: text.WrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
 				},
 			},
 		}
@@ -146,10 +147,6 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 			ID:  &id,
 		},
 	}
-}
-
-func wrapAsHCLCodeFence(s string) string {
-	return "```hcl\n" + s + "\n```"
 }
 
 func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
