@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"terragrunt-ls/internal/testutils"
+	"terragrunt-ls/internal/tg"
 	"testing"
 
 	"github.com/gruntwork-io/terragrunt/config"
@@ -89,7 +90,7 @@ inputs = {
 			filename := tt.setup(t, tmpDir)
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := ParseTerragruntBuffer(l, filename, tt.content)
+			cfg, diags := tg.ParseTerragruntBuffer(l, filename, tt.content)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")
