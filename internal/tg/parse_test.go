@@ -58,6 +58,10 @@ terraform {
 			content: `
 dependency "base" {
   config_path = "../base"
+
+  mock_outputs = {
+    vpc_id = "vpc-1234567890"
+  }
 }
 
 terraform {
