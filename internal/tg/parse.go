@@ -44,7 +44,11 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 	ctx := config.NewParsingContext(context.TODO(), opts)
 	ctx.ParserOptions = parseOptions
 
-	cfg, _ := config.ParseConfigString(ctx, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, filename, text, nil)
+	if err != nil {
+		// Just log the error for now
+		l.Error("Error parsing Terragrunt config", "error", err)
+	}
 
 	filteredDiags := filterHCLDiags(l, parseDiags, filename)
 
