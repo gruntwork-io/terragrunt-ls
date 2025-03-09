@@ -49,7 +49,7 @@ func (s *State) UpdateDocument(l logger.Logger, docURI protocol.DocumentURI, tex
 }
 
 func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	cfg, diags := parseTerragruntBuffer(docURI.Filename(), text)
+	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
 		"Config",

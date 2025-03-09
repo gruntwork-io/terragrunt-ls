@@ -2,6 +2,10 @@ package tg
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
+
+	"terragrunt-ls/internal/logger"
 
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/gruntwork-io/terragrunt/config/hclparse"
@@ -10,7 +14,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func parseTerragruntBuffer(filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	var parseDiags hcl.Diagnostics
 
 	parseOptions := []hclparse.Option{
@@ -41,11 +45,91 @@ func parseTerragruntBuffer(filename, text string) (*config.TerragruntConfig, []p
 	ctx := config.NewParsingContext(context.TODO(), opts)
 	ctx.ParserOptions = parseOptions
 
-	cfg, _ := config.ParseConfigString(ctx, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, filename, text, nil)
+	if err != nil {
+		// Just log the error for now
+		l.Error("Error parsing Terragrunt config", "error", err)
+	}
 
-	diags := hclDiagsToLSPDiags(parseDiags)
+	filteredDiags := filterHCLDiags(l, parseDiags, filename)
+
+	diags := hclDiagsToLSPDiags(filteredDiags)
 
 	return cfg, diags
+}
+
+func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl.Diagnostics {
+	filtered := hcl.Diagnostics{}
+
+	for _, diag := range diags {
+		l.Debug(
+			"Checking to see diag can be filtered.",
+			"diag", diag,
+			"filename", filename,
+		)
+
+		if isMissingOutputDiag(diag) {
+			l.Debug(
+				"Filtering output missing diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if isParentFileNotFoundDiag(diag) {
+			l.Debug(
+				"Filtering parent file not found diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if diag.Subject.Filename == filename {
+			filtered = append(filtered, diag)
+		}
+	}
+
+	return filtered
+}
+
+const (
+	// UnsupportedAttributeSummary is the summary for an unsupported attribute diagnostic.
+	UnsupportedAttributeSummary = "Unsupported attribute"
+
+	// OutputsMissingDetail is the detail for a missing outputs attribute diagnostic.
+	OutputsMissingDetail = "This object does not have an attribute named \"outputs\"."
+)
+
+func isMissingOutputDiag(diag *hcl.Diagnostic) bool {
+	if diag.Summary != UnsupportedAttributeSummary {
+		return false
+	}
+
+	if filepath.Base(diag.Subject.Filename) == "terragrunt.hcl" {
+		return false
+	}
+
+	return diag.Detail == OutputsMissingDetail
+}
+
+const (
+	// ErrorInFunctionCallSummary is the summary for an error in a function call diagnostic.
+	ErrorInFunctionCallSummary = "Error in function call"
+
+	// ParentFileNotFoundErrorDetailPartial is the partial detail for a parent file not found diagnostic.
+	ParentFileNotFoundErrorDetailPartial = `Call to function "find_in_parent_folders" failed: ParentFileNotFoundError`
+)
+
+func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
+	if diag.Summary != ErrorInFunctionCallSummary {
+		return false
+	}
+
+	return strings.HasPrefix(diag.Detail, ParentFileNotFoundErrorDetailPartial)
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
@@ -65,7 +149,7 @@ func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 			},
 			Severity: protocol.DiagnosticSeverity(diag.Severity),
 			Source:   "HCL",
-			Message:  diag.Summary,
+			Message:  diag.Summary + ": " + diag.Detail,
 		})
 	}
 
