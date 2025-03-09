@@ -34,3 +34,7 @@ func GetCursorWord(document string, position protocol.Position) string {
 func isWordChar(c byte) bool {
 	return c == '_' || c == '.' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
+
+func WrapAsHCLCodeFence(s string) string {
+	return "```hcl\n" + s + "\n```"
+}
