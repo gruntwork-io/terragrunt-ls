@@ -13,7 +13,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func parseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	var parseDiags hcl.Diagnostics
 
 	parseOptions := []hclparse.Option{
