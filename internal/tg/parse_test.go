@@ -13,7 +13,7 @@ import (
 )
 
 func TestParseTerragruntBuffer(t *testing.T) {
-        t.Parallel()
+	t.Parallel()
 	
 	tests := []struct {
 		name     string
@@ -81,7 +81,7 @@ inputs = {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-                        t.Parallel()
+			t.Parallel()
 			
 			// Create temporary directory for test
 			tmpDir := t.TempDir()
