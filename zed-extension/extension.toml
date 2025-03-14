@@ -1,0 +1,16 @@
+id = "terragrunt-ls"
+name = "Terragrunt"
+version = "0.0.1"
+schema_version = 1
+authors = ["Tomasz Warczykowski <tomasz.warczykowski@silksh.pl>"]
+description = "Terragrunt Language Server"
+repository = "https://github.com/gruntwork-io/terragrunt-ls/zed-extension"
+
+[language_servers.terragrunt]
+name = "Terragrunt LSP"
+languages = ["Terragrunt"]
+language_ids = { Terragrunt = "terragrunt" }
+
+[grammars.hcl]
+repository = "https://github.com/tree-sitter-grammars/tree-sitter-hcl"
+commit = "9e3ec9848f28d26845ba300fd73c740459b83e9b"
