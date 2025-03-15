@@ -4,12 +4,16 @@
 
 ## Configuration
 
-By default this extension will recongize only `terragrunt.hcl` and `terragrunt.stack.hcl` as Terragrunt file. You can configure following setting to treat all `.hcl` as Terragrunt files:
+By default this extension will only recognize all HCL files as valid Terragrunt configuration files. You can configure the following setting to adjust this:
 
 ```json
 {
   "file_types": {
-    "Terragrunt": ["*.hcl"]
+    "Terragrunt": [
+      "terragrunt.hcl", 
+      "terragrunt.stack.hcl",
+      "root.hcl"
+    ]
   }
 }
 ```
