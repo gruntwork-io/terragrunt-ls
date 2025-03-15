@@ -3,11 +3,16 @@ package testutils
 
 import (
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"terragrunt-ls/internal/logger"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var _ logger.Logger = &testLogger{}
@@ -74,21 +79,74 @@ func (l *testLogger) Close() error {
 }
 
 // Debug logs a debug message
-func (l *testLogger) Debug(msg string, args ...interface{}) {
+func (l *testLogger) Debug(msg string, args ...any) {
 	l.Logger.Debug(msg, args...)
 }
 
 // Info logs an info message
-func (l *testLogger) Info(msg string, args ...interface{}) {
+func (l *testLogger) Info(msg string, args ...any) {
 	l.Logger.Info(msg, args...)
 }
 
 // Warn logs a warning message
-func (l *testLogger) Warn(msg string, args ...interface{}) {
+func (l *testLogger) Warn(msg string, args ...any) {
 	l.Logger.Warn(msg, args...)
 }
 
 // Error logs an error message
-func (l *testLogger) Error(msg string, args ...interface{}) {
+func (l *testLogger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
+}
+
+// CloneGitRepo clones a git repo into a temporary directory,
+// and returns the path to the cloned repo.
+func CloneGitRepo(t *testing.T, repoURL, branch string) string {
+	t.Helper()
+
+	tempdir := t.TempDir()
+
+	cmd := exec.Command("git", "clone", "--branch", branch, "--depth", "1", repoURL, tempdir)
+
+	err := cmd.Run()
+	require.NoError(t, err)
+
+	return tempdir
+}
+
+// HCLFilesInDir returns a list of all HCL files in a directory.
+func HCLFilesInDir(t *testing.T, dir string) []string {
+	t.Helper()
+
+	files := []string{}
+
+	walkFn := func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if strings.HasSuffix(path, ".hcl") {
+			files = append(files, path)
+		}
+
+		return nil
+	}
+
+	err := filepath.WalkDir(dir, walkFn)
+	require.NoError(t, err)
+
+	return files
+}
+
+// ReadFile reads a file and returns its contents.
+func ReadFile(t *testing.T, path string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	return string(content)
 }

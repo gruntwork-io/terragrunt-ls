@@ -58,6 +58,8 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 	return cfg, diags
 }
 
+// filterHCLDiags filters out diagnostics that are not relevant to the current file.
+// TODO: Move this to another file.
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl.Diagnostics {
 	filtered := hcl.Diagnostics{}
 
@@ -81,6 +83,36 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl
 		if isParentFileNotFoundDiag(diag) {
 			l.Debug(
 				"Filtering parent file not found diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if isGetAWSAccountIDError(diag) {
+			l.Debug(
+				"Filtering get AWS account ID error diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if isGetAWSCallerIdentityARNError(diag) {
+			l.Debug(
+				"Filtering get AWS caller identity ARN error diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if isGetAWSCallerIdentityUserIDError(diag) {
+			l.Debug(
+				"Filtering get AWS caller identity user ID error diag",
 				"diag", diag,
 				"filename", filename,
 			)
@@ -120,8 +152,17 @@ const (
 	// ErrorInFunctionCallSummary is the summary for an error in a function call diagnostic.
 	ErrorInFunctionCallSummary = "Error in function call"
 
-	// ParentFileNotFoundErrorDetailPartial is the partial detail for a parent file not found diagnostic.
-	ParentFileNotFoundErrorDetailPartial = `Call to function "find_in_parent_folders" failed: ParentFileNotFoundError`
+	// FindInParentFoldersParentFileNotFoundErrorDetailPartial is the partial detail for a parent file not found diagnostic.
+	FindInParentFoldersParentFileNotFoundErrorDetailPartial = `Call to function "find_in_parent_folders" failed: ParentFileNotFoundError`
+
+	// GetAWSAccountIDErrorFindingAWSAccountIDDetailPartial is the partial detail for an error finding AWS account ID diagnostic.
+	GetAWSAccountIDErrorFindingAWSAccountIDDetailPartial = `Call to function "get_aws_account_id" failed: Error finding AWS credentials`
+
+	// GetAWSCallerIdentityARNErrorFindingAWSCredentialsDetailPartial is the partial detail for an error finding AWS credentials diagnostic.
+	GetAWSCallerIdentityARNErrorFindingAWSCredentialsDetailPartial = `Call to function "get_aws_caller_identity_arn" failed: Error finding AWS credentials`
+
+	// GetAWSCallerIdentityUserIDErrorFindingAWSCredentialsDetailPartial is the partial detail for an error finding AWS credentials diagnostic.
+	GetAWSCallerIdentityUserIDErrorFindingAWSCredentialsDetailPartial = `Call to function "get_aws_caller_identity_user_id" failed: Error finding AWS credentials`
 )
 
 func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
@@ -129,7 +170,31 @@ func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
 		return false
 	}
 
-	return strings.HasPrefix(diag.Detail, ParentFileNotFoundErrorDetailPartial)
+	return strings.HasPrefix(diag.Detail, FindInParentFoldersParentFileNotFoundErrorDetailPartial)
+}
+
+func isGetAWSAccountIDError(diag *hcl.Diagnostic) bool {
+	if diag.Summary != ErrorInFunctionCallSummary {
+		return false
+	}
+
+	return strings.HasPrefix(diag.Detail, GetAWSAccountIDErrorFindingAWSAccountIDDetailPartial)
+}
+
+func isGetAWSCallerIdentityARNError(diag *hcl.Diagnostic) bool {
+	if diag.Summary != ErrorInFunctionCallSummary {
+		return false
+	}
+
+	return strings.HasPrefix(diag.Detail, GetAWSCallerIdentityARNErrorFindingAWSCredentialsDetailPartial)
+}
+
+func isGetAWSCallerIdentityUserIDError(diag *hcl.Diagnostic) bool {
+	if diag.Summary != ErrorInFunctionCallSummary {
+		return false
+	}
+
+	return strings.HasPrefix(diag.Detail, GetAWSCallerIdentityUserIDErrorFindingAWSCredentialsDetailPartial)
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
