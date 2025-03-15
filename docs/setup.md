@@ -48,3 +48,9 @@ return {
   },
 }
 ```
+
+## Zed
+
+For now install rust, clone this repo and point to `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
+
+Installing from extension page comming soon ;)
