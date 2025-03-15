@@ -2,7 +2,10 @@ id = "terragrunt-ls"
 name = "Terragrunt"
 version = "0.0.1"
 schema_version = 1
-authors = ["Tomasz Warczykowski <tomasz.warczykowski@silksh.pl>"]
+authors = [
+	"Tomasz Warczykowski <tomasz.warczykowski@silksh.pl>",
+	"Terragrunt Language Server Contributors"
+]
 description = "Terragrunt Language Server"
 repository = "https://github.com/gruntwork-io/terragrunt-ls/zed-extension"
 

@@ -1,6 +1,6 @@
 name = "Terragrunt"
 grammar = "hcl"
-path_suffixes = ["terragrunt.hcl", "terragrunt.stack.hcl"]
+path_suffixes = [".hcl"]
 line_comments = ["# ", "// "]
 block_comment = ["/*", "*/"]
 autoclose_before = ",}])"
