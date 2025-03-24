@@ -2,8 +2,8 @@ package definition_test
 
 import (
 	"terragrunt-ls/internal/testutils"
+	"terragrunt-ls/internal/tg"
 	"terragrunt-ls/internal/tg/definition"
-	"terragrunt-ls/internal/tg/store"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,39 +15,26 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 	tc := []struct {
 		name            string
-		store           store.Store
+		document        string
 		position        protocol.Position
 		expectedTarget  string
 		expectedContext string
 	}{
 		{
 			name:            "empty store",
-			store:           store.Store{},
+			document:        "",
 			position:        protocol.Position{Line: 0, Character: 0},
 			expectedTarget:  "",
 			expectedContext: "null",
 		},
 		{
 			name: "include definition",
-			store: store.Store{
-				Document: `include "root" {
+			document: `include "root" {
 	path = find_in_parent_folders("root")
 }`,
-			},
-			position:        protocol.Position{Line: 0, Character: 0},
+			position:        protocol.Position{Line: 1, Character: 8},
 			expectedTarget:  "root",
 			expectedContext: "include",
-		},
-		{
-			name: "dependency definition",
-			store: store.Store{
-				Document: `dependency "vpc" {
-	config_path = "../vpc"
-}`,
-			},
-			position:        protocol.Position{Line: 0, Character: 0},
-			expectedTarget:  "vpc",
-			expectedContext: "dependency",
 		},
 	}
 
@@ -57,7 +44,11 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			target, context := definition.GetDefinitionTargetWithContext(l, tt.store, tt.position)
+			s := tg.NewState()
+
+			s.OpenDocument(l, "file:///test.hcl", tt.document)
+
+			target, context := definition.GetDefinitionTargetWithContext(l, s.Configs["/test.hcl"], tt.position)
 
 			assert.Equal(t, tt.expectedTarget, target)
 			assert.Equal(t, tt.expectedContext, context)

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
@@ -49,6 +50,9 @@ func (s *State) UpdateDocument(l logger.Logger, docURI protocol.DocumentURI, tex
 }
 
 func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	// Ignore errors from AST indexing since we'll get the same errors from the Terragrunt parser just below
+	ast, _ := ast.ParseHCLFile(docURI.Filename(), []byte(text))
+
 	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
@@ -66,6 +70,7 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 	}
 
 	s.Configs[docURI.Filename()] = store.Store{
+		Ast:      ast,
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,

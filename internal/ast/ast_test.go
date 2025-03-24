@@ -259,7 +259,7 @@ func TestIsAttribute(t *testing.T) {
 	}
 }
 
-func TestGetNodeIncludePath(t *testing.T) {
+func TestGetNodeIncludeLabel(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
@@ -316,3 +316,70 @@ func TestGetNodeIncludePath(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNodeDependencyLabel(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name     string
+		content  string
+		pos      hcl.Pos
+		expected string
+	}{
+		{
+			name: "not a dependency block",
+			content: `inputs = {
+	foo = "bar"
+}`,
+			pos:      hcl.Pos{Line: 1, Column: 1},
+			expected: "",
+		},
+		{
+			name: "dependency block beginning of path",
+			content: `dependency "vpc" {
+	config_path = "../vpc"
+}`,
+			pos:      hcl.Pos{Line: 2, Column: 2},
+			expected: "vpc",
+		},
+		{
+			name: "dependency block end of path",
+			content: `dependency "vpc" {
+	config_path = "../vpc"
+}`,
+			pos:      hcl.Pos{Line: 2, Column: 18},
+			expected: "vpc",
+		},
+		{
+			name: "dependency block wrong attribute",
+			content: `dependency "vpc" {
+	other_field = "../vpc"
+}`,
+			pos:      hcl.Pos{Line: 2, Column: 18},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			indexed, err := ast.ParseHCLFile("test.hcl", []byte(tt.content))
+			require.NoError(t, err)
+
+			require.NotNil(t, indexed)
+
+			node := indexed.FindNodeAt(tt.pos)
+
+			path, ok := ast.GetNodeDependencyLabel(node)
+			if tt.expected == "" {
+				assert.False(t, ok)
+				return
+			}
+
+			assert.True(t, ok)
+			assert.Equal(t, tt.expected, path)
+		})
+	}
+}
+

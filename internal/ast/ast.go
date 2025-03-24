@@ -3,22 +3,14 @@ package ast
 import (
 	"fmt"
 	"reflect"
-	"runtime/debug"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/pkg/errors"
 )
 
 // ParseHCLFile parses a Terragrunt HCL file using the official hcl2 parser, then walks the AST and builds an IndexedAST
 // where nodes are indexed by their line numbers.
 func ParseHCLFile(fileName string, contents []byte) (file *IndexedAST, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = errors.Errorf("panic while parsing %s: %+v\n%s", fileName, recovered, string(debug.Stack()))
-		}
-	}()
-
 	hclFile, diags := hclsyntax.ParseConfig(contents, fileName, hcl.Pos{Byte: 0, Line: 1, Column: 1})
 	if diags != nil && diags.HasErrors() {
 		return indexAST(hclFile), diags
@@ -176,6 +168,12 @@ func IsIncludeBlock(node hclsyntax.Node) bool {
 	return ok && block.Type == "include" && len(block.Labels) > 0
 }
 
+// IsDependencyBlock returns TRUE if the node is an HCL block of type "dependency".
+func IsDependencyBlock(node hclsyntax.Node) bool {
+	block, ok := node.(*hclsyntax.Block)
+	return ok && block.Type == "dependency" && len(block.Labels) > 0
+}
+
 // IsAttribute returns TRUE if the node is an hclsyntax.Attribute.
 func IsAttribute(node hclsyntax.Node) bool {
 	_, ok := node.(*hclsyntax.Attribute)
@@ -203,21 +201,28 @@ func GetNodeIncludeLabel(inode *IndexedNode) (string, bool) {
 	return name, true
 }
 
-// IsInIncludePathExpr returns whether the node is part of an include block's path expression. If it is, returns
-// the name of the include block and TRUE, otherwise returns "" and FALSE.
-func IsInIncludePathExpr(inode *IndexedNode) (string, bool) {
+// GetNodeDependencyLabel returns whether the node is part of a dependency block's config_path field.
+// If it is, returns the name of the dependency block and TRUE, otherwise returns "" and FALSE.
+func GetNodeDependencyLabel(inode *IndexedNode) (string, bool) {
 	attr := FindFirstParentMatch(inode, IsAttribute)
 	if attr == nil {
 		return "", false
 	}
-	local := FindFirstParentMatch(attr, IsIncludeBlock)
-	if local == nil {
+
+	if attr.Node.(*hclsyntax.Attribute).Name != "config_path" {
 		return "", false
 	}
+
+	dep := FindFirstParentMatch(attr, IsDependencyBlock)
+	if dep == nil {
+		return "", false
+	}
+
 	name := ""
-	if labels := local.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
+	if labels := dep.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
 		name = labels[0]
 	}
+
 	return name, true
 }
 
