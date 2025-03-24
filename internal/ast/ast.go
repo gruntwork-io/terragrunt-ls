@@ -1,3 +1,4 @@
+// Package ast provides Abstract Syntax Tree indexing support for Terragrunt HCL files.
 package ast
 
 import (
@@ -41,7 +42,7 @@ type IndexedAST struct {
 	// A map from line number to a list of nodes that start on that line
 	Index NodeIndex
 	// Locals contains the local attributes in the file, indexed by attribute key
-	Locals   Scope
+	Locals Scope
 	// Includes contains the include blocks in the file, indexed by include block name
 	Includes Scope
 }
@@ -53,6 +54,7 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 	if !ok {
 		return nil
 	}
+
 	var closest *IndexedNode
 	// First try finding a matching node on the same line
 	for _, node := range nodes {
@@ -60,6 +62,7 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 			closest = node
 		}
 	}
+
 	if closest == nil {
 		// Iterate backwards by line
 		for i := pos.Line - 1; i >= 1; i-- {
@@ -67,10 +70,13 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 			if !ok || len(nodes) == 0 {
 				continue
 			}
+
 			closest = nodes[len(nodes)-1]
+
 			break
 		}
 	}
+
 	if closest == nil {
 		return nil
 	}
@@ -81,8 +87,10 @@ func (d *IndexedAST) FindNodeAt(pos hcl.Pos) *IndexedNode {
 		if end.Line > pos.Line || end.Line == pos.Line && end.Column > pos.Column {
 			return node
 		}
+
 		node = node.Parent
 	}
+
 	return nil
 }
 
@@ -122,6 +130,7 @@ func (w *nodeIndexBuilder) Enter(node hclsyntax.Node) hcl.Diagnostics {
 	if len(w.stack) > 0 {
 		parent = w.stack[len(w.stack)-1]
 	}
+
 	line := node.Range().Start.Line
 	inode := &IndexedNode{
 		Parent: parent,
@@ -129,11 +138,13 @@ func (w *nodeIndexBuilder) Enter(node hclsyntax.Node) hcl.Diagnostics {
 	}
 	w.stack = append(w.stack, inode)
 	w.index[line] = append(w.index[line], inode)
+
 	if IsLocalAttribute(inode) {
 		w.locals.Add(inode)
 	} else if IsIncludeBlock(inode) {
 		w.includes.Add(inode)
 	}
+
 	return nil
 }
 
@@ -143,40 +154,43 @@ func (w *nodeIndexBuilder) Exit(node hclsyntax.Node) hcl.Diagnostics {
 }
 
 // IsLocalAttribute returns TRUE if the node is a hclsyntax.Attribute within a locals {} block.
-func IsLocalAttribute(node *IndexedNode) bool {
-	if node.Parent == nil || node.Parent.Parent == nil || node.Parent.Parent.Parent == nil {
+func IsLocalAttribute(inode *IndexedNode) bool {
+	if inode.Parent == nil || inode.Parent.Parent == nil || inode.Parent.Parent.Parent == nil {
 		return false
 	}
-	if _, ok := node.Parent.Node.(hclsyntax.Attributes); !ok {
+
+	if _, ok := inode.Parent.Node.(hclsyntax.Attributes); !ok {
 		return false
 	}
-	if _, ok := node.Parent.Parent.Node.(*hclsyntax.Body); !ok {
+
+	if _, ok := inode.Parent.Parent.Node.(*hclsyntax.Body); !ok {
 		return false
 	}
-	return IsLocalsBlock(node.Parent.Parent.Parent.Node)
+
+	return IsLocalsBlock(inode.Parent.Parent.Parent)
 }
 
 // IsLocalsBlock returns TRUE if the node is an HCL block of type "locals".
-func IsLocalsBlock(node hclsyntax.Node) bool {
-	block, ok := node.(*hclsyntax.Block)
+func IsLocalsBlock(inode *IndexedNode) bool {
+	block, ok := inode.Node.(*hclsyntax.Block)
 	return ok && block.Type == "locals"
 }
 
 // IsIncludeBlock returns TRUE if the node is an HCL block of type "include".
-func IsIncludeBlock(node hclsyntax.Node) bool {
-	block, ok := node.(*hclsyntax.Block)
+func IsIncludeBlock(inode *IndexedNode) bool {
+	block, ok := inode.Node.(*hclsyntax.Block)
 	return ok && block.Type == "include" && len(block.Labels) > 0
 }
 
 // IsDependencyBlock returns TRUE if the node is an HCL block of type "dependency".
-func IsDependencyBlock(node hclsyntax.Node) bool {
-	block, ok := node.(*hclsyntax.Block)
+func IsDependencyBlock(inode *IndexedNode) bool {
+	block, ok := inode.Node.(*hclsyntax.Block)
 	return ok && block.Type == "dependency" && len(block.Labels) > 0
 }
 
 // IsAttribute returns TRUE if the node is an hclsyntax.Attribute.
-func IsAttribute(node hclsyntax.Node) bool {
-	_, ok := node.(*hclsyntax.Attribute)
+func IsAttribute(inode *IndexedNode) bool {
+	_, ok := inode.Node.(*hclsyntax.Attribute)
 	return ok
 }
 
@@ -226,12 +240,13 @@ func GetNodeDependencyLabel(inode *IndexedNode) (string, bool) {
 	return name, true
 }
 
-func FindFirstParentMatch(inode *IndexedNode, matcher func(node hclsyntax.Node) bool) *IndexedNode {
+func FindFirstParentMatch(inode *IndexedNode, matcher func(*IndexedNode) bool) *IndexedNode {
 	for cur := inode; cur != nil; cur = cur.Parent {
-		if matcher(cur.Node) {
+		if matcher(cur) {
 			return cur
 		}
 	}
+
 	return nil
 }
 
@@ -241,6 +256,7 @@ func indexAST(ast *hcl.File) *IndexedAST {
 	body := ast.Body.(*hclsyntax.Body)
 	builder := newNodeIndexBuilider()
 	_ = hclsyntax.Walk(body, builder)
+
 	return &IndexedAST{
 		Index:    builder.index,
 		Locals:   builder.locals,

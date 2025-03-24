@@ -47,5 +47,6 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 	}
 
 	l.Debug("No definition found at", "line", position.Line, "character", position.Character)
+
 	return "", DefinitionContextNull
 }
