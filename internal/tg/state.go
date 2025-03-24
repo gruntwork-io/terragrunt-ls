@@ -70,7 +70,7 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 	}
 
 	s.Configs[docURI.Filename()] = store.Store{
-		Ast:      ast,
+		AST:      ast,
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,

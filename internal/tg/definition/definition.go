@@ -25,12 +25,12 @@ const (
 )
 
 func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position protocol.Position) (string, string) {
-	if store.Ast == nil {
+	if store.AST == nil {
 		l.Debug("No AST found")
 		return "", DefinitionContextNull
 	}
 
-	node := store.Ast.FindNodeAt(ast.ToHCLPos(position))
+	node := store.AST.FindNodeAt(ast.ToHCLPos(position))
 	if node == nil {
 		l.Debug("No node found at", "line", position.Line, "character", position.Character)
 		return "", DefinitionContextNull

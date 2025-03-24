@@ -11,7 +11,7 @@ import (
 )
 
 type Store struct {
-	Ast      *ast.IndexedAST
+	AST      *ast.IndexedAST
 	Cfg      *config.TerragruntConfig
 	CfgAsCty cty.Value
 	Document string
