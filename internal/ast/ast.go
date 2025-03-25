@@ -117,7 +117,7 @@ type nodeIndexBuilder struct {
 	includes Scope
 }
 
-func newNodeIndexBuilider() *nodeIndexBuilder {
+func newNodeIndexBuilder() *nodeIndexBuilder {
 	return &nodeIndexBuilder{
 		index:    make(map[int][]*IndexedNode),
 		locals:   make(Scope),
@@ -254,7 +254,7 @@ var _ hclsyntax.Walker = &nodeIndexBuilder{}
 
 func indexAST(ast *hcl.File) *IndexedAST {
 	body := ast.Body.(*hclsyntax.Body)
-	builder := newNodeIndexBuilider()
+	builder := newNodeIndexBuilder()
 	_ = hclsyntax.Walk(body, builder)
 
 	return &IndexedAST{
