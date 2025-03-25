@@ -6,9 +6,12 @@ package store
 import (
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/zclconf/go-cty/cty"
+
+	"terragrunt-ls/internal/ast"
 )
 
 type Store struct {
+	AST      *ast.IndexedAST
 	Cfg      *config.TerragruntConfig
 	CfgAsCty cty.Value
 	Document string
