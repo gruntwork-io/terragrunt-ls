@@ -1,1 +1,8 @@
 terragrunt-ls
+
+# Put temporary fixtures here.
+tmp-fixtures
+
+
+.DS_Store
+*.log
