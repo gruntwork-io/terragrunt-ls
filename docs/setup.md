@@ -1,5 +1,19 @@
 # Setup
 
+## Setting up build dependencies
+
+To bootstrap your development environment, the most convenient method is to [install mise](https://mise.jdx.dev/installing-mise.html).
+
+After installing `mise`, you can run the following command to install all necessary build dependencies for this project:
+
+```bash
+mise install
+```
+
+Alternatively, you can install the relevant dependencies manually by reading the [mise.toml](../mise.toml) file, and installing the dependencies listed there.
+
+## Building the Language Server
+
 To setup the language server in your editor, first install `terragrunt-ls` by running the following at the root of this repository:
 
 ```bash
@@ -12,7 +26,33 @@ Then follow the instructions below for your editor:
 
 ## Visual Studio Code
 
-Coming soon!
+To install the Visual Studio Code extension, you can manually compile the extension locally, then install it from the `.vsix` file.
+
+1. Navigate to the `vscode-extension` directory:
+
+   ```bash
+   cd vscode-extension
+   ```
+
+2. Ensure you have vsce (Visual Studio Code Extension CLI) installed. If you don't have it, you can install it globally using npm:
+
+   ```bash
+   npm install -g @vscode/vsce
+   ```
+
+3. Run the following command to package the extension:
+
+   ```bash
+   vsce package
+   ```
+
+4. This will create a `.vsix` file in the `vscode-extension` directory (e.g. `terragrunt-ls-0.0.1.vsix`). You can install this file directly as a Visual Studio Code extension, like so:
+
+   ```bash
+    code --install-extension terragrunt-ls-0.0.1.vsix
+    ```
+
+Installation from the Visual Studio Extensions Marketplace coming soon!
 
 ## Neovim
 
@@ -49,8 +89,10 @@ return {
 }
 ```
 
+Installation from Mason coming soon!
+
 ## Zed
 
-For now install rust, clone this repo and point to `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
+For now, clone this repo and point to the `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
 
-Installing from extension page comming soon ;)
+Installing from extension page coming soon!
