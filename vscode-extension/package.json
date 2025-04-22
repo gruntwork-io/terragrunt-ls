@@ -27,13 +27,13 @@
 			"type": "object",
 			"title": "Example configuration",
 			"properties": {
-				"languageServerExample.maxNumberOfProblems": {
+				"terragrunt-ls.maxNumberOfProblems": {
 					"scope": "resource",
 					"type": "number",
 					"default": 100,
 					"description": "Controls the maximum number of problems produced by the server."
 				},
-				"languageServerExample.trace.server": {
+				"terragrunt-ls.trace.server": {
 					"scope": "window",
 					"type": "string",
 					"enum": [
@@ -51,8 +51,7 @@
 		"vscode:prepublish": "npm run compile && ./scripts/package.sh",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
-		"lint": "eslint",
-		"test": "./scripts/e2e.sh"
+		"lint": "eslint"
 	},
 	"dependencies": {
 		"glob": "^11.0.0",

@@ -33,7 +33,7 @@ export function activate(context: ExtensionContext) {
 			transport: TransportKind.stdio,
 			options: isDevMode ? {
 				cwd: context.asAbsolutePath(".."),
-				env: isDevMode ? { ...process.env, TG_LS_LOG: "debug.log" } : process
+				env: { ...process.env, TG_LS_LOG: "debug.log" }
 			} : undefined
 		},
 		debug: {
