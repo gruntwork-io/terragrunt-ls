@@ -34,19 +34,24 @@ To install the Visual Studio Code extension, you can manually compile the extens
    cd vscode-extension
    ```
 
-2. Ensure you have vsce (Visual Studio Code Extension CLI) installed. If you don't have it, you can install it globally using npm:
+2. Ensure you have vsce (Visual Studio Code Extension CLI) & the typescript compiler installed. If you don't have it, you can install it globally using npm:
 
    ```bash
    npm install -g @vscode/vsce
+   npm install -g typescript
    ```
-
-3. Run the following command to package the extension:
+3. Install local javascript packages
+   ```bash
+   npm install
+   ```
+   
+4. Run the following command to package the extension:
 
    ```bash
    vsce package
    ```
 
-4. This will create a `.vsix` file in the `vscode-extension` directory (e.g. `terragrunt-ls-0.0.1.vsix`). You can install this file directly as a Visual Studio Code extension, like so:
+5. This will create a `.vsix` file in the `vscode-extension` directory (e.g. `terragrunt-ls-0.0.1.vsix`). You can install this file directly as a Visual Studio Code extension, like so:
 
    ```bash
     code --install-extension terragrunt-ls-0.0.1.vsix
