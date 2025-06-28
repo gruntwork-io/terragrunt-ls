@@ -14,10 +14,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use mise to install dependencies
+      - name: Set up mise
         uses: jdx/mise-action@v2
         with:
-          version: 2025.4.4
+          version: 2025.6.8
           experimental: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

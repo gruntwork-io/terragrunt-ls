@@ -16,6 +16,11 @@ jobs:
 
     - name: Set up mise
       uses: jdx/mise-action@v2
+      with:
+        version: 2025.6.8
+        experimental: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - id: go-cache-paths
       run: |
