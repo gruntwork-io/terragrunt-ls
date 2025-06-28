@@ -9,11 +9,13 @@ import (
 	"github.com/zclconf/go-cty/cty"
 
 	"terragrunt-ls/internal/ast"
+	astconfig "terragrunt-ls/internal/ast/config"
+	aststack "terragrunt-ls/internal/ast/stack"
 )
 
 // Store represents the state for a standard terragrunt.hcl file
 type Store struct {
-	AST      *ast.IndexedAST
+	AST      astconfig.ConfigAST
 	Cfg      *config.TerragruntConfig
 	CfgAsCty cty.Value
 	Document string
@@ -21,7 +23,7 @@ type Store struct {
 
 // StackStore represents the state for a terragrunt.stack.hcl file
 type StackStore struct {
-	AST      *ast.IndexedAST
+	AST      aststack.StackAST
 	StackCfg *config.StackConfig
 	Document string
 }

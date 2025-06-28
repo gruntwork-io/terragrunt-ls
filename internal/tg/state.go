@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/ast"
+	astconfig "terragrunt-ls/internal/ast/config"
+	aststack "terragrunt-ls/internal/ast/stack"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
@@ -67,6 +69,9 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 		return s.updateStackState(l, docURI, text, astTree)
 	case TerragruntFileTypeValues:
 		return s.updateValuesState(l, docURI, text, astTree)
+	case TerragruntFileTypeUnknown:
+		l.Debug("Unknown file type", "filename", filename, "fileType", fileType)
+		return []protocol.Diagnostic{}
 	default:
 		l.Debug("Unknown file type", "filename", filename, "fileType", fileType)
 		return []protocol.Diagnostic{}
@@ -91,7 +96,7 @@ func (s *State) updateConfigState(l logger.Logger, docURI protocol.DocumentURI, 
 	}
 
 	s.Configs[docURI.Filename()] = store.Store{
-		AST:      astTree,
+		AST:      astconfig.NewConfigAST(astTree),
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,
@@ -110,7 +115,7 @@ func (s *State) updateStackState(l logger.Logger, docURI protocol.DocumentURI, t
 	)
 
 	s.StackConfigs[docURI.Filename()] = store.StackStore{
-		AST:      astTree,
+		AST:      aststack.NewStackAST(astTree),
 		StackCfg: stackCfg,
 		Document: text,
 	}
@@ -225,7 +230,7 @@ func (s *State) hoverConfig(l logger.Logger, id int, docURI protocol.DocumentURI
 }
 
 func (s *State) hoverStack(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	_, ok := s.StackConfigs[docURI.Filename()]
+	store, ok := s.StackConfigs[docURI.Filename()]
 	if !ok {
 		return newEmptyHoverResponse(id)
 	}
@@ -236,13 +241,34 @@ func (s *State) hoverStack(l logger.Logger, id int, docURI protocol.DocumentURI,
 		"position", position,
 	)
 
-	// TODO: Implement stack-specific hover logic
-	// For now, return empty response
-	return newEmptyHoverResponse(id)
+	target, context := hover.GetStackHoverTargetWithContext(l, store, position)
+
+	l.Debug(
+		"Stack hover target discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyHoverResponse(id)
+	}
+
+	switch context {
+	case hover.HoverContextStackUnit:
+		return newStackUnitHoverResponse(id, target)
+	case hover.HoverContextStackSource:
+		return newStackSourceHoverResponse(id, target)
+	case hover.HoverContextStackPath:
+		return newStackPathHoverResponse(id, target)
+	case hover.HoverContextStackBlock:
+		return newStackBlockHoverResponse(id, target)
+	default:
+		return newEmptyHoverResponse(id)
+	}
 }
 
 func (s *State) hoverValues(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	_, ok := s.ValuesConfigs[docURI.Filename()]
+	store, ok := s.ValuesConfigs[docURI.Filename()]
 	if !ok {
 		return newEmptyHoverResponse(id)
 	}
@@ -253,9 +279,118 @@ func (s *State) hoverValues(l logger.Logger, id int, docURI protocol.DocumentURI
 		"position", position,
 	)
 
-	// TODO: Implement values-specific hover logic
-	// For now, return empty response
-	return newEmptyHoverResponse(id)
+	target, context := hover.GetValuesHoverTargetWithContext(l, store, position)
+
+	l.Debug(
+		"Values hover target discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyHoverResponse(id)
+	}
+
+	switch context {
+	case hover.HoverContextValuesVariable:
+		return newValuesVariableHoverResponse(id, target)
+	case hover.HoverContextValuesDependency:
+		return newValuesDependencyHoverResponse(id, target)
+	default:
+		return newEmptyHoverResponse(id)
+	}
+}
+
+// Helper functions for creating hover responses
+
+func newStackUnitHoverResponse(id int, unitName string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Unit: `" + unitName + "`**\n\nA unit block defines a single infrastructure component in a Terragrunt stack.\n\nEach unit has a source (where the Terraform code lives) and a path (where it will be deployed).",
+			},
+		},
+	}
+}
+
+func newStackSourceHoverResponse(id int, source string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Source: `" + source + "`**\n\nThe source attribute specifies where the Terraform module or configuration is located.\n\nThis can be a local path, Git repository, or other supported Terraform module sources.",
+			},
+		},
+	}
+}
+
+func newStackPathHoverResponse(id int, path string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Path: `" + path + "`**\n\nThe path attribute specifies the relative directory where this unit will be deployed.\n\nThis path is relative to the stack directory and determines where Terragrunt will run commands for this unit.",
+			},
+		},
+	}
+}
+
+func newStackBlockHoverResponse(id int, stackName string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Stack: `" + stackName + "`**\n\nA stack block defines a nested stack within the current stack.\n\nNested stacks allow you to organize and compose multiple related infrastructure units together.",
+			},
+		},
+	}
+}
+
+func newValuesVariableHoverResponse(id int, variable string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Variable: `" + variable + "`**\n\nThis appears to be a variable defined in the values block.\n\nValues files are used to define dynamic input values for units in Terragrunt stacks.",
+			},
+		},
+	}
+}
+
+func newValuesDependencyHoverResponse(id int, dependency string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Dependency: `" + dependency + "`**\n\nA dependency reference allows you to use outputs from other units in your stack.\n\nThe dependency block defines where to find the output values and provides mock values for testing.",
+			},
+		},
+	}
 }
 
 func newEmptyHoverResponse(id int) lsp.HoverResponse {
@@ -285,6 +420,8 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		return s.definitionStack(l, id, docURI, position)
 	case TerragruntFileTypeValues:
 		return s.definitionValues(l, id, docURI, position)
+	case TerragruntFileTypeUnknown:
+		return newEmptyDefinitionResponse(id, docURI, position)
 	default:
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
@@ -431,6 +568,131 @@ func (s *State) definitionConfig(l logger.Logger, id int, docURI protocol.Docume
 	return newEmptyDefinitionResponse(id, docURI, position)
 }
 
+func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	store, ok := s.StackConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug(
+		"Stack definition requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	target, context := definition.GetStackDefinitionTargetWithContext(l, store, position)
+
+	l.Debug(
+		"Stack definition target discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	currentDir := filepath.Dir(docURI.Filename())
+
+	switch context {
+	case definition.DefinitionContextStackSource:
+		if resolved, ok := definition.ResolveStackSourceLocation(target, currentDir); ok {
+			defURI := uri.File(resolved)
+			l.Debug("Navigating to source", "source", target, "resolved", resolved)
+
+			return lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: lsp.RPCVersion,
+					ID:  &id,
+				},
+				Result: protocol.Location{
+					URI: defURI,
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 0, Character: 0},
+						End:   protocol.Position{Line: 0, Character: 0},
+					},
+				},
+			}
+		}
+
+		l.Debug("Could not resolve source location", "source", target)
+
+	case definition.DefinitionContextStackPath:
+		if resolved, ok := definition.ResolveStackUnitPath(target, currentDir); ok {
+			defURI := uri.File(resolved)
+			l.Debug("Navigating to unit path", "path", target, "resolved", resolved)
+
+			return lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: lsp.RPCVersion,
+					ID:  &id,
+				},
+				Result: protocol.Location{
+					URI: defURI,
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 0, Character: 0},
+						End:   protocol.Position{Line: 0, Character: 0},
+					},
+				},
+			}
+		}
+
+		l.Debug("Could not resolve unit path", "path", target)
+	}
+
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
+func (s *State) definitionValues(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	store, ok := s.ValuesConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug(
+		"Values definition requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	target, context := definition.GetValuesDefinitionTargetWithContext(l, store, position)
+
+	l.Debug(
+		"Values definition target discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	if context == definition.DefinitionContextValuesDependency {
+		if resolved, ok := definition.ResolveValuesDependencyPath(target, docURI.Filename()); ok {
+			defURI := uri.File(resolved)
+			l.Debug("Navigating to dependency", "dependency", target, "resolved", resolved)
+
+			return lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: lsp.RPCVersion,
+					ID:  &id,
+				},
+				Result: protocol.Location{
+					URI: defURI,
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 0, Character: 0},
+						End:   protocol.Position{Line: 0, Character: 0},
+					},
+				},
+			}
+		}
+
+		l.Debug("Could not resolve dependency path", "dependency", target)
+	}
+
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
 func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
 	return lsp.DefinitionResponse{
 		Response: lsp.Response{
@@ -447,40 +709,6 @@ func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position pr
 	}
 }
 
-func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	_, ok := s.StackConfigs[docURI.Filename()]
-	if !ok {
-		return newEmptyDefinitionResponse(id, docURI, position)
-	}
-
-	l.Debug(
-		"Stack definition requested",
-		"uri", docURI,
-		"position", position,
-	)
-
-	// TODO: Implement stack-specific definition logic
-	// For now, return empty response
-	return newEmptyDefinitionResponse(id, docURI, position)
-}
-
-func (s *State) definitionValues(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	_, ok := s.ValuesConfigs[docURI.Filename()]
-	if !ok {
-		return newEmptyDefinitionResponse(id, docURI, position)
-	}
-
-	l.Debug(
-		"Values definition requested",
-		"uri", docURI,
-		"position", position,
-	)
-
-	// TODO: Implement values-specific definition logic
-	// For now, return empty response
-	return newEmptyDefinitionResponse(id, docURI, position)
-}
-
 func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
 	filename := docURI.Filename()
 	fileType := GetTerragruntFileType(filename)
@@ -493,23 +721,23 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 			items = completion.GetCompletions(l, store, position, filename)
 		}
 	case TerragruntFileTypeStack:
-		// For stack files, create a minimal store with just the document text
-		// since GetCompletions mainly uses filename for file type detection
+		// Use real stack store now that we have proper functionality
 		if stackStore, ok := s.StackConfigs[filename]; ok {
-			minimalStore := store.Store{
+			// Create a compatible store struct for the completion function
+			// The completion function currently expects store.Store but we can adapt it
+			compatStore := store.Store{
 				Document: stackStore.Document,
-				AST:      stackStore.AST,
 			}
-			items = completion.GetCompletions(l, minimalStore, position, filename)
+			items = completion.GetCompletions(l, compatStore, position, filename)
 		}
 	case TerragruntFileTypeValues:
-		// For values files, create a minimal store with just the document text
+		// Use real values store now that we have proper functionality
 		if valuesStore, ok := s.ValuesConfigs[filename]; ok {
-			minimalStore := store.Store{
+			// Create a compatible store struct for the completion function
+			compatStore := store.Store{
 				Document: valuesStore.Document,
-				AST:      valuesStore.AST,
 			}
-			items = completion.GetCompletions(l, minimalStore, position, filename)
+			items = completion.GetCompletions(l, compatStore, position, filename)
 		}
 	case TerragruntFileTypeUnknown:
 		items = []protocol.CompletionItem{}
@@ -537,6 +765,7 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 	)
 
 	var document string
+
 	var found bool
 
 	switch fileType {
@@ -555,6 +784,10 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 			document = valuesStore.Document
 			found = true
 		}
+	case TerragruntFileTypeUnknown:
+		// Do nothing - found remains false
+	default:
+		// Do nothing - found remains false
 	}
 
 	if !found {
