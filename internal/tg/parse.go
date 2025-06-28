@@ -49,23 +49,6 @@ func GetTerragruntFileType(filename string) TerragruntFileType {
 	}
 }
 
-func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
-	fileType := GetTerragruntFileType(filename)
-
-	switch fileType {
-	case TerragruntFileTypeStack:
-		return ParseTerragruntStackBuffer(l, filename, text)
-	case TerragruntFileTypeValues:
-		return ParseTerragruntValuesBuffer(l, filename, text)
-	case TerragruntFileTypeConfig:
-		return ParseTerragruntConfigBuffer(l, filename, text)
-	case TerragruntFileTypeUnknown:
-		return nil, []protocol.Diagnostic{}
-	default:
-		return nil, []protocol.Diagnostic{}
-	}
-}
-
 func ParseTerragruntConfigBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	var parseDiags hcl.Diagnostics
 
@@ -116,7 +99,7 @@ func ParseTerragruntConfigBuffer(l logger.Logger, filename, text string) (*confi
 	return cfg, diags
 }
 
-func ParseTerragruntStackBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntStackBuffer(l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
 	// Create Terragrunt options for parsing
 	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
 	if err != nil {
@@ -176,14 +159,12 @@ func ParseTerragruntStackBuffer(l logger.Logger, filename, text string) (*config
 		}
 	}
 
-	// Stack files don't map directly to TerragruntConfig, but we return nil to indicate success
-	// The stackConfig contains the parsed stack information
 	l.Debug("Successfully parsed stack config", "filename", filename, "stacks_count", len(stackConfig.Stacks), "units_count", len(stackConfig.Units))
 
-	return nil, []protocol.Diagnostic{}
+	return stackConfig, []protocol.Diagnostic{}
 }
 
-func ParseTerragruntValuesBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntValuesBuffer(l logger.Logger, filename, text string) (*hclparse.File, []protocol.Diagnostic) {
 	// Create Terragrunt options for parsing
 	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
 	if err != nil {
@@ -262,7 +243,7 @@ func ParseTerragruntValuesBuffer(l logger.Logger, filename, text string) (*confi
 	// Successfully parsed values file
 	l.Debug("Successfully parsed values config", "filename", filename)
 
-	return nil, diags
+	return hclFile, diags
 }
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl.Diagnostics {

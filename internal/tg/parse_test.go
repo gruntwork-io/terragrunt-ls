@@ -3,7 +3,6 @@ package tg_test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 func TestParseTerragruntBuffer(t *testing.T) {
@@ -136,19 +136,56 @@ inputs = {
 			filename := tt.setup(t, tmpDir)
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseTerragruntBuffer(l, filename, tt.content)
 
-			if tt.wantDiag {
-				assert.NotEmpty(t, diags, "expected diagnostics but got none")
-			} else {
-				assert.Empty(t, diags, "expected no diagnostics but got: %v", diags)
-			}
+			// Call the appropriate parser based on file type
+			fileType := tg.GetTerragruntFileType(filename)
+			var diags []protocol.Diagnostic
 
-			// For stack and values files, cfg will be nil but should not cause errors
-			if strings.Contains(filename, ".stack.hcl") || strings.Contains(filename, ".values.hcl") {
-				assert.Nil(t, cfg, "expected nil config for stack/values files")
-			} else {
+			switch fileType {
+			case tg.TerragruntFileTypeUnknown:
+				t.Fatalf("Unknown file type for: %s", filename)
+
+			case tg.TerragruntFileTypeStack:
+				stackCfg, stackDiags := tg.ParseTerragruntStackBuffer(l, filename, tt.content)
+				diags = stackDiags
+
+				if tt.wantDiag {
+					assert.NotEmpty(t, diags, "expected diagnostics but got none")
+				} else {
+					assert.Empty(t, diags, "expected no diagnostics but got: %v", diags)
+				}
+
+				// For stack files, we should get a valid StackConfig
+				assert.NotNil(t, stackCfg, "expected stack config to not be nil for stack files")
+
+			case tg.TerragruntFileTypeValues:
+				cfg, valuesDiags := tg.ParseTerragruntValuesBuffer(l, filename, tt.content)
+				diags = valuesDiags
+
+				if tt.wantDiag {
+					assert.NotEmpty(t, diags, "expected diagnostics but got none")
+				} else {
+					assert.Empty(t, diags, "expected no diagnostics but got: %v", diags)
+				}
+
+				// For values files, we should get a valid HCL file
+				assert.NotNil(t, cfg, "expected valid HCL config for values files")
+
+			case tg.TerragruntFileTypeConfig:
+				cfg, configDiags := tg.ParseTerragruntConfigBuffer(l, filename, tt.content)
+				diags = configDiags
+
+				if tt.wantDiag {
+					assert.NotEmpty(t, diags, "expected diagnostics but got none")
+				} else {
+					assert.Empty(t, diags, "expected no diagnostics but got: %v", diags)
+				}
+
+				// For regular terragrunt files, we should get a valid TerragruntConfig
 				assert.NotNil(t, cfg, "expected config to not be nil for regular terragrunt files")
+
+			default:
+				t.Fatalf("Unknown file type for: %s", filename)
 			}
 		})
 	}

@@ -5,7 +5,7 @@ package store
 
 import (
 	"github.com/gruntwork-io/terragrunt/config"
-	"github.com/hashicorp/hcl/v2"
+	"github.com/gruntwork-io/terragrunt/config/hclparse"
 	"github.com/zclconf/go-cty/cty"
 
 	"terragrunt-ls/internal/ast"
@@ -29,6 +29,6 @@ type StackStore struct {
 // ValuesStore represents the state for a terragrunt.values.hcl file
 type ValuesStore struct {
 	AST       *ast.IndexedAST
-	ValuesHCL *hcl.File
+	ValuesHCL *hclparse.File
 	Document  string
 }

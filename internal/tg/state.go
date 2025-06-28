@@ -14,7 +14,6 @@ import (
 	"terragrunt-ls/internal/tg/text"
 
 	"github.com/gruntwork-io/terragrunt/config"
-	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
@@ -75,7 +74,7 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 }
 
 func (s *State) updateConfigState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
-	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+	cfg, diags := ParseTerragruntConfigBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
 		"Config",
@@ -102,20 +101,17 @@ func (s *State) updateConfigState(l logger.Logger, docURI protocol.DocumentURI, 
 }
 
 func (s *State) updateStackState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
-	// Parse stack configuration
-	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+	stackCfg, diags := ParseTerragruntStackBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
 		"Stack Config",
 		"uri", docURI,
-		"config", cfg,
+		"config", stackCfg,
 	)
 
-	// For now, we'll store nil StackConfig since ParseTerragruntBuffer doesn't return it yet
-	// TODO: Update when ParseTerragruntStackBuffer returns proper StackConfig
 	s.StackConfigs[docURI.Filename()] = store.StackStore{
 		AST:      astTree,
-		StackCfg: nil, // Will be populated when parsing is fully implemented
+		StackCfg: stackCfg,
 		Document: text,
 	}
 
@@ -123,21 +119,13 @@ func (s *State) updateStackState(l logger.Logger, docURI protocol.DocumentURI, t
 }
 
 func (s *State) updateValuesState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
-	// Parse values configuration
-	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+	valuesHCL, diags := ParseTerragruntValuesBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
 		"Values Config",
 		"uri", docURI,
-		"config", cfg,
+		"valuesHCL", valuesHCL,
 	)
-
-	// For now, we'll store the HCL file from the AST
-	// TODO: Extract proper HCL file structure for values
-	var valuesHCL *hcl.File
-	if astTree != nil {
-		valuesHCL = astTree.HCLFile
-	}
 
 	s.ValuesConfigs[docURI.Filename()] = store.ValuesStore{
 		AST:       astTree,
@@ -166,6 +154,8 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 		return s.hoverStack(l, id, docURI, position)
 	case TerragruntFileTypeValues:
 		return s.hoverValues(l, id, docURI, position)
+	case TerragruntFileTypeUnknown:
+		return newEmptyHoverResponse(id)
 	default:
 		return newEmptyHoverResponse(id)
 	}
@@ -521,7 +511,7 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 			}
 			items = completion.GetCompletions(l, minimalStore, position, filename)
 		}
-	default:
+	case TerragruntFileTypeUnknown:
 		items = []protocol.CompletionItem{}
 	}
 
