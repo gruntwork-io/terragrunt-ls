@@ -111,10 +111,10 @@ func (s Scope) Add(node *IndexedNode) {
 type NodeIndex map[int][]*IndexedNode
 
 type nodeIndexBuilder struct {
-	stack    []*IndexedNode
 	index    NodeIndex
 	locals   Scope
 	includes Scope
+	stack    []*IndexedNode
 }
 
 func newNodeIndexBuilder() *nodeIndexBuilder {

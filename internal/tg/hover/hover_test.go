@@ -14,11 +14,11 @@ func TestGetHoverTargetWithContext(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
-		name            string
 		store           store.Store
-		position        protocol.Position
+		name            string
 		expectedTarget  string
 		expectedContext string
+		position        protocol.Position
 	}{
 		{
 			name:            "empty document",

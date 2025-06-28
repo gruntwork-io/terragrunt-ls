@@ -3,8 +3,8 @@ package lsp
 import "go.lsp.dev/protocol"
 
 type HoverRequest struct {
-	Request
 	Params protocol.HoverParams `json:"params"`
+	Request
 }
 
 type HoverResponse struct {

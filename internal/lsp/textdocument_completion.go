@@ -3,8 +3,8 @@ package lsp
 import "go.lsp.dev/protocol"
 
 type CompletionRequest struct {
-	Request
 	Params protocol.CompletionParams `json:"params"`
+	Request
 }
 
 type CompletionResponse struct {

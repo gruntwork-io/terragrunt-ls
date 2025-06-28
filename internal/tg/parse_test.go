@@ -16,10 +16,10 @@ func TestParseTerragruntBuffer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		setup    func(t *testing.T, tmpDir string) string // returns the path to the file to parse
-		content  string
+		setup    func(t *testing.T, tmpDir string) string
 		wantCfg  *config.TerragruntConfig
+		name     string
+		content  string
 		wantDiag bool
 	}{
 		{

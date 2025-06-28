@@ -3,8 +3,8 @@ package lsp
 import "go.lsp.dev/protocol"
 
 type DefinitionRequest struct {
-	Request
 	Params protocol.DefinitionParams `json:"params"`
+	Request
 }
 
 type DefinitionResponse struct {

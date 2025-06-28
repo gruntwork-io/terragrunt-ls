@@ -16,9 +16,9 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 	tc := []struct {
 		name            string
 		document        string
-		position        protocol.Position
 		expectedTarget  string
 		expectedContext string
+		position        protocol.Position
 	}{
 		{
 			name:            "empty store",
