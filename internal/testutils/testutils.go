@@ -74,21 +74,21 @@ func (l *testLogger) Close() error {
 }
 
 // Debug logs a debug message
-func (l *testLogger) Debug(msg string, args ...interface{}) {
+func (l *testLogger) Debug(msg string, args ...any) {
 	l.Logger.Debug(msg, args...)
 }
 
 // Info logs an info message
-func (l *testLogger) Info(msg string, args ...interface{}) {
+func (l *testLogger) Info(msg string, args ...any) {
 	l.Logger.Info(msg, args...)
 }
 
 // Warn logs a warning message
-func (l *testLogger) Warn(msg string, args ...interface{}) {
+func (l *testLogger) Warn(msg string, args ...any) {
 	l.Logger.Warn(msg, args...)
 }
 
 // Error logs an error message
-func (l *testLogger) Error(msg string, args ...interface{}) {
+func (l *testLogger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
 }
