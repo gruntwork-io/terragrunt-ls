@@ -8,8 +8,8 @@ type InitializeRequest struct {
 }
 
 type InitializeResponse struct {
-	Response
 	Result protocol.InitializeResult `json:"result"`
+	Response
 }
 
 type ServerInfo struct {

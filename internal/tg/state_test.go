@@ -49,9 +49,9 @@ func TestState_OpenDocument(t *testing.T) {
 	unitURI := uri.File(unitPath)
 
 	tc := []struct {
+		expected *config.TerragruntConfig
 		name     string
 		document string
-		expected *config.TerragruntConfig
 	}{
 		{
 			name:     "empty document",
@@ -67,12 +67,12 @@ func TestState_OpenDocument(t *testing.T) {
 	foo = "bar"
 }`,
 			expected: &config.TerragruntConfig{
-				Locals: map[string]interface{}{
+				Locals: map[string]any{
 					"foo": "bar",
 				},
 				GenerateConfigs:   map[string]codegen.GenerateConfig{},
 				ProcessedIncludes: config.IncludeConfigsMap{},
-				FieldsMetadata: map[string]map[string]interface{}{
+				FieldsMetadata: map[string]map[string]any{
 					"locals-foo": {
 						"found_in_file": unitPath,
 					},
@@ -86,13 +86,13 @@ func TestState_OpenDocument(t *testing.T) {
 	baz = "qux"
 }`,
 			expected: &config.TerragruntConfig{
-				Locals: map[string]interface{}{
+				Locals: map[string]any{
 					"baz": "qux",
 					"foo": "bar",
 				},
 				GenerateConfigs:   map[string]codegen.GenerateConfig{},
 				ProcessedIncludes: config.IncludeConfigsMap{},
-				FieldsMetadata: map[string]map[string]interface{}{
+				FieldsMetadata: map[string]map[string]any{
 					"locals-baz": {
 						"found_in_file": unitPath,
 					},
@@ -142,11 +142,11 @@ func TestState_UpdateDocument(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
+		expected        map[string]any
+		expectedUpdated map[string]any
 		name            string
 		document        string
-		expected        map[string]interface{}
 		updated         string
-		expectedUpdated map[string]interface{}
 	}{
 		{
 			name:     "empty document",
@@ -157,13 +157,13 @@ func TestState_UpdateDocument(t *testing.T) {
 			document: `locals {
 	foo = "bar"
 }`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"foo": "bar",
 			},
 			updated: `locals {
 	foo = "baz"
 }`,
-			expectedUpdated: map[string]interface{}{
+			expectedUpdated: map[string]any{
 				"foo": "baz",
 			},
 		},
@@ -173,7 +173,7 @@ func TestState_UpdateDocument(t *testing.T) {
 	foo = "bar"
 	baz = "qux"
 }`,
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"foo": "bar",
 				"baz": "qux",
 			},
@@ -181,7 +181,7 @@ func TestState_UpdateDocument(t *testing.T) {
 	foo = "baz"
 	baz = "qux"
 }`,
-			expectedUpdated: map[string]interface{}{
+			expectedUpdated: map[string]any{
 				"foo": "baz",
 				"baz": "qux",
 			},
@@ -221,10 +221,10 @@ func TestState_Hover(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
+		expected lsp.HoverResponse
 		name     string
 		document string
 		position protocol.Position
-		expected lsp.HoverResponse
 	}{
 		{
 			name: "simple locals",
@@ -328,8 +328,8 @@ func TestState_Definition(t *testing.T) {
 	tc := []struct {
 		name     string
 		document string
-		position protocol.Position
 		expected lsp.DefinitionResponse
+		position protocol.Position
 	}{
 		{
 			name: "nothing to jump to",
@@ -447,8 +447,8 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 		name              string
 		initial           string
 		document          string
-		position          protocol.Position
 		expected          lsp.CompletionResponse
+		position          protocol.Position
 		expectDiagnostics bool
 	}{
 		{

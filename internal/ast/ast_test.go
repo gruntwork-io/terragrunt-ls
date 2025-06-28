@@ -14,9 +14,9 @@ func TestParseHCLFile(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
+		expectedNodesAt map[hcl.Pos]string
 		name            string
 		contents        string
-		expectedNodesAt map[hcl.Pos]string
 	}{
 		{
 			name:     "empty hcl",
@@ -308,8 +308,8 @@ func TestGetNodeIncludeLabel(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
 		expected string
+		pos      hcl.Pos
 	}{
 		{
 			name: "not an include block",
@@ -366,8 +366,8 @@ func TestGetNodeDependencyLabel(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
 		expected string
+		pos      hcl.Pos
 	}{
 		{
 			name: "not a dependency block",
@@ -430,10 +430,10 @@ func TestFindFirstParentMatch(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
+		matcher  func(node *ast.IndexedNode) bool
 		name     string
 		content  string
 		pos      hcl.Pos
-		matcher  func(node *ast.IndexedNode) bool
 		expected bool
 	}{
 		{

@@ -14,8 +14,8 @@ func TestGetCursorWord(t *testing.T) {
 	tc := []struct {
 		name     string
 		document string
-		position protocol.Position
 		expected string
+		position protocol.Position
 	}{
 		{
 			name:     "simple word",
