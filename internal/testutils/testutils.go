@@ -16,6 +16,7 @@ var _ logger.Logger = &testLogger{}
 type testLogger struct {
 	*slog.Logger
 	writer io.WriteCloser
+	level  slog.Level
 }
 
 func NewTestLogger(t *testing.T) *testLogger {
@@ -32,6 +33,7 @@ func NewTestLogger(t *testing.T) *testLogger {
 	return &testLogger{
 		Logger: slogger,
 		writer: testWriter,
+		level:  slog.LevelDebug,
 	}
 }
 
@@ -81,6 +83,11 @@ func (l *testLogger) Close() error {
 // Writer returns the writer for the logger
 func (l *testLogger) Writer() io.WriteCloser {
 	return l.writer
+}
+
+// Level returns the level of the logger
+func (l *testLogger) Level() slog.Level {
+	return l.level
 }
 
 // Debug logs a debug message

@@ -42,6 +42,77 @@ golangci-lint run ./...
 
 This will run the linter on the project.
 
+## Logging
+
+The terragrunt-ls language server includes basic logging capabilities to help with development and debugging. The logging system is built on Go's structured logging (`slog`) package and provides multiple log levels and output formats.
+
+### Configuration
+
+Logging is configured using the `TG_LS_LOG` environment variable.
+
+### Log Levels and Output Formats
+
+#### File Logging
+
+When `TG_LS_LOG` is set to a file path:
+
+- **Format**: JSON structured logs
+- **Level**: Debug and above (Debug, Info, Warn, Error)
+- **Output**: Specified file
+
+```bash
+# Enable detailed file logging
+export TG_LS_LOG=/tmp/terragrunt-ls.log
+./terragrunt-ls
+```
+
+#### Console Logging
+
+When `TG_LS_LOG` is not set:
+
+- **Format**: Human-readable text
+- **Level**: Info and above (Info, Warn, Error)
+- **Output**: stderr
+
+```bash
+# Basic console logging
+./terragrunt-ls
+```
+
+### Development Usage
+
+For development and debugging, it's recommended to use file logging:
+
+```bash
+# Set up file logging
+export TG_LS_LOG=/tmp/terragrunt-ls-debug.log
+
+# Build and run the language server
+go build && ./terragrunt-ls
+
+# Monitor logs in real-time
+tail -f /tmp/terragrunt-ls-debug.log
+```
+
+### Log Structure
+
+The logger uses structured logging with key-value pairs for better searchability and parsing:
+
+```go
+// Example usage in code
+logger.Debug("Processing completion request",
+    "uri", documentURI,
+    "position", position)
+
+logger.Error("Failed to parse request",
+    "error", err,
+    "method", method)
+```
+
+### Integration with the Terragrunt logger
+
+
+
 ## Installing
 
 To install the project, you can run the following command:
