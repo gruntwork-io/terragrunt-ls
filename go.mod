@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/gruntwork-io/terragrunt v0.82.3
 	github.com/hashicorp/hcl/v2 v2.23.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/zclconf/go-cty v1.16.3
 	go.lsp.dev/protocol v0.12.0
@@ -146,7 +147,6 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.5.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/urfave/cli v1.22.17 // indirect
