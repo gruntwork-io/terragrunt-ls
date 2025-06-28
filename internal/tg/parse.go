@@ -2,7 +2,6 @@ package tg
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -46,7 +45,7 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 	opts.NonInteractive = true
 
 	tgLogger := tgLog.New(
-		tgLog.WithOutput(os.Stderr),
+		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.InfoLevel),
 		tgLog.WithFormatter(format.NewFormatter(format.NewPrettyFormatPlaceholders())),
 	)

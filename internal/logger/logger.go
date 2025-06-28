@@ -12,11 +12,12 @@ var _ Logger = &slogLogger{}
 // slogLogger is a wrapper around slog.Logger that provides additional methods
 type slogLogger struct {
 	*slog.Logger
-	closer io.Closer
+	writer io.WriteCloser
 }
 
 type Logger interface {
 	Close() error
+	Writer() io.WriteCloser
 	Debug(msg string, args ...any)
 	Info(msg string, args ...any)
 	Warn(msg string, args ...any)
@@ -54,17 +55,22 @@ func NewLogger(filename string) *slogLogger {
 
 	return &slogLogger{
 		Logger: logger,
-		closer: file,
+		writer: file,
 	}
 }
 
 // Close closes the logger
 func (l *slogLogger) Close() error {
-	if l.closer != nil {
-		return l.closer.Close()
+	if l.writer != nil {
+		return l.writer.Close()
 	}
 
 	return nil
+}
+
+// Writer returns the writer for the logger
+func (l *slogLogger) Writer() io.WriteCloser {
+	return l.writer
 }
 
 // Debug logs a debug message

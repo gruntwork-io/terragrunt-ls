@@ -15,7 +15,7 @@ var _ logger.Logger = &testLogger{}
 // Logger is a wrapper around slog.Logger that provides additional methods
 type testLogger struct {
 	*slog.Logger
-	closer io.Closer
+	writer io.WriteCloser
 }
 
 func NewTestLogger(t *testing.T) *testLogger {
@@ -31,6 +31,7 @@ func NewTestLogger(t *testing.T) *testLogger {
 	// Create a new logger with the test writer
 	return &testLogger{
 		Logger: slogger,
+		writer: testWriter,
 	}
 }
 
@@ -42,6 +43,10 @@ type testWriter struct {
 func (tw testWriter) Write(p []byte) (n int, err error) {
 	tw.t.Log(string(p))
 	return len(p), nil
+}
+
+func (tw testWriter) Close() error {
+	return nil
 }
 
 func PointerOfInt(i int) *int {
@@ -66,11 +71,16 @@ func CreateFileWithMode(dir, name, content string, mode os.FileMode) (string, er
 
 // Close closes the logger
 func (l *testLogger) Close() error {
-	if l.closer != nil {
-		return l.closer.Close()
+	if l.writer != nil {
+		return l.writer.Close()
 	}
 
 	return nil
+}
+
+// Writer returns the writer for the logger
+func (l *testLogger) Writer() io.WriteCloser {
+	return l.writer
 }
 
 // Debug logs a debug message
