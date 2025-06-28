@@ -6,3 +6,6 @@ tmp-fixtures
 
 .DS_Store
 *.log
+
+vendor
+.licensei.cache

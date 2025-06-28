@@ -10,7 +10,10 @@ import (
 	"github.com/gruntwork-io/terragrunt/config"
 	"github.com/gruntwork-io/terragrunt/config/hclparse"
 	"github.com/gruntwork-io/terragrunt/options"
+	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
+	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
 )
 
@@ -42,10 +45,16 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 	opts.SkipOutput = true
 	opts.NonInteractive = true
 
-	ctx := config.NewParsingContext(context.TODO(), opts)
+	tgLogger := tgLog.New(
+		tgLog.WithOutput(l.Writer()),
+		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
+		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
+	)
+
+	ctx := config.NewParsingContext(context.TODO(), tgLogger, opts)
 	ctx.ParserOptions = parseOptions
 
-	cfg, err := config.ParseConfigString(ctx, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, tgLogger, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)

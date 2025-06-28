@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"terragrunt-ls/internal/config"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/rpc"
@@ -14,9 +15,9 @@ import (
 )
 
 func main() {
-	logfile := os.Getenv("TG_LS_LOG")
+	cfg := config.Load()
 
-	l := logger.NewLogger(logfile)
+	l := logger.NewLogger(cfg.LogFile, cfg.LogLevel)
 	defer func() {
 		if err := l.Close(); err != nil {
 			panic(err)

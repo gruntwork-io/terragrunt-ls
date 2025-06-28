@@ -12,11 +12,14 @@ var _ Logger = &slogLogger{}
 // slogLogger is a wrapper around slog.Logger that provides additional methods
 type slogLogger struct {
 	*slog.Logger
-	closer io.Closer
+	writer io.WriteCloser
+	level  slog.Level
 }
 
 type Logger interface {
 	Close() error
+	Writer() io.WriteCloser
+	Level() slog.Level
 	Debug(msg string, args ...any)
 	Info(msg string, args ...any)
 	Warn(msg string, args ...any)
@@ -27,15 +30,16 @@ type Logger interface {
 //
 // When supplied with a filename, it'll create a new file and write logs to it.
 // Otherwise, it'll write logs to stderr.
-func NewLogger(filename string) *slogLogger {
+func NewLogger(filename string, level slog.Level) *slogLogger {
 	if filename == "" {
 		handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
+			Level: level,
 		})
 		logger := slog.New(handler)
 
 		return &slogLogger{
 			Logger: logger,
+			level:  level,
 		}
 	}
 
@@ -48,23 +52,34 @@ func NewLogger(filename string) *slogLogger {
 	}
 
 	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: level,
 	})
 	logger := slog.New(handler)
 
 	return &slogLogger{
 		Logger: logger,
-		closer: file,
+		writer: file,
+		level:  level,
 	}
 }
 
 // Close closes the logger
 func (l *slogLogger) Close() error {
-	if l.closer != nil {
-		return l.closer.Close()
+	if l.writer != nil {
+		return l.writer.Close()
 	}
 
 	return nil
+}
+
+// Writer returns the writer for the logger
+func (l *slogLogger) Writer() io.WriteCloser {
+	return l.writer
+}
+
+// Level returns the level of the logger
+func (l *slogLogger) Level() slog.Level {
+	return l.level
 }
 
 // Debug logs a debug message

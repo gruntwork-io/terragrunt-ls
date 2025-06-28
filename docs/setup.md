@@ -40,11 +40,13 @@ To install the Visual Studio Code extension, you can manually compile the extens
    npm install -g @vscode/vsce
    npm install -g typescript
    ```
+
 3. Install local javascript packages
+
    ```bash
    npm install
    ```
-   
+
 4. Run the following command to package the extension:
 
    ```bash
