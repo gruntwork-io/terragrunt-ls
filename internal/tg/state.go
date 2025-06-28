@@ -315,7 +315,7 @@ func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position pr
 }
 
 func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
-	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position)
+	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position, docURI.Filename())
 
 	response := lsp.CompletionResponse{
 		Response: lsp.Response{

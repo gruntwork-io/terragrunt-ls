@@ -3,6 +3,7 @@ package tg_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 	"testing"
@@ -33,6 +34,51 @@ func TestParseTerragruntBuffer(t *testing.T) {
 			content: `
 terraform {
   source = "./modules/example"
+}
+`,
+			wantDiag: false,
+		},
+		{
+			name: "terragrunt stack file",
+			setup: func(t *testing.T, tmpDir string) string {
+				t.Helper()
+
+				path := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+				return path
+			},
+			content: `
+unit "database" {
+  source = "git::git@github.com:acme/infrastructure-catalog.git//units/mysql"
+  path   = "database"
+}
+
+unit "app" {
+  source = "git::git@github.com:acme/infrastructure-catalog.git//units/app"
+  path   = "app"
+}
+`,
+			wantDiag: false,
+		},
+		{
+			name: "terragrunt values file",
+			setup: func(t *testing.T, tmpDir string) string {
+				t.Helper()
+
+				path := filepath.Join(tmpDir, "terragrunt.values.hcl")
+				return path
+			},
+			content: `
+values {
+  instance_type = "t3.micro"
+  environment   = "dev"
+}
+
+dependency "vpc" {
+  config_path = "../vpc"
+
+  mock_outputs = {
+    vpc_id = "vpc-1234567890"
+  }
 }
 `,
 			wantDiag: false,
@@ -98,7 +144,57 @@ inputs = {
 				assert.Empty(t, diags, "expected no diagnostics but got: %v", diags)
 			}
 
-			assert.NotNil(t, cfg, "expected config to not be nil")
+			// For stack and values files, cfg will be nil but should not cause errors
+			if strings.Contains(filename, ".stack.hcl") || strings.Contains(filename, ".values.hcl") {
+				assert.Nil(t, cfg, "expected nil config for stack/values files")
+			} else {
+				assert.NotNil(t, cfg, "expected config to not be nil for regular terragrunt files")
+			}
+		})
+	}
+}
+
+func TestGetTerragruntFileType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		filename string
+		name     string
+		expected tg.TerragruntFileType
+	}{
+		{
+			name:     "terragrunt.hcl file",
+			filename: "/path/to/terragrunt.hcl",
+			expected: tg.TerragruntFileTypeConfig,
+		},
+		{
+			name:     "terragrunt.stack.hcl file",
+			filename: "/path/to/terragrunt.stack.hcl",
+			expected: tg.TerragruntFileTypeStack,
+		},
+		{
+			name:     "terragrunt.values.hcl file",
+			filename: "/path/to/terragrunt.values.hcl",
+			expected: tg.TerragruntFileTypeValues,
+		},
+		{
+			name:     "other .hcl file",
+			filename: "/path/to/variables.hcl",
+			expected: tg.TerragruntFileTypeConfig,
+		},
+		{
+			name:     "non-hcl file",
+			filename: "/path/to/main.tf",
+			expected: tg.TerragruntFileTypeUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tg.GetTerragruntFileType(tt.filename)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
