@@ -14,6 +14,7 @@ import (
 	"terragrunt-ls/internal/tg/text"
 
 	"github.com/gruntwork-io/terragrunt/config"
+	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
@@ -23,10 +24,14 @@ import (
 type State struct {
 	// Map of file names to Terragrunt configs
 	Configs map[string]store.Store
+	// Map of file names to stack configs
+	StackConfigs map[string]store.StackStore
+	// Map of file names to values configs
+	ValuesConfigs map[string]store.ValuesStore
 }
 
 func NewState() State {
-	return State{Configs: map[string]store.Store{}}
+	return State{Configs: map[string]store.Store{}, StackConfigs: map[string]store.StackStore{}, ValuesConfigs: map[string]store.ValuesStore{}}
 }
 
 func (s *State) OpenDocument(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
@@ -51,8 +56,25 @@ func (s *State) UpdateDocument(l logger.Logger, docURI protocol.DocumentURI, tex
 
 func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	// Ignore errors from AST indexing since we'll get the same errors from the Terragrunt parser just below
-	ast, _ := ast.ParseHCLFile(docURI.Filename(), []byte(text))
+	astTree, _ := ast.ParseHCLFile(docURI.Filename(), []byte(text))
 
+	filename := docURI.Filename()
+	fileType := GetTerragruntFileType(filename)
+
+	switch fileType {
+	case TerragruntFileTypeConfig:
+		return s.updateConfigState(l, docURI, text, astTree)
+	case TerragruntFileTypeStack:
+		return s.updateStackState(l, docURI, text, astTree)
+	case TerragruntFileTypeValues:
+		return s.updateValuesState(l, docURI, text, astTree)
+	default:
+		l.Debug("Unknown file type", "filename", filename, "fileType", fileType)
+		return []protocol.Diagnostic{}
+	}
+}
+
+func (s *State) updateConfigState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
 	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
 
 	l.Debug(
@@ -70,7 +92,7 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 	}
 
 	s.Configs[docURI.Filename()] = store.Store{
-		AST:      ast,
+		AST:      astTree,
 		Cfg:      cfg,
 		CfgAsCty: cfgAsCty,
 		Document: text,
@@ -79,14 +101,81 @@ func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text s
 	return diags
 }
 
+func (s *State) updateStackState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
+	// Parse stack configuration
+	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+
+	l.Debug(
+		"Stack Config",
+		"uri", docURI,
+		"config", cfg,
+	)
+
+	// For now, we'll store nil StackConfig since ParseTerragruntBuffer doesn't return it yet
+	// TODO: Update when ParseTerragruntStackBuffer returns proper StackConfig
+	s.StackConfigs[docURI.Filename()] = store.StackStore{
+		AST:      astTree,
+		StackCfg: nil, // Will be populated when parsing is fully implemented
+		Document: text,
+	}
+
+	return diags
+}
+
+func (s *State) updateValuesState(l logger.Logger, docURI protocol.DocumentURI, text string, astTree *ast.IndexedAST) []protocol.Diagnostic {
+	// Parse values configuration
+	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+
+	l.Debug(
+		"Values Config",
+		"uri", docURI,
+		"config", cfg,
+	)
+
+	// For now, we'll store the HCL file from the AST
+	// TODO: Extract proper HCL file structure for values
+	var valuesHCL *hcl.File
+	if astTree != nil {
+		valuesHCL = astTree.HCLFile
+	}
+
+	s.ValuesConfigs[docURI.Filename()] = store.ValuesStore{
+		AST:       astTree,
+		ValuesHCL: valuesHCL,
+		Document:  text,
+	}
+
+	return diags
+}
+
 func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	store := s.Configs[docURI.Filename()]
+	filename := docURI.Filename()
+	fileType := GetTerragruntFileType(filename)
 
 	l.Debug(
 		"Hovering over character",
 		"uri", docURI,
 		"position", position,
+		"fileType", fileType,
 	)
+
+	switch fileType {
+	case TerragruntFileTypeConfig:
+		return s.hoverConfig(l, id, docURI, position)
+	case TerragruntFileTypeStack:
+		return s.hoverStack(l, id, docURI, position)
+	case TerragruntFileTypeValues:
+		return s.hoverValues(l, id, docURI, position)
+	default:
+		return newEmptyHoverResponse(id)
+	}
+}
+
+func (s *State) hoverConfig(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+	store, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return newEmptyHoverResponse(id)
+	}
 
 	l.Debug(
 		"Config",
@@ -145,6 +234,40 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 	return newEmptyHoverResponse(id)
 }
 
+func (s *State) hoverStack(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+	_, ok := s.StackConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyHoverResponse(id)
+	}
+
+	l.Debug(
+		"Stack hover requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	// TODO: Implement stack-specific hover logic
+	// For now, return empty response
+	return newEmptyHoverResponse(id)
+}
+
+func (s *State) hoverValues(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
+	_, ok := s.ValuesConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyHoverResponse(id)
+	}
+
+	l.Debug(
+		"Values hover requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	// TODO: Implement values-specific hover logic
+	// For now, return empty response
+	return newEmptyHoverResponse(id)
+}
+
 func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	return lsp.HoverResponse{
 		Response: lsp.Response{
@@ -155,13 +278,33 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 }
 
 func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	store := s.Configs[docURI.Filename()]
+	filename := docURI.Filename()
+	fileType := GetTerragruntFileType(filename)
 
 	l.Debug(
 		"Definition requested",
 		"uri", docURI,
 		"position", position,
+		"fileType", fileType,
 	)
+
+	switch fileType {
+	case TerragruntFileTypeConfig:
+		return s.definitionConfig(l, id, docURI, position)
+	case TerragruntFileTypeStack:
+		return s.definitionStack(l, id, docURI, position)
+	case TerragruntFileTypeValues:
+		return s.definitionValues(l, id, docURI, position)
+	default:
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+}
+
+func (s *State) definitionConfig(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	store, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
 
 	target, context := definition.GetDefinitionTargetWithContext(l, store, position)
 
@@ -314,8 +457,73 @@ func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position pr
 	}
 }
 
+func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	_, ok := s.StackConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug(
+		"Stack definition requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	// TODO: Implement stack-specific definition logic
+	// For now, return empty response
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
+func (s *State) definitionValues(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	_, ok := s.ValuesConfigs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug(
+		"Values definition requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	// TODO: Implement values-specific definition logic
+	// For now, return empty response
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
 func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
-	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position, docURI.Filename())
+	filename := docURI.Filename()
+	fileType := GetTerragruntFileType(filename)
+
+	var items []protocol.CompletionItem
+
+	switch fileType {
+	case TerragruntFileTypeConfig:
+		if store, ok := s.Configs[filename]; ok {
+			items = completion.GetCompletions(l, store, position, filename)
+		}
+	case TerragruntFileTypeStack:
+		// For stack files, create a minimal store with just the document text
+		// since GetCompletions mainly uses filename for file type detection
+		if stackStore, ok := s.StackConfigs[filename]; ok {
+			minimalStore := store.Store{
+				Document: stackStore.Document,
+				AST:      stackStore.AST,
+			}
+			items = completion.GetCompletions(l, minimalStore, position, filename)
+		}
+	case TerragruntFileTypeValues:
+		// For values files, create a minimal store with just the document text
+		if valuesStore, ok := s.ValuesConfigs[filename]; ok {
+			minimalStore := store.Store{
+				Document: valuesStore.Document,
+				AST:      valuesStore.AST,
+			}
+			items = completion.GetCompletions(l, minimalStore, position, filename)
+		}
+	default:
+		items = []protocol.CompletionItem{}
+	}
 
 	response := lsp.CompletionResponse{
 		Response: lsp.Response{
@@ -329,14 +537,48 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 }
 
 func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.DocumentURI) lsp.FormatResponse {
-	store := s.Configs[docURI.Filename()]
+	filename := docURI.Filename()
+	fileType := GetTerragruntFileType(filename)
 
 	l.Debug(
 		"Formatting requested",
 		"uri", docURI,
+		"fileType", fileType,
 	)
 
-	formatted := hclwrite.Format([]byte(store.Document))
+	var document string
+	var found bool
+
+	switch fileType {
+	case TerragruntFileTypeConfig:
+		if store, ok := s.Configs[filename]; ok {
+			document = store.Document
+			found = true
+		}
+	case TerragruntFileTypeStack:
+		if stackStore, ok := s.StackConfigs[filename]; ok {
+			document = stackStore.Document
+			found = true
+		}
+	case TerragruntFileTypeValues:
+		if valuesStore, ok := s.ValuesConfigs[filename]; ok {
+			document = valuesStore.Document
+			found = true
+		}
+	}
+
+	if !found {
+		// Return empty response if document not found
+		return lsp.FormatResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: []protocol.TextEdit{},
+		}
+	}
+
+	formatted := hclwrite.Format([]byte(document))
 
 	return lsp.FormatResponse{
 		Response: lsp.Response{
@@ -350,7 +592,7 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 						Line:      0,
 						Character: 0,
 					},
-					End: getEndOfDocument(store.Document),
+					End: getEndOfDocument(document),
 				},
 				NewText: string(formatted),
 			},
