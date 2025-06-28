@@ -13,6 +13,7 @@ import (
 	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
 )
 
@@ -46,8 +47,8 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 
 	tgLogger := tgLog.New(
 		tgLog.WithOutput(l.Writer()),
-		tgLog.WithLevel(tgLog.InfoLevel),
-		tgLog.WithFormatter(format.NewFormatter(format.NewPrettyFormatPlaceholders())),
+		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
+		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
 	ctx := config.NewParsingContext(context.TODO(), tgLogger, opts)
