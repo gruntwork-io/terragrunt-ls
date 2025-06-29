@@ -27,6 +27,7 @@ func GetStackDefinitionTargetWithContext(
 	l logger.Logger,
 	store store.StackStore,
 	position protocol.Position,
+	currentDir string,
 ) (string, string) {
 	if store.AST == nil {
 		l.Debug("No AST found for stack file")
@@ -51,13 +52,55 @@ func GetStackDefinitionTargetWithContext(
 		}
 
 		// Check if we're hovering over path attribute - navigate to unit directory
-		//
-		// FIXME: This is not correct.
-		// We actually want to navigate to the directory within `.terragrunt-stack`
-		// unless the user has specified `no_dot_stack` in their stack configuration.
 		if path, ok := store.AST.GetUnitPath(node); ok {
 			l.Debug("Found unit path for definition", "path", path)
-			return path, DefinitionContextStackPath
+
+			// Get the unit name to look up the configuration
+			unitName, hasName := store.AST.GetUnitLabel(node)
+			if !hasName {
+				l.Debug("Could not determine unit name for path resolution")
+				// Fallback to default behavior
+				resolved := filepath.Join(currentDir, ".terragrunt-stack", path, "terragrunt.hcl")
+				if _, err := os.Stat(resolved); err == nil {
+					return resolved, DefinitionContextStackPath
+				}
+
+				return "", DefinitionContextNull
+			}
+
+			// Look up the unit in the parsed configuration
+			var noStack bool
+
+			if store.StackCfg != nil {
+				for _, unit := range store.StackCfg.Units {
+					if unit.Name == unitName {
+						if unit.NoStack != nil {
+							noStack = *unit.NoStack
+						}
+
+						break
+					}
+				}
+			}
+
+			// Resolve the path based on no_dot_terragrunt_stack configuration
+			var resolved string
+			if noStack {
+				// Direct path - no .terragrunt-stack directory
+				resolved = filepath.Join(currentDir, path, "terragrunt.hcl")
+			} else {
+				// Default behavior - use .terragrunt-stack directory
+				resolved = filepath.Join(currentDir, ".terragrunt-stack", path, "terragrunt.hcl")
+			}
+
+			if _, err := os.Stat(resolved); err == nil {
+				l.Debug("Resolved unit path", "path", path, "resolved", resolved, "noStack", noStack)
+				return resolved, DefinitionContextStackPath
+			}
+
+			l.Debug("Could not resolve unit path", "path", path, "resolved", resolved, "noStack", noStack)
+
+			return "", DefinitionContextNull
 		}
 	}
 
@@ -70,13 +113,55 @@ func GetStackDefinitionTargetWithContext(
 		}
 
 		// Check if we're hovering over path attribute in stack block
-		//
-		// FIXME: This is not correct.
-		// We actually want to navigate to the directory within `.terragrunt-stack`
-		// unless the user has specified `no_dot_stack` in their stack configuration.
 		if path, ok := store.AST.GetUnitPath(node); ok { // reuse GetUnitPath since it's the same structure
 			l.Debug("Found stack path for definition", "path", path)
-			return path, DefinitionContextStackPath
+
+			// Get the stack name to look up the configuration
+			stackName, hasName := store.AST.GetStackLabel(node)
+			if !hasName {
+				l.Debug("Could not determine stack name for path resolution")
+				// Fallback to default behavior
+				resolved := filepath.Join(currentDir, ".terragrunt-stack", path, "terragrunt.hcl")
+				if _, err := os.Stat(resolved); err == nil {
+					return resolved, DefinitionContextStackPath
+				}
+
+				return "", DefinitionContextNull
+			}
+
+			// Look up the stack in the parsed configuration
+			var noStack bool
+
+			if store.StackCfg != nil {
+				for _, stack := range store.StackCfg.Stacks {
+					if stack.Name == stackName {
+						if stack.NoStack != nil {
+							noStack = *stack.NoStack
+						}
+
+						break
+					}
+				}
+			}
+
+			// Resolve the path based on no_dot_terragrunt_stack configuration
+			var resolved string
+			if noStack {
+				// Direct path - no .terragrunt-stack directory
+				resolved = filepath.Join(currentDir, path, "terragrunt.hcl")
+			} else {
+				// Default behavior - use .terragrunt-stack directory
+				resolved = filepath.Join(currentDir, ".terragrunt-stack", path, "terragrunt.hcl")
+			}
+
+			if _, err := os.Stat(resolved); err == nil {
+				l.Debug("Resolved stack path", "path", path, "resolved", resolved, "noStack", noStack)
+				return resolved, DefinitionContextStackPath
+			}
+
+			l.Debug("Could not resolve stack path", "path", path, "resolved", resolved, "noStack", noStack)
+
+			return "", DefinitionContextNull
 		}
 	}
 
@@ -98,18 +183,6 @@ func ResolveStackSourceLocation(source, currentDir string) (string, bool) {
 				return resolved, true
 			}
 		}
-	}
-
-	return "", false
-}
-
-// ResolveStackUnitPath resolves a unit path to a terragrunt.hcl file
-func ResolveStackUnitPath(path, currentDir string) (string, bool) {
-	// Unit paths are relative to the stack directory
-	resolved := filepath.Join(currentDir, path, "terragrunt.hcl")
-
-	if _, err := os.Stat(resolved); err == nil {
-		return resolved, true
 	}
 
 	return "", false

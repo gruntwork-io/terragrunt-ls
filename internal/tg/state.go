@@ -580,7 +580,8 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 		"position", position,
 	)
 
-	target, context := definition.GetStackDefinitionTargetWithContext(l, store, position)
+	currentDir := filepath.Dir(docURI.Filename())
+	target, context := definition.GetStackDefinitionTargetWithContext(l, store, position, currentDir)
 
 	l.Debug(
 		"Stack definition target discovered",
@@ -591,8 +592,6 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 	if target == "" {
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
-
-	currentDir := filepath.Dir(docURI.Filename())
 
 	switch context {
 	case definition.DefinitionContextStackSource:
@@ -618,26 +617,23 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 		l.Debug("Could not resolve source location", "source", target)
 
 	case definition.DefinitionContextStackPath:
-		if resolved, ok := definition.ResolveStackUnitPath(target, currentDir); ok {
-			defURI := uri.File(resolved)
-			l.Debug("Navigating to unit path", "path", target, "resolved", resolved)
+		// target is already the resolved file path
+		defURI := uri.File(target)
+		l.Debug("Navigating to unit path", "resolved", target)
 
-			return lsp.DefinitionResponse{
-				Response: lsp.Response{
-					RPC: lsp.RPCVersion,
-					ID:  &id,
+		return lsp.DefinitionResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: protocol.Location{
+				URI: defURI,
+				Range: protocol.Range{
+					Start: protocol.Position{Line: 0, Character: 0},
+					End:   protocol.Position{Line: 0, Character: 0},
 				},
-				Result: protocol.Location{
-					URI: defURI,
-					Range: protocol.Range{
-						Start: protocol.Position{Line: 0, Character: 0},
-						End:   protocol.Position{Line: 0, Character: 0},
-					},
-				},
-			}
+			},
 		}
-
-		l.Debug("Could not resolve unit path", "path", target)
 	}
 
 	return newEmptyDefinitionResponse(id, docURI, position)
