@@ -16,6 +16,8 @@ type StackAST interface {
 	GetStackLabel(node *ast.IndexedNode) (string, bool)
 	GetUnitSource(node *ast.IndexedNode) (string, bool)
 	GetUnitPath(node *ast.IndexedNode) (string, bool)
+	GetStackSource(node *ast.IndexedNode) (string, bool)
+	GetStackPath(node *ast.IndexedNode) (string, bool)
 	FindUnitAt(pos hcl.Pos) (*ast.IndexedNode, bool)
 	FindStackAt(pos hcl.Pos) (*ast.IndexedNode, bool)
 }
@@ -83,6 +85,16 @@ func (s *stackAST) GetUnitSource(node *ast.IndexedNode) (string, bool) {
 // GetUnitPath returns the path attribute value from a unit block
 func (s *stackAST) GetUnitPath(node *ast.IndexedNode) (string, bool) {
 	return s.getBlockAttribute(node, isUnitBlock, "path")
+}
+
+// GetStackSource returns the source attribute value from a stack block
+func (s *stackAST) GetStackSource(node *ast.IndexedNode) (string, bool) {
+	return s.getBlockAttribute(node, isStackBlock, "source")
+}
+
+// GetStackPath returns the path attribute value from a stack block
+func (s *stackAST) GetStackPath(node *ast.IndexedNode) (string, bool) {
+	return s.getBlockAttribute(node, isStackBlock, "path")
 }
 
 // FindUnitAt finds a unit block at the given position
