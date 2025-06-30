@@ -13,7 +13,10 @@ import (
 )
 
 const (
-	// DefinitionContextStackSource is the context for navigating to a source location
+	// DefinitionContextUnitSource is the context for navigating to a unit source location
+	DefinitionContextUnitSource = "unit_source"
+
+	// DefinitionContextStackSource is the context for navigating to a stack source location
 	DefinitionContextStackSource = "stack_source"
 
 	// DefinitionContextStackPath is the context for navigating to a unit path
@@ -48,7 +51,7 @@ func GetStackDefinitionTargetWithContext(
 	if _, ok := store.AST.FindUnitAt(pos); ok {
 		if source, ok := store.AST.GetUnitSource(node); ok {
 			l.Debug("Found unit source for definition", "source", source)
-			return source, DefinitionContextStackSource
+			return source, DefinitionContextUnitSource
 		}
 
 		if path, ok := store.AST.GetUnitPath(node); ok {
@@ -76,25 +79,40 @@ func GetStackDefinitionTargetWithContext(
 	return "", DefinitionContextNull
 }
 
-// ResolveStackSourceLocation attempts to resolve a source to a local file path
-func ResolveStackSourceLocation(source, currentDir string) (string, bool) {
+// ResolveUnitSourceLocation attempts to resolve a unit source to a Terraform file
+func ResolveUnitSourceLocation(source, currentDir string) string {
+	var absPath string
+
 	if filepath.IsAbs(source) {
-		if stat, err := os.Stat(source); err == nil {
-			if stat.IsDir() {
-				return source, true
-			}
-		}
+		absPath = source
+	} else {
+		absPath = filepath.Join(currentDir, source)
 	}
 
-	resolved := filepath.Join(currentDir, source)
-
-	if stat, err := os.Stat(resolved); err == nil {
-		if stat.IsDir() {
-			return resolved, true
-		}
+	unitFile := filepath.Join(absPath, "terragrunt.hcl")
+	if _, err := os.Stat(unitFile); err == nil {
+		return unitFile
 	}
 
-	return "", false
+	return ""
+}
+
+// ResolveStackSourceLocation attempts to resolve a stack source to a terragrunt.stack.hcl file
+func ResolveStackSourceLocation(source, currentDir string) string {
+	var absPath string
+
+	if filepath.IsAbs(source) {
+		absPath = source
+	} else {
+		absPath = filepath.Join(currentDir, source)
+	}
+
+	stackFile := filepath.Join(absPath, "terragrunt.stack.hcl")
+	if _, err := os.Stat(stackFile); err == nil {
+		return stackFile
+	}
+
+	return ""
 }
 
 // resolveBlockPath handles path resolution for both unit and stack blocks

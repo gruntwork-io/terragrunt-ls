@@ -137,23 +137,43 @@ func isStackBlock(inode *ast.IndexedNode) bool {
 
 // getBlockAttribute is a helper to get attribute values from blocks
 func (s *stackAST) getBlockAttribute(node *ast.IndexedNode, blockMatcher func(*ast.IndexedNode) bool, attrName string) (string, bool) {
+	// First, try to find the attribute that contains the current node
 	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
 	if attr == nil {
 		return "", false
 	}
 
-	// Check if this is the attribute we're looking for
-	if attrNode, ok := attr.Node.(*hclsyntax.Attribute); ok && attrNode.Name == attrName {
-		block := ast.FindFirstParentMatch(attr, blockMatcher)
-		if block != nil {
-			// Extract the string value from the attribute
-			if expr, ok := attrNode.Expr.(*hclsyntax.LiteralValueExpr); ok {
-				if expr.Val.Type().FriendlyName() == "string" {
-					return expr.Val.AsString(), true
-				}
+	// Check if the found attribute has the name we're looking for
+	if attrNode, ok := attr.Node.(*hclsyntax.Attribute); ok {
+		if attrNode.Name == attrName {
+			// Verify we're within the correct block type
+			block := ast.FindFirstParentMatch(attr, blockMatcher)
+			if block != nil {
+				// Extract the string value from the attribute expression
+				return s.extractStringValue(attrNode.Expr)
 			}
 		}
 	}
 
+	return "", false
+}
+
+// extractStringValue extracts a string value from various HCL expression types
+func (s *stackAST) extractStringValue(expr hclsyntax.Expression) (string, bool) {
+	switch e := expr.(type) {
+	case *hclsyntax.LiteralValueExpr:
+		if e.Val.Type().FriendlyName() == "string" {
+			return e.Val.AsString(), true
+		}
+	case *hclsyntax.TemplateExpr:
+		// Handle quoted strings which are parsed as TemplateExpr
+		if len(e.Parts) == 1 {
+			if literal, ok := e.Parts[0].(*hclsyntax.LiteralValueExpr); ok {
+				if literal.Val.Type().FriendlyName() == "string" {
+					return literal.Val.AsString(), true
+				}
+			}
+		}
+	}
 	return "", false
 }

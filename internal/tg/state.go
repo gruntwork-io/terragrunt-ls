@@ -594,10 +594,15 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 	}
 
 	switch context {
-	case definition.DefinitionContextStackSource:
-		if resolved, ok := definition.ResolveStackSourceLocation(target, currentDir); ok {
+	case definition.DefinitionContextUnitSource:
+		if resolved := definition.ResolveUnitSourceLocation(target, currentDir); resolved != "" {
 			defURI := uri.File(resolved)
-			l.Debug("Navigating to source", "source", target, "resolved", resolved)
+			l.Debug(
+				"Navigating to unit source",
+				"source", target,
+				"resolved", resolved,
+				"uri", defURI,
+			)
 
 			return lsp.DefinitionResponse{
 				Response: lsp.Response{
@@ -614,11 +619,42 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 			}
 		}
 
-		l.Debug("Could not resolve source location", "source", target)
+		l.Debug("Could not resolve unit source location", "source", target)
+
+	case definition.DefinitionContextStackSource:
+		if resolved := definition.ResolveStackSourceLocation(target, currentDir); resolved != "" {
+			defURI := uri.File(resolved)
+			l.Debug(
+				"Navigating to stack source",
+				"source", target,
+				"resolved", resolved,
+				"uri", defURI,
+			)
+
+			return lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: lsp.RPCVersion,
+					ID:  &id,
+				},
+				Result: protocol.Location{
+					URI: defURI,
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 0, Character: 0},
+						End:   protocol.Position{Line: 0, Character: 0},
+					},
+				},
+			}
+		}
+
+		l.Debug("Could not resolve stack source location", "source", target)
 
 	case definition.DefinitionContextStackPath:
 		defURI := uri.File(target)
-		l.Debug("Navigating to unit path", "resolved", target)
+		l.Debug(
+			"Navigating to unit path",
+			"resolved", target,
+			"uri", defURI,
+		)
 
 		return lsp.DefinitionResponse{
 			Response: lsp.Response{
