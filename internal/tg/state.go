@@ -617,7 +617,6 @@ func (s *State) definitionStack(l logger.Logger, id int, docURI protocol.Documen
 		l.Debug("Could not resolve source location", "source", target)
 
 	case definition.DefinitionContextStackPath:
-		// target is already the resolved file path
 		defURI := uri.File(target)
 		l.Debug("Navigating to unit path", "resolved", target)
 
@@ -717,19 +716,14 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 			items = completion.GetCompletions(l, store, position, filename)
 		}
 	case TerragruntFileTypeStack:
-		// Use real stack store now that we have proper functionality
 		if stackStore, ok := s.StackConfigs[filename]; ok {
-			// Create a compatible store struct for the completion function
-			// The completion function currently expects store.Store but we can adapt it
 			compatStore := store.Store{
 				Document: stackStore.Document,
 			}
 			items = completion.GetCompletions(l, compatStore, position, filename)
 		}
 	case TerragruntFileTypeValues:
-		// Use real values store now that we have proper functionality
 		if valuesStore, ok := s.ValuesConfigs[filename]; ok {
-			// Create a compatible store struct for the completion function
 			compatStore := store.Store{
 				Document: valuesStore.Document,
 			}
@@ -781,13 +775,10 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 			found = true
 		}
 	case TerragruntFileTypeUnknown:
-		// Do nothing - found remains false
 	default:
-		// Do nothing - found remains false
 	}
 
 	if !found {
-		// Return empty response if document not found
 		return lsp.FormatResponse{
 			Response: lsp.Response{
 				RPC: lsp.RPCVersion,

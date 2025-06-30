@@ -46,13 +46,11 @@ func GetStackDefinitionTargetWithContext(
 
 	// Check if we're in a unit block
 	if _, ok := store.AST.FindUnitAt(pos); ok {
-		// Check if we're hovering over source attribute - navigate to source if local
 		if source, ok := store.AST.GetUnitSource(node); ok {
 			l.Debug("Found unit source for definition", "source", source)
 			return source, DefinitionContextStackSource
 		}
 
-		// Check if we're hovering over path attribute - navigate to unit directory
 		if path, ok := store.AST.GetUnitPath(node); ok {
 			l.Debug("Found unit path for definition", "path", path)
 			return resolveBlockPath(l, store, node, path, currentDir, "unit")
@@ -67,7 +65,6 @@ func GetStackDefinitionTargetWithContext(
 			return source, DefinitionContextStackSource
 		}
 
-		// Check if we're hovering over path attribute in stack block
 		if path, ok := store.AST.GetStackPath(node); ok {
 			l.Debug("Found stack path for definition", "path", path)
 			return resolveBlockPath(l, store, node, path, currentDir, "stack")
@@ -81,16 +78,19 @@ func GetStackDefinitionTargetWithContext(
 
 // ResolveStackSourceLocation attempts to resolve a source to a local file path
 func ResolveStackSourceLocation(source, currentDir string) (string, bool) {
-	// Handle relative paths
-	if !filepath.IsAbs(source) {
-		resolved := filepath.Join(currentDir, source)
-
-		// Check if it's a directory.
-		// This implicitly only handles local paths.
-		if stat, err := os.Stat(resolved); err == nil {
+	if filepath.IsAbs(source) {
+		if stat, err := os.Stat(source); err == nil {
 			if stat.IsDir() {
-				return resolved, true
+				return source, true
 			}
+		}
+	}
+
+	resolved := filepath.Join(currentDir, source)
+
+	if stat, err := os.Stat(resolved); err == nil {
+		if stat.IsDir() {
+			return resolved, true
 		}
 	}
 
