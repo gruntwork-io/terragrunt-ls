@@ -2,6 +2,7 @@
 package completion
 
 import (
+	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
@@ -10,17 +11,53 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func GetCompletions(l logger.Logger, store store.Store, position protocol.Position) []protocol.CompletionItem {
-	word := text.GetCursorWord(store.Document, position)
-	completions := []protocol.CompletionItem{}
+// TerragruntFileType represents the type of Terragrunt configuration file
+type TerragruntFileType int
 
-	for _, completion := range newCompletions(position) {
-		if strings.HasPrefix(completion.Label, word) {
-			completions = append(completions, completion)
-		}
+const (
+	// TerragruntFileTypeUnknown represents an unknown file type
+	TerragruntFileTypeUnknown TerragruntFileType = iota
+	// TerragruntFileTypeConfig represents a standard terragrunt.hcl file
+	TerragruntFileTypeConfig
+	// TerragruntFileTypeStack represents a terragrunt.stack.hcl file
+	TerragruntFileTypeStack
+	// TerragruntFileTypeValues represents a terragrunt.values.hcl file
+	TerragruntFileTypeValues
+)
+
+// GetTerragruntFileType determines the type of Terragrunt file based on its name
+func GetTerragruntFileType(filename string) TerragruntFileType {
+	base := filepath.Base(filename)
+
+	switch {
+	case strings.HasSuffix(base, ".stack.hcl"):
+		return TerragruntFileTypeStack
+	case strings.HasSuffix(base, ".values.hcl"):
+		return TerragruntFileTypeValues
+	case base != ".terraform.lock.hcl" && strings.HasSuffix(base, ".hcl"):
+		return TerragruntFileTypeConfig
+	default:
+		return TerragruntFileTypeUnknown
 	}
+}
 
-	return completions
+// GetCompletions returns completion suggestions for the given position in the document
+func GetCompletions(l logger.Logger, store store.Store, position protocol.Position, filename string) []protocol.CompletionItem {
+	// Determine file type for context-specific completions
+	fileType := GetTerragruntFileType(filename)
+
+	switch fileType {
+	case TerragruntFileTypeStack:
+		return getStackCompletions(position)
+	case TerragruntFileTypeValues:
+		return getValuesCompletions(position)
+	case TerragruntFileTypeConfig:
+		return getConfigCompletions(store, position)
+	case TerragruntFileTypeUnknown:
+		return []protocol.CompletionItem{}
+	default:
+		return []protocol.CompletionItem{}
+	}
 }
 
 // newCompletions returns a list of completions for the given position.
@@ -406,4 +443,92 @@ The terragrunt_version_constraint attribute is used to specify which versions of
 			},
 		},
 	}
+}
+
+// createCompletionItem creates a completion item with the given parameters
+func createCompletionItem(label, docValue, newText string, position protocol.Position) protocol.CompletionItem {
+	return protocol.CompletionItem{
+		Label: label,
+		Documentation: protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: docValue,
+		},
+		Kind:             protocol.CompletionItemKindClass,
+		InsertTextFormat: protocol.InsertTextFormatSnippet,
+		TextEdit: &protocol.TextEdit{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: position.Line, Character: 0},
+				End:   protocol.Position{Line: position.Line, Character: position.Character},
+			},
+			NewText: newText,
+		},
+	}
+}
+
+// getStackCompletions returns completions specific to terragrunt.stack.hcl files
+func getStackCompletions(position protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		createCompletionItem(
+			"unit",
+			`# unit
+The unit block is used to define a single infrastructure unit in a Terragrunt stack.`,
+			`unit "${1:name}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+			position,
+		),
+		createCompletionItem(
+			"stack",
+			`# stack
+The stack block is used to define a nested stack within a Terragrunt stack.`,
+			`stack "${1:name}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+			position,
+		),
+	}
+}
+
+// getValuesCompletions returns completions specific to terragrunt.values.hcl files
+func getValuesCompletions(position protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		createCompletionItem(
+			"values",
+			`# values
+The values block is used to define dynamic values for units in Terragrunt stacks.`,
+			`values {
+	${1:key} = "${2:value}"
+}`,
+			position,
+		),
+		createCompletionItem(
+			"dependency",
+			`# dependency
+The dependency block is used to reference outputs from other units in values files.`,
+			`dependency "${1:name}" {
+	config_path = "${2}"
+
+	mock_outputs = {
+		${3:output_name} = "${4:mock_value}"
+	}
+}`,
+			position,
+		),
+	}
+}
+
+// getConfigCompletions returns completions for standard terragrunt.hcl files
+func getConfigCompletions(store store.Store, position protocol.Position) []protocol.CompletionItem {
+	word := text.GetCursorWord(store.Document, position)
+	completions := []protocol.CompletionItem{}
+
+	for _, completion := range newCompletions(position) {
+		if strings.HasPrefix(completion.Label, word) {
+			completions = append(completions, completion)
+		}
+	}
+
+	return completions
 }
