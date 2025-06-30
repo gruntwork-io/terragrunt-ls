@@ -8,6 +8,7 @@ import (
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
+	"github.com/gruntwork-io/terragrunt/config"
 	"go.lsp.dev/protocol"
 )
 
@@ -103,7 +104,7 @@ func resolveBlockPath(
 	node *ast.IndexedNode,
 	path string,
 	currentDir string,
-	blockType string, // "unit" or "stack"
+	blockType string,
 ) (string, string) {
 	var blockName string
 
@@ -127,33 +128,13 @@ func resolveBlockPath(
 		return "", DefinitionContextNull
 	}
 
-	// Look up the block in the parsed configuration
-	var noStack bool
-
+	// Look up the block in the parsed configuration to get noStack setting
+	noStack := false
 	if store.StackCfg != nil {
-		if blockType == "unit" {
-			for _, unit := range store.StackCfg.Units {
-				if unit.Name == blockName {
-					if unit.NoStack != nil {
-						noStack = *unit.NoStack
-					}
-
-					break
-				}
-			}
-		} else {
-			for _, stack := range store.StackCfg.Stacks {
-				if stack.Name == blockName {
-					if stack.NoStack != nil {
-						noStack = *stack.NoStack
-					}
-
-					break
-				}
-			}
-		}
+		noStack = lookupNoStackConfig(store.StackCfg, blockName, blockType)
 	}
 
+	// Resolve the path based on no_dot_terragrunt_stack configuration
 	var resolved string
 	if noStack {
 		resolved = filepath.Join(currentDir, path, "terragrunt.hcl")
@@ -169,4 +150,42 @@ func resolveBlockPath(
 	l.Debug("Could not resolve "+blockType+" path", "path", path, "resolved", resolved, "noStack", noStack)
 
 	return "", DefinitionContextNull
+}
+
+// lookupNoStackConfig looks up the no_dot_terragrunt_stack configuration for a given block
+func lookupNoStackConfig(stackCfg *config.StackConfig, blockName, blockType string) bool {
+	switch blockType {
+	case "unit":
+		for _, unit := range stackCfg.Units {
+			if unit.Name != blockName {
+				continue
+			}
+
+			if unit.NoStack != nil {
+				return *unit.NoStack
+			}
+
+			return false
+		}
+
+		return false
+
+	case "stack":
+		for _, stack := range stackCfg.Stacks {
+			if stack.Name != blockName {
+				continue
+			}
+
+			if stack.NoStack != nil {
+				return *stack.NoStack
+			}
+
+			return false
+		}
+
+		return false
+
+	default:
+		return false
+	}
 }
