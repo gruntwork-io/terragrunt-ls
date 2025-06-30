@@ -40,10 +40,10 @@ stack "nested" {
 
 	tests := []struct {
 		name        string
+		description string
 		line        uint32
 		character   uint32
 		expectEmpty bool
-		description string
 	}{
 		{
 			name:        "unit source attribute value",
@@ -77,6 +77,8 @@ stack "nested" {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			position := protocol.Position{Line: tt.line, Character: tt.character}
 			defResponse := state.Definition(l, 1, docURI, position)
 

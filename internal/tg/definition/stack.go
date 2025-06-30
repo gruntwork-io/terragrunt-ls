@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/logger"
+	"terragrunt-ls/internal/stackutils"
 	"terragrunt-ls/internal/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/config"
@@ -49,28 +50,57 @@ func GetStackDefinitionTargetWithContext(
 
 	// Check if we're in a unit block
 	if _, ok := store.AST.FindUnitAt(pos); ok {
+		// Check if we're jumping to a unit source
 		if source, ok := store.AST.GetUnitSource(node); ok {
-			l.Debug("Found unit source for definition", "source", source)
+			l.Debug(
+				"Found unit source for definition",
+				"source", source,
+				"currentDir", currentDir,
+			)
+
 			return source, DefinitionContextUnitSource
 		}
 
-		if path, ok := store.AST.GetUnitPath(node); ok {
-			l.Debug("Found unit path for definition", "path", path)
-			return resolveBlockPath(l, store, node, path, currentDir, "unit")
+		// Check if we're jumping to a unit path
+		if blockName, ok := store.AST.GetUnitLabel(node); ok {
+			if path, ok := stackutils.LookupUnitPath(store.StackCfg, blockName); ok {
+				l.Debug(
+					"Found unit path for definition from parsed config",
+					"blockName", blockName,
+					"path", path,
+					"currentDir", currentDir,
+				)
+
+				return resolveBlockPath(l, store, node, path, currentDir, "unit")
+			}
 		}
 	}
 
-	// Check if we're in a stack block - could navigate to nested stack
+	// Check if we're in a stack block
 	if _, ok := store.AST.FindStackAt(pos); ok {
-		// Check if we're hovering over source attribute in stack block
+		// Check if we're jumping to a stack source
 		if source, ok := store.AST.GetStackSource(node); ok {
-			l.Debug("Found stack source for definition", "source", source)
+			l.Debug(
+				"Found stack source for definition",
+				"source", source,
+				"currentDir", currentDir,
+			)
+
 			return source, DefinitionContextStackSource
 		}
 
-		if path, ok := store.AST.GetStackPath(node); ok {
-			l.Debug("Found stack path for definition", "path", path)
-			return resolveBlockPath(l, store, node, path, currentDir, "stack")
+		// Check if we're jumping to a stack path
+		if blockName, ok := store.AST.GetStackLabel(node); ok {
+			if path, ok := stackutils.LookupStackPath(store.StackCfg, blockName); ok {
+				l.Debug(
+					"Found stack path for definition from parsed config",
+					"blockName", blockName,
+					"path", path,
+					"currentDir", currentDir,
+				)
+
+				return resolveBlockPath(l, store, node, path, currentDir, "stack")
+			}
 		}
 	}
 

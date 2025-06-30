@@ -175,5 +175,6 @@ func (s *stackAST) extractStringValue(expr hclsyntax.Expression) (string, bool) 
 			}
 		}
 	}
+
 	return "", false
 }

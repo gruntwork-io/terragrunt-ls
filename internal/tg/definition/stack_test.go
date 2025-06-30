@@ -22,6 +22,8 @@ func TestResolveUnitSourceLocation(t *testing.T) {
 		{
 			name: "directory with main.tf",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				moduleDir := filepath.Join(tmpDir, "modules", "database")
 				require.NoError(t, os.MkdirAll(moduleDir, 0755))
 
@@ -37,6 +39,8 @@ func TestResolveUnitSourceLocation(t *testing.T) {
 		{
 			name: "directory with other .tf files (no main.tf)",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				moduleDir := filepath.Join(tmpDir, "modules", "vpc")
 				require.NoError(t, os.MkdirAll(moduleDir, 0755))
 
@@ -52,6 +56,8 @@ func TestResolveUnitSourceLocation(t *testing.T) {
 		{
 			name: "directory with both main.tf and other files",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				moduleDir := filepath.Join(tmpDir, "modules", "priority-test")
 				require.NoError(t, os.MkdirAll(moduleDir, 0755))
 
@@ -67,6 +73,8 @@ func TestResolveUnitSourceLocation(t *testing.T) {
 		{
 			name: "directory with no terraform files",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				moduleDir := filepath.Join(tmpDir, "modules", "empty")
 				require.NoError(t, os.MkdirAll(moduleDir, 0755))
 
@@ -81,6 +89,8 @@ func TestResolveUnitSourceLocation(t *testing.T) {
 		{
 			name: "non-existent directory",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				return "./non-existent", tmpDir
 			},
 			expectedFile:  "",
@@ -134,6 +144,8 @@ func TestResolveStackSourceLocation(t *testing.T) {
 		{
 			name: "directory with terragrunt.stack.hcl",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				stackDir := filepath.Join(tmpDir, "stacks", "webapp")
 				require.NoError(t, os.MkdirAll(stackDir, 0755))
 
@@ -149,6 +161,8 @@ func TestResolveStackSourceLocation(t *testing.T) {
 		{
 			name: "directory with no stack file",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				stackDir := filepath.Join(tmpDir, "stacks", "empty")
 				require.NoError(t, os.MkdirAll(stackDir, 0755))
 
@@ -163,6 +177,8 @@ func TestResolveStackSourceLocation(t *testing.T) {
 		{
 			name: "non-existent directory",
 			setupFunc: func(t *testing.T, tmpDir string) (string, string) {
+				t.Helper()
+
 				return "./non-existent", tmpDir
 			},
 			expectedFile:  "",

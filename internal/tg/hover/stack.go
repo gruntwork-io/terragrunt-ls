@@ -4,6 +4,7 @@ package hover
 import (
 	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/logger"
+	"terragrunt-ls/internal/stackutils"
 	"terragrunt-ls/internal/tg/store"
 
 	"go.lsp.dev/protocol"
@@ -40,42 +41,52 @@ func GetStackHoverTargetWithContext(l logger.Logger, store store.StackStore, pos
 	}
 
 	// Check if we're in a unit block
-	if unitBlock, ok := store.AST.FindUnitAt(pos); ok {
-		if unitLabel, ok := store.AST.GetUnitLabel(node); ok {
-			l.Debug("Found unit block hover", "unit", unitLabel)
-			return unitLabel, HoverContextStackUnit
-		}
-
-		// Check if we're hovering over source attribute in unit block
+	if _, ok := store.AST.FindUnitAt(pos); ok {
+		// Check if we're hovering over source attribute
 		if source, ok := store.AST.GetUnitSource(node); ok {
 			l.Debug("Found unit source hover", "source", source)
 			return source, HoverContextStackSource
 		}
 
-		// Check if we're hovering over path attribute in unit block
-		if path, ok := store.AST.GetUnitPath(node); ok {
-			l.Debug("Found unit path hover", "path", path)
-			return path, HoverContextStackPath
+		// Check if we're on a path attribute
+		if blockName, ok := store.AST.GetUnitLabel(node); ok {
+			if path, ok := stackutils.LookupUnitPath(store.StackCfg, blockName); ok {
+				l.Debug("Found unit path hover from parsed config", "blockName", blockName, "path", path)
+				return path, HoverContextStackPath
+			}
 		}
 
-		// If we're in a unit block but not on a specific attribute, show unit info
-		if unitLabel, ok := store.AST.GetUnitLabel(unitBlock); ok {
-			l.Debug("Found unit block (general) hover", "unit", unitLabel)
-			return unitLabel, HoverContextStackUnit
+		// Fallback: if we're in a unit block but not on a specific attribute, show unit info
+		if unitBlock, ok := store.AST.FindUnitAt(pos); ok {
+			if unitLabel, ok := store.AST.GetUnitLabel(unitBlock); ok {
+				l.Debug("Found unit block (general) hover", "unit", unitLabel)
+				return unitLabel, HoverContextStackUnit
+			}
 		}
 	}
 
 	// Check if we're in a stack block
-	if stackBlock, ok := store.AST.FindStackAt(pos); ok {
-		if stackLabel, ok := store.AST.GetStackLabel(node); ok {
-			l.Debug("Found stack block hover", "stack", stackLabel)
-			return stackLabel, HoverContextStackBlock
+	if _, ok := store.AST.FindStackAt(pos); ok {
+		// Check if we're hovering over source attribute
+		if source, ok := store.AST.GetStackSource(node); ok {
+			l.Debug("Found stack source hover", "source", source)
+			return source, HoverContextStackSource
 		}
 
-		// If we're in a stack block but not on a specific attribute, show stack info
-		if stackLabel, ok := store.AST.GetStackLabel(stackBlock); ok {
-			l.Debug("Found stack block (general) hover", "stack", stackLabel)
-			return stackLabel, HoverContextStackBlock
+		// Check if we're on a path attribute
+		if blockName, ok := store.AST.GetStackLabel(node); ok {
+			if path, ok := stackutils.LookupStackPath(store.StackCfg, blockName); ok {
+				l.Debug("Found stack path hover from parsed config", "blockName", blockName, "path", path)
+				return path, HoverContextStackPath
+			}
+		}
+
+		// Fallback: if we're in a stack block but not on a specific attribute, show stack info
+		if stackBlock, ok := store.AST.FindStackAt(pos); ok {
+			if stackLabel, ok := store.AST.GetStackLabel(stackBlock); ok {
+				l.Debug("Found stack block (general) hover", "stack", stackLabel)
+				return stackLabel, HoverContextStackBlock
+			}
 		}
 	}
 

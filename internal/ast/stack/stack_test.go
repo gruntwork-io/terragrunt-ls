@@ -124,9 +124,9 @@ unit "database" {
 
 	tests := []struct {
 		name       string
+		expected   string
 		line       int
 		col        int
-		expected   string
 		shouldFind bool
 	}{
 		{
@@ -154,6 +154,8 @@ unit "database" {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pos := hcl.Pos{Line: tt.line, Column: tt.col}
 			node := stackAST.FindNodeAt(pos)
 			require.NotNil(t, node, "should find node at position")
@@ -189,9 +191,9 @@ unit "database" {
 
 	tests := []struct {
 		name       string
+		expected   string
 		line       int
 		col        int
-		expected   string
 		shouldFind bool
 	}{
 		{
@@ -212,6 +214,8 @@ unit "database" {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pos := hcl.Pos{Line: tt.line, Column: tt.col}
 			node := stackAST.FindNodeAt(pos)
 			require.NotNil(t, node, "should find node at position")
@@ -278,6 +282,8 @@ unit "app" {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pos := hcl.Pos{Line: tt.line, Column: tt.col}
 			_, found := stackAST.FindUnitAt(pos)
 			assert.Equal(t, tt.shouldFind, found)
@@ -309,10 +315,10 @@ stack "nested" {
 
 	tests := []struct {
 		name        string
+		description string
 		line        int
 		col         int
 		shouldFind  bool
-		description string
 	}{
 		{
 			name:        "inside unit block",
@@ -346,6 +352,8 @@ stack "nested" {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pos := hcl.Pos{Line: tt.line, Column: tt.col}
 
 			stackBlock, found := stackAST.FindStackAt(pos)
