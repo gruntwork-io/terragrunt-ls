@@ -362,49 +362,24 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.PrepareRenameResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debug(
-		"Prepare rename requested",
-		"uri", docURI,
-		"position", position,
-	)
+	l.Debug("Prepare rename requested", "uri", docURI, "position", position)
 
 	// Get the word range at the cursor position
 	wordRange := text.GetCursorWordRange(store.Document, position)
-	if wordRange == nil {
+	word := text.GetCursorWord(store.Document, position)
+
+	if wordRange == nil || word == "" {
 		l.Debug("No word found at position for rename")
 		return lsp.PrepareRenameResponse{
-			Response: lsp.Response{
-				RPC: lsp.RPCVersion,
-				ID:  &id,
-			},
-			Result: nil,
+			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+			Result:   nil,
 		}
 	}
 
-	// Get the actual word text to use as placeholder
-	word := text.GetCursorWord(store.Document, position)
-	if word == "" {
-		l.Debug("Empty word at position for rename")
-		return lsp.PrepareRenameResponse{
-			Response: lsp.Response{
-				RPC: lsp.RPCVersion,
-				ID:  &id,
-			},
-			Result: nil,
-		}
-	}
-
-	l.Debug(
-		"Prepare rename result",
-		"word", word,
-		"range", wordRange,
-	)
+	l.Debug("Prepare rename result", "word", word, "range", wordRange)
 
 	return lsp.PrepareRenameResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
 		Result: &lsp.PrepareRenameResult{
 			Range:       *wordRange,
 			Placeholder: word,
@@ -415,87 +390,62 @@ func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentU
 func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, newName string) lsp.RenameResponse {
 	store := s.Configs[docURI.Filename()]
 
-	l.Debug(
-		"Rename requested",
-		"uri", docURI,
-		"position", position,
-		"newName", newName,
-	)
+	l.Debug("Rename requested", "uri", docURI, "position", position, "newName", newName)
 
 	// Determine what we're renaming
 	target, context := rename.GetRenameTargetWithContext(l, store, position)
-
-	l.Debug(
-		"Rename target discovered",
-		"target", target,
-		"context", context,
-	)
+	l.Debug("Rename target discovered", "target", target, "context", context)
 
 	// If nothing valid to rename, return null
 	if target == "" || context == rename.RenameContextNull {
 		l.Debug("No renameable identifier at position")
-		return lsp.RenameResponse{
-			Response: lsp.Response{
-				RPC: lsp.RPCVersion,
-				ID:  &id,
-			},
-			Result: nil,
-		}
+		return newEmptyRenameResponse(id)
 	}
 
-	// Normalize the new name based on context
-	// For local variables, strip the "local." prefix if provided
-	normalizedNewName := newName
-	if context == rename.RenameContextLocal {
-		// If user provides "local.newname", extract just "newname"
-		if strings.HasPrefix(newName, "local.") {
-			normalizedNewName = strings.TrimPrefix(newName, "local.")
-			l.Debug("Stripped local. prefix from new name", "normalized", normalizedNewName)
-		}
-	}
+	// Normalize the new name (strip "local." prefix for local variables)
+	normalizedNewName := normalizeNewName(l, newName, context)
 
 	// Find all occurrences of the identifier
 	occurrences := rename.FindAllOccurrences(l, store.Document, target, context)
-
 	if len(occurrences) == 0 {
 		l.Debug("No occurrences found to rename")
-		return lsp.RenameResponse{
-			Response: lsp.Response{
-				RPC: lsp.RPCVersion,
-				ID:  &id,
-			},
-			Result: nil,
-		}
+		return newEmptyRenameResponse(id)
 	}
 
 	// Create text edits for all occurrences
-	var edits []protocol.TextEdit
-	for _, occurrence := range occurrences {
-		edits = append(edits, protocol.TextEdit{
-			Range:   occurrence,
-			NewText: normalizedNewName,
-		})
-	}
-
-	l.Debug(
-		"Rename edits created",
-		"count", len(edits),
-	)
-
-	// Return workspace edit
-	workspaceEdit := &protocol.WorkspaceEdit{
-		Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-			docURI: edits,
-		},
-	}
+	edits := createTextEdits(occurrences, normalizedNewName)
+	l.Debug("Rename edits created", "count", len(edits))
 
 	return lsp.RenameResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result: &protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentURI][]protocol.TextEdit{docURI: edits},
 		},
-		Result: workspaceEdit,
 	}
+}
+
+func newEmptyRenameResponse(id int) lsp.RenameResponse {
+	return lsp.RenameResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result:   nil,
+	}
+}
+
+func normalizeNewName(l logger.Logger, newName, context string) string {
+	if context == rename.RenameContextLocal && strings.HasPrefix(newName, "local.") {
+		normalized := strings.TrimPrefix(newName, "local.")
+		l.Debug("Stripped local. prefix from new name", "normalized", normalized)
+		return normalized
+	}
+	return newName
+}
+
+func createTextEdits(ranges []protocol.Range, newText string) []protocol.TextEdit {
+	edits := make([]protocol.TextEdit, len(ranges))
+	for i, r := range ranges {
+		edits[i] = protocol.TextEdit{Range: r, NewText: newText}
+	}
+	return edits
 }
 
 func getEndOfDocument(doc string) protocol.Position {

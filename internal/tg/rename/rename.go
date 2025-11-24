@@ -135,38 +135,9 @@ func findStandaloneIdentifierInLine(line string, identifier string, lineNum uint
 		}
 
 		absolutePos := startPos + idx
-
-		// Check if it's a standalone identifier (not part of a larger word)
-		isStandalone := true
-
-		// Check if it's inside a string (skip if it is)
-		if isInsideString(line, absolutePos) {
-			isStandalone = false
-		}
-
-		// Check character before
-		if absolutePos > 0 && isStandalone {
-			prevChar := line[absolutePos-1]
-			if isWordChar(prevChar) {
-				isStandalone = false
-			}
-		}
-
-		// Check character after
 		endPos := absolutePos + len(identifier)
-		if endPos < len(line) && isStandalone {
-			nextChar := line[endPos]
-			if isWordChar(nextChar) {
-				isStandalone = false
-			}
-		}
 
-		// Also skip if it's part of "local.identifier" (we handle those separately)
-		if absolutePos >= 6 && isStandalone && line[absolutePos-6:absolutePos] == "local." {
-			isStandalone = false
-		}
-
-		if isStandalone {
+		if isStandaloneIdentifier(line, absolutePos, endPos) {
 			ranges = append(ranges, protocol.Range{
 				Start: protocol.Position{
 					Line:      lineNum,
@@ -179,28 +150,48 @@ func findStandaloneIdentifierInLine(line string, identifier string, lineNum uint
 			})
 		}
 
-		startPos = absolutePos + len(identifier)
+		startPos = endPos
 	}
 
 	return ranges
 }
 
-// isInsideString checks if a position in a line is inside a string literal.
-// Handles both double quotes (") and heredocs (<<EOF, <<-EOF).
-func isInsideString(line string, pos int) bool {
-	inDoubleQuote := false
-	inSingleQuote := false
-
-	// Check for heredoc syntax - if line contains <<, it's likely a heredoc start
-	// For simplicity, we'll treat the whole line as non-string in heredoc cases
-	// A more robust solution would track heredoc state across lines
-	if strings.Contains(line, "<<") {
-		// Don't treat identifier definitions in heredoc lines as strings
-		// This is a simplified approach
+// isStandaloneIdentifier checks if an identifier at the given position is standalone
+// (not inside a string, not part of a larger word, not part of local.identifier).
+func isStandaloneIdentifier(line string, start, end int) bool {
+	// Check if it's inside a string
+	if isInsideString(line, start) {
 		return false
 	}
 
-	// Walk through the line up to the position
+	// Check character before
+	if start > 0 && text.IsWordChar(line[start-1]) {
+		return false
+	}
+
+	// Check character after
+	if end < len(line) && text.IsWordChar(line[end]) {
+		return false
+	}
+
+	// Skip if it's part of "local.identifier" (we handle those separately)
+	if start >= 6 && line[start-6:start] == "local." {
+		return false
+	}
+
+	return true
+}
+
+// isInsideString checks if a position in a line is inside a string literal.
+func isInsideString(line string, pos int) bool {
+	// Heredoc lines are not treated as strings for identifier matching
+	if strings.Contains(line, "<<") {
+		return false
+	}
+
+	inQuote := false
+	quoteChar := byte(0)
+
 	for i := 0; i < pos && i < len(line); i++ {
 		char := line[i]
 
@@ -210,21 +201,17 @@ func isInsideString(line string, pos int) bool {
 			continue
 		}
 
-		// Toggle double quote state
-		if char == '"' && !inSingleQuote {
-			inDoubleQuote = !inDoubleQuote
-		}
-
-		// Toggle single quote state (for HCL)
-		if char == '\'' && !inDoubleQuote {
-			inSingleQuote = !inSingleQuote
+		// Toggle quote state
+		if char == '"' || char == '\'' {
+			if !inQuote {
+				inQuote = true
+				quoteChar = char
+			} else if char == quoteChar {
+				inQuote = false
+				quoteChar = 0
+			}
 		}
 	}
 
-	return inDoubleQuote || inSingleQuote
-}
-
-// isWordChar checks if a character is part of a word (identifier).
-func isWordChar(c byte) bool {
-	return c == '_' || c == '.' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+	return inQuote
 }

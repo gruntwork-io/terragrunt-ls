@@ -9,49 +9,14 @@ import (
 )
 
 func GetCursorWord(document string, position protocol.Position) string {
-	scanner := bufio.NewScanner(strings.NewReader(document))
-	for i := 0; i <= int(position.Line); i++ {
-		scanner.Scan()
-	}
-
-	line := scanner.Text()
-
-	// Find the start of the word
-	start := position.Character
-	for start > 0 && int(start) <= len(line) && isWordChar(line[start-1]) {
-		start--
-	}
-
-	// Find the end of the word
-	end := position.Character
-	for int(end) < len(line) && isWordChar(line[end]) {
-		end++
-	}
-
-	return line[start:end]
+	start, end := getWordBounds(document, position)
+	return getLine(document, position.Line)[start:end]
 }
 
 // GetCursorWordRange returns the range of the word at the cursor position.
 // Returns nil if no word is found at the position.
 func GetCursorWordRange(document string, position protocol.Position) *protocol.Range {
-	scanner := bufio.NewScanner(strings.NewReader(document))
-	for i := 0; i <= int(position.Line); i++ {
-		scanner.Scan()
-	}
-
-	line := scanner.Text()
-
-	// Find the start of the word
-	start := position.Character
-	for start > 0 && int(start) <= len(line) && isWordChar(line[start-1]) {
-		start--
-	}
-
-	// Find the end of the word
-	end := position.Character
-	for int(end) < len(line) && isWordChar(line[end]) {
-		end++
-	}
+	start, end := getWordBounds(document, position)
 
 	// If no word found (start == end), return nil
 	if start == end {
@@ -70,7 +35,34 @@ func GetCursorWordRange(document string, position protocol.Position) *protocol.R
 	}
 }
 
-func isWordChar(c byte) bool {
+// getLine returns the specified line from the document.
+func getLine(document string, lineNum uint32) string {
+	scanner := bufio.NewScanner(strings.NewReader(document))
+	for i := 0; i <= int(lineNum); i++ {
+		scanner.Scan()
+	}
+	return scanner.Text()
+}
+
+// getWordBounds finds the start and end character positions of a word at the given position.
+func getWordBounds(document string, position protocol.Position) (start, end uint32) {
+	line := getLine(document, position.Line)
+
+	start = position.Character
+	for start > 0 && int(start) <= len(line) && IsWordChar(line[start-1]) {
+		start--
+	}
+
+	end = position.Character
+	for int(end) < len(line) && IsWordChar(line[end]) {
+		end++
+	}
+
+	return start, end
+}
+
+// IsWordChar checks if a character is part of a word (identifier).
+func IsWordChar(c byte) bool {
 	return c == '_' || c == '.' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
 
