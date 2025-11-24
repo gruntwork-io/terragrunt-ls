@@ -360,9 +360,26 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 }
 
 func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.PrepareRenameResponse {
-	store := s.Configs[docURI.Filename()]
+	store, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		l.Debug("No config found for document", "uri", docURI)
+		return lsp.PrepareRenameResponse{
+			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+			Result:   nil,
+		}
+	}
 
 	l.Debug("Prepare rename requested", "uri", docURI, "position", position)
+
+	// Check if the identifier at this position is actually renameable
+	target, context := rename.GetRenameTargetWithContext(l, store, position)
+	if target == "" || context == rename.RenameContextNull {
+		l.Debug("No renameable identifier at position")
+		return lsp.PrepareRenameResponse{
+			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+			Result:   nil,
+		}
+	}
 
 	// Get the word range at the cursor position
 	wordRange := text.GetCursorWordRange(store.Document, position)
@@ -388,7 +405,11 @@ func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentU
 }
 
 func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, newName string) lsp.RenameResponse {
-	store := s.Configs[docURI.Filename()]
+	store, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		l.Error("No config found for document", "uri", docURI)
+		return newEmptyRenameResponse(id)
+	}
 
 	l.Debug("Rename requested", "uri", docURI, "position", position, "newName", newName)
 

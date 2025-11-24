@@ -17,6 +17,14 @@ const (
 
 	// RenameContextNull indicates the position is not renameable.
 	RenameContextNull = "null"
+
+	// TODO: Add support for renaming include block labels
+	// RenameContextInclude = "include"
+
+	// TODO: Add support for renaming dependency block labels
+	// RenameContextDependency = "dependency"
+
+	// TODO: Add support for cross-file renames using WorkspaceEdit properly
 )
 
 // GetRenameTargetWithContext determines what is being renamed at the given position.
@@ -57,6 +65,11 @@ func GetRenameTargetWithContext(l logger.Logger, store store.Store, position pro
 	return "", RenameContextNull
 }
 
+const (
+	localPrefix       = "local."
+	localPrefixLength = len(localPrefix)
+)
+
 // FindAllOccurrences finds all occurrences of an identifier in the document.
 // For local variables, it finds both the definition and all references (local.varname).
 func FindAllOccurrences(l logger.Logger, document string, identifier string, context string) []protocol.Range {
@@ -65,14 +78,19 @@ func FindAllOccurrences(l logger.Logger, document string, identifier string, con
 	scanner := bufio.NewScanner(strings.NewReader(document))
 	lineNum := uint32(0)
 
+	// Hoist string concatenation outside loop for efficiency
+	fullIdentifier := ""
+	if context == RenameContextLocal {
+		fullIdentifier = localPrefix + identifier
+	}
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		switch context {
 		case RenameContextLocal:
 			// Find occurrences of "local.identifier"
-			fullIdentifier := "local." + identifier
-			ranges = append(ranges, findInLine(line, fullIdentifier, lineNum, 6)...) // 6 = len("local.")
+			ranges = append(ranges, findInLine(line, fullIdentifier, lineNum, localPrefixLength)...)
 
 			// Also find the definition in locals block (just "identifier")
 			// Only match standalone identifiers (not part of longer words)
@@ -80,6 +98,12 @@ func FindAllOccurrences(l logger.Logger, document string, identifier string, con
 		}
 
 		lineNum++
+	}
+
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		l.Error("Scanner error while finding occurrences", "error", err)
+		return ranges // Return partial results
 	}
 
 	l.Debug(
@@ -175,7 +199,7 @@ func isStandaloneIdentifier(line string, start, end int) bool {
 	}
 
 	// Skip if it's part of "local.identifier" (we handle those separately)
-	if start >= 6 && line[start-6:start] == "local." {
+	if start >= localPrefixLength && line[start-localPrefixLength:start] == localPrefix {
 		return false
 	}
 
@@ -185,6 +209,8 @@ func isStandaloneIdentifier(line string, start, end int) bool {
 // isInsideString checks if a position in a line is inside a string literal.
 func isInsideString(line string, pos int) bool {
 	// Heredoc lines are not treated as strings for identifier matching
+	// TODO: Improve heredoc detection to handle edge cases like var = "<<text"
+	// A more robust solution would track heredoc state across lines
 	if strings.Contains(line, "<<") {
 		return false
 	}

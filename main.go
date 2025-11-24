@@ -25,8 +25,6 @@ func main() {
 	}()
 
 	l.Info("Initializing terragrunt-ls")
-	l.Info("Log file", "file", cfg.LogFile)
-	l.Info("Log level", "level", cfg.LogLevel)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
