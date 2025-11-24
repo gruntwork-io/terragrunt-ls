@@ -31,6 +31,45 @@ func GetCursorWord(document string, position protocol.Position) string {
 	return line[start:end]
 }
 
+// GetCursorWordRange returns the range of the word at the cursor position.
+// Returns nil if no word is found at the position.
+func GetCursorWordRange(document string, position protocol.Position) *protocol.Range {
+	scanner := bufio.NewScanner(strings.NewReader(document))
+	for i := 0; i <= int(position.Line); i++ {
+		scanner.Scan()
+	}
+
+	line := scanner.Text()
+
+	// Find the start of the word
+	start := position.Character
+	for start > 0 && int(start) <= len(line) && isWordChar(line[start-1]) {
+		start--
+	}
+
+	// Find the end of the word
+	end := position.Character
+	for int(end) < len(line) && isWordChar(line[end]) {
+		end++
+	}
+
+	// If no word found (start == end), return nil
+	if start == end {
+		return nil
+	}
+
+	return &protocol.Range{
+		Start: protocol.Position{
+			Line:      position.Line,
+			Character: start,
+		},
+		End: protocol.Position{
+			Line:      position.Line,
+			Character: end,
+		},
+	}
+}
+
 func isWordChar(c byte) bool {
 	return c == '_' || c == '.' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }

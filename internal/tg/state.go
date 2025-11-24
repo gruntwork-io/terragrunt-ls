@@ -10,6 +10,7 @@ import (
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
 	"terragrunt-ls/internal/tg/hover"
+	"terragrunt-ls/internal/tg/rename"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
@@ -355,6 +356,145 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 				NewText: string(formatted),
 			},
 		},
+	}
+}
+
+func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.PrepareRenameResponse {
+	store := s.Configs[docURI.Filename()]
+
+	l.Debug(
+		"Prepare rename requested",
+		"uri", docURI,
+		"position", position,
+	)
+
+	// Get the word range at the cursor position
+	wordRange := text.GetCursorWordRange(store.Document, position)
+	if wordRange == nil {
+		l.Debug("No word found at position for rename")
+		return lsp.PrepareRenameResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: nil,
+		}
+	}
+
+	// Get the actual word text to use as placeholder
+	word := text.GetCursorWord(store.Document, position)
+	if word == "" {
+		l.Debug("Empty word at position for rename")
+		return lsp.PrepareRenameResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: nil,
+		}
+	}
+
+	l.Debug(
+		"Prepare rename result",
+		"word", word,
+		"range", wordRange,
+	)
+
+	return lsp.PrepareRenameResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: &lsp.PrepareRenameResult{
+			Range:       *wordRange,
+			Placeholder: word,
+		},
+	}
+}
+
+func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, newName string) lsp.RenameResponse {
+	store := s.Configs[docURI.Filename()]
+
+	l.Debug(
+		"Rename requested",
+		"uri", docURI,
+		"position", position,
+		"newName", newName,
+	)
+
+	// Determine what we're renaming
+	target, context := rename.GetRenameTargetWithContext(l, store, position)
+
+	l.Debug(
+		"Rename target discovered",
+		"target", target,
+		"context", context,
+	)
+
+	// If nothing valid to rename, return null
+	if target == "" || context == rename.RenameContextNull {
+		l.Debug("No renameable identifier at position")
+		return lsp.RenameResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: nil,
+		}
+	}
+
+	// Normalize the new name based on context
+	// For local variables, strip the "local." prefix if provided
+	normalizedNewName := newName
+	if context == rename.RenameContextLocal {
+		// If user provides "local.newname", extract just "newname"
+		if strings.HasPrefix(newName, "local.") {
+			normalizedNewName = strings.TrimPrefix(newName, "local.")
+			l.Debug("Stripped local. prefix from new name", "normalized", normalizedNewName)
+		}
+	}
+
+	// Find all occurrences of the identifier
+	occurrences := rename.FindAllOccurrences(l, store.Document, target, context)
+
+	if len(occurrences) == 0 {
+		l.Debug("No occurrences found to rename")
+		return lsp.RenameResponse{
+			Response: lsp.Response{
+				RPC: lsp.RPCVersion,
+				ID:  &id,
+			},
+			Result: nil,
+		}
+	}
+
+	// Create text edits for all occurrences
+	var edits []protocol.TextEdit
+	for _, occurrence := range occurrences {
+		edits = append(edits, protocol.TextEdit{
+			Range:   occurrence,
+			NewText: normalizedNewName,
+		})
+	}
+
+	l.Debug(
+		"Rename edits created",
+		"count", len(edits),
+	)
+
+	// Return workspace edit
+	workspaceEdit := &protocol.WorkspaceEdit{
+		Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+			docURI: edits,
+		},
+	}
+
+	return lsp.RenameResponse{
+		Response: lsp.Response{
+			RPC: lsp.RPCVersion,
+			ID:  &id,
+		},
+		Result: workspaceEdit,
 	}
 }
 

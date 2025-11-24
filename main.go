@@ -25,6 +25,8 @@ func main() {
 	}()
 
 	l.Info("Initializing terragrunt-ls")
+	l.Info("Log file", "file", cfg.LogFile)
+	l.Info("Log level", "level", cfg.LogLevel)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
@@ -222,6 +224,45 @@ func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method str
 		)
 
 		response := state.TextDocumentFormatting(l, request.ID, request.Params.TextDocument.URI)
+
+		writeResponse(l, writer, response)
+	case protocol.MethodTextDocumentPrepareRename:
+		var request lsp.PrepareRenameRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Error(
+				"Failed to parse prepare rename request",
+				"error",
+				err,
+			)
+		}
+
+		l.Debug(
+			"Prepare rename",
+			"URI", request.Params.TextDocument.URI,
+			"Position", request.Params.Position,
+		)
+
+		response := state.PrepareRename(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		writeResponse(l, writer, response)
+	case protocol.MethodTextDocumentRename:
+		var request lsp.RenameRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Error(
+				"Failed to parse rename request",
+				"error",
+				err,
+			)
+		}
+
+		l.Debug(
+			"Renaming",
+			"URI", request.Params.TextDocument.URI,
+			"Position", request.Params.Position,
+			"NewName", request.Params.NewName,
+		)
+
+		response := state.TextDocumentRename(l, request.ID, request.Params.TextDocument.URI, request.Params.Position, request.Params.NewName)
 
 		writeResponse(l, writer, response)
 	}

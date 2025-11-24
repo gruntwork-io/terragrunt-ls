@@ -64,3 +64,75 @@ func TestGetCursorWord(t *testing.T) {
 		})
 	}
 }
+
+func TestGetCursorWordRange(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name     string
+		document string
+		expected *protocol.Range
+		position protocol.Position
+	}{
+		{
+			name:     "simple word at start",
+			document: "hello",
+			position: protocol.Position{Line: 0, Character: 0},
+			expected: &protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 5},
+			},
+		},
+		{
+			name:     "simple word in middle",
+			document: "hello",
+			position: protocol.Position{Line: 0, Character: 2},
+			expected: &protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 5},
+			},
+		},
+		{
+			name:     "local variable",
+			document: "local.var",
+			position: protocol.Position{Line: 0, Character: 6},
+			expected: &protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 9},
+			},
+		},
+		{
+			name:     "second word",
+			document: "hello world",
+			position: protocol.Position{Line: 0, Character: 6},
+			expected: &protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 6},
+				End:   protocol.Position{Line: 0, Character: 11},
+			},
+		},
+		{
+			name:     "first word",
+			document: "hello world",
+			position: protocol.Position{Line: 0, Character: 2},
+			expected: &protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 5},
+			},
+		},
+		{
+			name:     "whitespace only - no word",
+			document: "   ",
+			position: protocol.Position{Line: 0, Character: 1},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			actual := text.GetCursorWordRange(tt.document, tt.position)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
