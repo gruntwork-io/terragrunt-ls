@@ -23,6 +23,25 @@
 	],
 	"main": "./out/extension",
 	"contributes": {
+		"languages": [
+			{
+				"id": "terragrunt",
+				"aliases": ["Terragrunt", "terragrunt"],
+				"filenames": [
+					"terragrunt.hcl",
+					"terragrunt.stack.hcl",
+					"terragrunt.values.hcl"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "terragrunt",
+				"scopeName": "source.hcl.terragrunt",
+				"path": "./syntaxes/terragrunt.tmGrammar.json"
+			}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "Example configuration",
@@ -51,7 +70,8 @@
 		"vscode:prepublish": "npm run compile && ./scripts/package.sh",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
-		"lint": "eslint"
+		"lint": "eslint",
+		"test": "tsc -p tsconfig.test.json && mocha 'out/test/**/*.test.js'"
 	},
 	"dependencies": {
 		"glob": "^11.0.0",
