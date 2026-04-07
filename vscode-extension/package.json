@@ -25,12 +25,21 @@
 	"contributes": {
 		"languages": [
 			{
-				"id": "hcl",
+				"id": "terragrunt",
+				"aliases": ["Terragrunt", "terragrunt"],
 				"filenames": [
 					"terragrunt.hcl",
 					"terragrunt.stack.hcl",
 					"terragrunt.values.hcl"
-				]
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "terragrunt",
+				"scopeName": "source.hcl.terragrunt",
+				"path": "./syntaxes/terragrunt.tmGrammar.json"
 			}
 		],
 		"configuration": {

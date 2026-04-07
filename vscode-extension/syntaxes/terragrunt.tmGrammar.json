@@ -1,0 +1,161 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Terragrunt",
+	"scopeName": "source.hcl.terragrunt",
+	"patterns": [
+		{ "include": "#comments" },
+		{ "include": "#block" },
+		{ "include": "#expressions" }
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.number-sign.hcl",
+					"match": "#.*$"
+				},
+				{
+					"name": "comment.line.double-slash.hcl",
+					"match": "//.*$"
+				},
+				{
+					"name": "comment.block.hcl",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
+		"block": {
+			"patterns": [
+				{
+					"name": "meta.block.hcl",
+					"begin": "(\\b(?:unit|stack|dependency|dependencies|include|terraform|remote_state|locals|inputs|generate|feature|exclude|errors|engine|catalog)\\b)(?:\\s+(\"[^\"]*\"))?\\s*\\{",
+					"beginCaptures": {
+						"1": { "name": "entity.name.type.hcl" },
+						"2": { "name": "string.quoted.double.hcl" }
+					},
+					"end": "\\}",
+					"patterns": [
+						{ "include": "#comments" },
+						{ "include": "#block" },
+						{ "include": "#expressions" }
+					]
+				},
+				{
+					"name": "meta.block.other.hcl",
+					"begin": "(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)(?:\\s+(\"[^\"]*\"))?\\s*\\{",
+					"beginCaptures": {
+						"1": { "name": "entity.name.type.hcl" },
+						"2": { "name": "string.quoted.double.hcl" }
+					},
+					"end": "\\}",
+					"patterns": [
+						{ "include": "#comments" },
+						{ "include": "#block" },
+						{ "include": "#expressions" }
+					]
+				}
+			]
+		},
+		"expressions": {
+			"patterns": [
+				{ "include": "#strings" },
+				{ "include": "#heredoc" },
+				{ "include": "#numbers" },
+				{ "include": "#booleans" },
+				{ "include": "#functions" },
+				{ "include": "#attribute" },
+				{ "include": "#object_key" }
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.double.hcl",
+					"begin": "\"",
+					"end": "\"",
+					"patterns": [
+						{
+							"name": "constant.character.escape.hcl",
+							"match": "\\\\[nrt\"\\\\]"
+						},
+						{
+							"name": "meta.interpolation.hcl",
+							"begin": "\\$\\{",
+							"end": "\\}",
+							"beginCaptures": {
+								"0": { "name": "punctuation.section.interpolation.begin.hcl" }
+							},
+							"endCaptures": {
+								"0": { "name": "punctuation.section.interpolation.end.hcl" }
+							},
+							"patterns": [
+								{ "include": "#expressions" }
+							]
+						}
+					]
+				}
+			]
+		},
+		"heredoc": {
+			"patterns": [
+				{
+					"name": "string.unquoted.heredoc.hcl",
+					"begin": "<<-?\\s*(\\w+)\\s*$",
+					"end": "^\\s*\\1\\s*$",
+					"beginCaptures": {
+						"1": { "name": "keyword.control.heredoc.hcl" }
+					}
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"name": "constant.numeric.hcl",
+					"match": "\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b"
+				}
+			]
+		},
+		"booleans": {
+			"patterns": [
+				{
+					"name": "constant.language.hcl",
+					"match": "\\b(true|false|null)\\b"
+				}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+					"name": "meta.function-call.hcl",
+					"match": "(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)\\s*\\(",
+					"captures": {
+						"1": { "name": "support.function.hcl" }
+					}
+				}
+			]
+		},
+		"attribute": {
+			"patterns": [
+				{
+					"match": "(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)\\s*=(?!=)",
+					"captures": {
+						"1": { "name": "variable.other.assignment.hcl" }
+					}
+				}
+			]
+		},
+		"object_key": {
+			"patterns": [
+				{
+					"match": "\\b(local|dependency|include|each|var|module)\\b\\s*\\.\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+					"captures": {
+						"1": { "name": "support.type.hcl" },
+						"2": { "name": "variable.other.member.hcl" }
+					}
+				}
+			]
+		}
+	}
+}

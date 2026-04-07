@@ -1,0 +1,27 @@
+{
+	"comments": {
+		"lineComment": "#",
+		"blockComment": ["/*", "*/"]
+	},
+	"brackets": [
+		["{", "}"],
+		["[", "]"],
+		["(", ")"]
+	],
+	"autoClosingPairs": [
+		{ "open": "{", "close": "}" },
+		{ "open": "[", "close": "]" },
+		{ "open": "(", "close": ")" },
+		{ "open": "\"", "close": "\"", "notIn": ["string"] }
+	],
+	"surroundingPairs": [
+		["{", "}"],
+		["[", "]"],
+		["(", ")"],
+		["\"", "\""]
+	],
+	"indentationRules": {
+		"increaseIndentPattern": "^\\s*(resource|data|variable|output|locals|module|terraform|provider|unit|stack|dependency|dependencies|include|remote_state|generate|feature|exclude|errors|engine|catalog)\\b.*\\{\\s*$|^\\s*\\w+\\s*=\\s*\\{\\s*$|^\\s*\\{\\s*$",
+		"decreaseIndentPattern": "^\\s*\\}"
+	}
+}
