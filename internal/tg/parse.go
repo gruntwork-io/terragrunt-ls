@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"terragrunt-ls/internal/logger"
+	"terragrunt-ls/internal/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
@@ -165,4 +166,64 @@ func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 	}
 
 	return diags
+}
+
+// DetectFileType returns the FileType for the given filename based on its base name.
+func DetectFileType(filename string) store.FileType {
+	base := filepath.Base(filename)
+
+	switch base {
+	case "terragrunt.stack.hcl":
+		return store.FileTypeStack
+	case "terragrunt.values.hcl":
+		return store.FileTypeValues
+	default:
+		return store.FileTypeTerragrunt
+	}
+}
+
+// ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
+func ParseStackBuffer(l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
+	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
+	if err != nil {
+		return nil, []protocol.Diagnostic{
+			{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: 0, Character: 0},
+					End:   protocol.Position{Line: 0, Character: 0},
+				},
+				Message:  err.Error(),
+				Severity: protocol.DiagnosticSeverityError,
+				Source:   "HCL",
+			},
+		}
+	}
+
+	opts.SkipOutput = true
+	opts.NonInteractive = true
+
+	tgLogger := tgLog.New(
+		tgLog.WithOutput(l.Writer()),
+		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
+		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
+	)
+
+	cfg, err := config.ReadStackConfigString(context.TODO(), tgLogger, opts, filename, text, nil)
+	if err != nil {
+		l.Error("Error parsing stack config", "error", err)
+
+		return cfg, []protocol.Diagnostic{
+			{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: 0, Character: 0},
+					End:   protocol.Position{Line: 0, Character: 0},
+				},
+				Message:  err.Error(),
+				Severity: protocol.DiagnosticSeverityError,
+				Source:   "HCL",
+			},
+		}
+	}
+
+	return cfg, []protocol.Diagnostic{}
 }
