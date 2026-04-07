@@ -588,6 +588,82 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 	assert.Equal(t, "vpc", st.StackCfg.Units[0].Name)
 }
 
+func TestState_OpenDocument_ValuesFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
+	valuesURI := uri.File(valuesPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	diags := state.OpenDocument(l, valuesURI, `some_var = "hello"`)
+	assert.Empty(t, diags)
+
+	require.Len(t, state.Configs, 1)
+
+	st := state.Configs[valuesPath]
+	assert.Nil(t, st.Cfg)
+	assert.Nil(t, st.StackCfg)
+}
+
+func TestState_Hover_StackFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+	stackURI := uri.File(stackPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	_ = state.OpenDocument(l, stackURI, `unit "vpc" {
+	source = "./units/vpc"
+	path   = "vpc"
+}`)
+
+	hover := state.Hover(l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
+	assert.Empty(t, hover.Result.Contents.Value)
+}
+
+func TestState_Hover_ValuesFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
+	valuesURI := uri.File(valuesPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	_ = state.OpenDocument(l, valuesURI, `some_var = "hello"`)
+
+	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
+	assert.Empty(t, hover.Result.Contents.Value)
+}
+
+func TestState_Definition_StackFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+	stackURI := uri.File(stackPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	_ = state.OpenDocument(l, stackURI, `unit "vpc" {
+	source = "./units/vpc"
+	path   = "vpc"
+}`)
+
+	pos := protocol.Position{Line: 0, Character: 0}
+	def := state.Definition(l, 1, stackURI, pos)
+	assert.Equal(t, stackURI, def.Result.URI)
+	assert.Equal(t, pos, def.Result.Range.Start)
+}
+
 func TestState_TextDocumentFormatting(t *testing.T) {
 	t.Parallel()
 

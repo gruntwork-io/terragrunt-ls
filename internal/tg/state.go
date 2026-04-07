@@ -59,6 +59,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 
 	st := store.Store{
 		AST:      indexedAST,
+		CfgAsCty: cty.NilVal,
 		Document: text,
 		FileType: fileType,
 	}
@@ -110,7 +111,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 }
 
 func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	store := s.Configs[docURI.Filename()]
+	st := s.Configs[docURI.Filename()]
 
 	l.Debug(
 		"Hovering over character",
@@ -118,13 +119,17 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 		"position", position,
 	)
 
+	if st.FileType != store.FileTypeTerragrunt {
+		return newEmptyHoverResponse(id)
+	}
+
 	l.Debug(
 		"Config",
 		"uri", docURI,
-		"config", store.Cfg,
+		"config", st.Cfg,
 	)
 
-	word, context := hover.GetHoverTargetWithContext(l, store, position)
+	word, context := hover.GetHoverTargetWithContext(l, st, position)
 
 	l.Debug(
 		"Hovering with context",
@@ -139,19 +144,19 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 	//nolint:gocritic
 	switch context {
 	case hover.HoverContextLocal:
-		if store.Cfg == nil {
+		if st.Cfg == nil {
 			return newEmptyHoverResponse(id)
 		}
 
-		if _, ok := store.Cfg.Locals[word]; !ok {
+		if _, ok := st.Cfg.Locals[word]; !ok {
 			return newEmptyHoverResponse(id)
 		}
 
-		if store.CfgAsCty.IsNull() {
+		if st.CfgAsCty.IsNull() {
 			return newEmptyHoverResponse(id)
 		}
 
-		locals := store.CfgAsCty.GetAttr("locals")
+		locals := st.CfgAsCty.GetAttr("locals")
 		localVal := locals.GetAttr(word)
 
 		f := hclwrite.NewEmptyFile()
@@ -185,7 +190,7 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 }
 
 func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	store := s.Configs[docURI.Filename()]
+	st := s.Configs[docURI.Filename()]
 
 	l.Debug(
 		"Definition requested",
@@ -193,7 +198,11 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		"position", position,
 	)
 
-	target, context := definition.GetDefinitionTargetWithContext(l, store, position)
+	if st.FileType != store.FileTypeTerragrunt {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	target, context := definition.GetDefinitionTargetWithContext(l, st, position)
 
 	l.Debug(
 		"Definition discovered",
@@ -210,19 +219,19 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 	case definition.DefinitionContextInclude:
 		l.Debug(
 			"Store content",
-			"store", store,
+			"store", st,
 		)
 
-		if store.Cfg == nil {
+		if st.Cfg == nil {
 			return newEmptyDefinitionResponse(id, docURI, position)
 		}
 
 		l.Debug(
 			"Includes",
-			"includes", store.Cfg.ProcessedIncludes,
+			"includes", st.Cfg.ProcessedIncludes,
 		)
 
-		for _, include := range store.Cfg.ProcessedIncludes {
+		for _, include := range st.Cfg.ProcessedIncludes {
 			if include.Name == target {
 				l.Debug(
 					"Jumping to target",
@@ -260,19 +269,19 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 	case definition.DefinitionContextDependency:
 		l.Debug(
 			"Store content",
-			"store", store,
+			"store", st,
 		)
 
-		if store.Cfg == nil {
+		if st.Cfg == nil {
 			return newEmptyDefinitionResponse(id, docURI, position)
 		}
 
 		l.Debug(
 			"Dependencies",
-			"dependencies", store.Cfg.TerragruntDependencies,
+			"dependencies", st.Cfg.TerragruntDependencies,
 		)
 
-		for _, dep := range store.Cfg.TerragruntDependencies {
+		for _, dep := range st.Cfg.TerragruntDependencies {
 			if dep.Name == target {
 				l.Debug(
 					"Jumping to target",
@@ -359,14 +368,14 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 }
 
 func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.DocumentURI) lsp.FormatResponse {
-	store := s.Configs[docURI.Filename()]
+	st := s.Configs[docURI.Filename()]
 
 	l.Debug(
 		"Formatting requested",
 		"uri", docURI,
 	)
 
-	formatted := hclwrite.Format([]byte(store.Document))
+	formatted := hclwrite.Format([]byte(st.Document))
 
 	return lsp.FormatResponse{
 		Response: lsp.Response{
@@ -380,7 +389,7 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 						Line:      0,
 						Character: 0,
 					},
-					End: getEndOfDocument(store.Document),
+					End: getEndOfDocument(st.Document),
 				},
 				NewText: string(formatted),
 			},
