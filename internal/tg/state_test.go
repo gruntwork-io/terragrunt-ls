@@ -526,6 +526,68 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 	}
 }
 
+func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+	stackURI := uri.File(stackPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
+	_ = state.OpenDocument(l, stackURI, "uni")
+
+	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
+
+	require.Len(t, completion.Result, 1)
+	assert.Equal(t, "unit", completion.Result[0].Label)
+}
+
+func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
+	valuesURI := uri.File(valuesPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	diags := state.OpenDocument(l, valuesURI, "loc")
+	assert.Empty(t, diags)
+
+	completion := state.TextDocumentCompletion(l, 1, valuesURI, protocol.Position{Line: 0, Character: 3})
+
+	assert.Empty(t, completion.Result)
+}
+
+func TestState_OpenDocument_StackFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+	stackURI := uri.File(stackPath)
+
+	state := tg.NewState()
+	l := testutils.NewTestLogger(t)
+
+	diags := state.OpenDocument(l, stackURI, `unit "vpc" {
+	source = "./units/vpc"
+	path   = "vpc"
+}`)
+	assert.Empty(t, diags)
+
+	require.Len(t, state.Configs, 1)
+
+	st := state.Configs[stackPath]
+	assert.NotNil(t, st.StackCfg)
+	assert.Nil(t, st.Cfg)
+	assert.Len(t, st.StackCfg.Units, 1)
+	assert.Equal(t, "vpc", st.StackCfg.Units[0].Name)
+}
+
 func TestState_TextDocumentFormatting(t *testing.T) {
 	t.Parallel()
 

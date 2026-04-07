@@ -51,31 +51,60 @@ func (s *State) UpdateDocument(ctx context.Context, l logger.Logger, docURI prot
 }
 
 func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+	filename := docURI.Filename()
+	fileType := DetectFileType(filename)
+
 	// Ignore errors from AST indexing since we'll get the same errors from the Terragrunt parser just below
-	ast, _ := ast.ParseHCLFile(docURI.Filename(), []byte(text))
+	indexedAST, _ := ast.ParseHCLFile(filename, []byte(text))
 
-	cfg, diags := ParseTerragruntBuffer(ctx, l, docURI.Filename(), text)
-
-	l.Debug(
-		"Config",
-		"uri", docURI,
-		"config", cfg,
-	)
-
-	cfgAsCty := cty.NilVal
-
-	if cfg != nil {
-		if converted, err := config.TerragruntConfigAsCty(cfg); err == nil {
-			cfgAsCty = converted
-		}
-	}
-
-	s.Configs[docURI.Filename()] = store.Store{
-		AST:      ast,
-		Cfg:      cfg,
-		CfgAsCty: cfgAsCty,
+	st := store.Store{
+		AST:      indexedAST,
 		Document: text,
+		FileType: fileType,
 	}
+
+	var diags []protocol.Diagnostic
+
+	switch fileType {
+	case store.FileTypeStack:
+		stackCfg, stackDiags := ParseStackBuffer(l, filename, text)
+
+		l.Debug(
+			"Stack Config",
+			"uri", docURI,
+			"config", stackCfg,
+		)
+
+		st.StackCfg = stackCfg
+		diags = stackDiags
+
+	case store.FileTypeValues:
+		// Values files are generated; only store the document for formatting.
+		diags = []protocol.Diagnostic{}
+
+	default:
+		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, filename, text)
+
+		l.Debug(
+			"Config",
+			"uri", docURI,
+			"config", cfg,
+		)
+
+		cfgAsCty := cty.NilVal
+
+		if cfg != nil {
+			if converted, err := config.TerragruntConfigAsCty(cfg); err == nil {
+				cfgAsCty = converted
+			}
+		}
+
+		st.Cfg = cfg
+		st.CfgAsCty = cfgAsCty
+		diags = unitDiags
+	}
+
+	s.Configs[filename] = st
 
 	return diags
 }
