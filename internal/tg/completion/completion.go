@@ -16,12 +16,12 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 	var candidates []protocol.CompletionItem
 
 	switch s.FileType {
+	case store.FileTypeTerragrunt:
+		candidates = newTerragruntCompletions(position)
 	case store.FileTypeStack:
 		candidates = newStackCompletions(position)
 	case store.FileTypeValues:
 		return []protocol.CompletionItem{}
-	default:
-		candidates = newTerragruntCompletions(position)
 	}
 
 	completions := []protocol.CompletionItem{}

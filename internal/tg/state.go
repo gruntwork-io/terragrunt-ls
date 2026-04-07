@@ -66,23 +66,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 	var diags []protocol.Diagnostic
 
 	switch fileType {
-	case store.FileTypeStack:
-		stackCfg, stackDiags := ParseStackBuffer(l, filename, text)
-
-		l.Debug(
-			"Stack Config",
-			"uri", docURI,
-			"config", stackCfg,
-		)
-
-		st.StackCfg = stackCfg
-		diags = stackDiags
-
-	case store.FileTypeValues:
-		// Values files are generated; only store the document for formatting.
-		diags = []protocol.Diagnostic{}
-
-	default:
+	case store.FileTypeTerragrunt:
 		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, filename, text)
 
 		l.Debug(
@@ -102,6 +86,22 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 		st.Cfg = cfg
 		st.CfgAsCty = cfgAsCty
 		diags = unitDiags
+
+	case store.FileTypeStack:
+		stackCfg, stackDiags := ParseStackBuffer(l, filename, text)
+
+		l.Debug(
+			"Stack Config",
+			"uri", docURI,
+			"config", stackCfg,
+		)
+
+		st.StackCfg = stackCfg
+		diags = stackDiags
+
+	case store.FileTypeValues:
+		// Values files are generated; only store the document for formatting.
+		diags = []protocol.Diagnostic{}
 	}
 
 	s.Configs[filename] = st
