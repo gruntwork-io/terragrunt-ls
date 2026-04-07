@@ -16,11 +16,13 @@ func TestGetCompletions(t *testing.T) {
 	tc := []struct {
 		store       store.Store
 		name        string
+		filename    string
 		completions []protocol.CompletionItem
 		position    protocol.Position
 	}{
 		{
-			name: "complete dep",
+			name:     "complete dep",
+			filename: "terragrunt.hcl",
 			store: store.Store{
 				Document: `dep`,
 			},
@@ -65,7 +67,8 @@ func TestGetCompletions(t *testing.T) {
 			},
 		},
 		{
-			name: "complete dependency",
+			name:     "complete dependency",
+			filename: "terragrunt.hcl",
 			store: store.Store{
 				Document: `dependency`,
 			},
@@ -92,7 +95,8 @@ func TestGetCompletions(t *testing.T) {
 			},
 		},
 		{
-			name: "complete include",
+			name:     "complete include",
+			filename: "terragrunt.hcl",
 			store: store.Store{
 				Document: `in`,
 			},
@@ -137,7 +141,8 @@ func TestGetCompletions(t *testing.T) {
 			},
 		},
 		{
-			name: "complete include",
+			name:     "complete include",
+			filename: "terragrunt.hcl",
 			store: store.Store{
 				Document: `include`,
 			},
@@ -164,7 +169,8 @@ func TestGetCompletions(t *testing.T) {
 			},
 		},
 		{
-			name: "complete generate",
+			name:     "complete generate",
+			filename: "terragrunt.hcl",
 			store: store.Store{
 				Document: `generate`,
 			},
@@ -204,9 +210,126 @@ EOF
 
 			l := testutils.NewTestLogger(t)
 
-			completions := completion.GetCompletions(l, tt.store, tt.position)
+			completions := completion.GetCompletions(l, tt.store, tt.position, tt.filename)
 
 			assert.ElementsMatch(t, tt.completions, completions)
+		})
+	}
+}
+
+func TestGetCompletion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		filename       string
+		expectedLabels []string
+		position       protocol.Position
+	}{
+		{
+			name:     "terragrunt.hcl completions",
+			filename: "/path/to/terragrunt.hcl",
+			position: protocol.Position{Line: 0, Character: 0},
+			expectedLabels: []string{
+				"locals",
+				"terraform",
+				"remote_state",
+				"include",
+				"dependencies",
+				"dependency",
+				"generate",
+				"inputs",
+			},
+		},
+		{
+			name:     "terragrunt.stack.hcl completions",
+			filename: "/path/to/terragrunt.stack.hcl",
+			position: protocol.Position{Line: 0, Character: 0},
+			expectedLabels: []string{
+				"unit",
+				"stack",
+			},
+		},
+		{
+			name:     "terragrunt.values.hcl completions",
+			filename: "/path/to/terragrunt.values.hcl",
+			position: protocol.Position{Line: 0, Character: 0},
+			expectedLabels: []string{
+				"values",
+				"dependency",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			l := testutils.NewTestLogger(t)
+			store := store.Store{
+				Document: "",
+			}
+
+			completions := completion.GetCompletions(l, store, tt.position, tt.filename)
+
+			// Check that we got some completions
+			assert.NotEmpty(t, completions, "expected to get completions")
+
+			// Check that expected labels are present
+			completionLabels := make([]string, len(completions))
+			for i, completion := range completions {
+				completionLabels[i] = completion.Label
+			}
+
+			for _, expectedLabel := range tt.expectedLabels {
+				assert.Contains(t, completionLabels, expectedLabel,
+					"expected completion label %s not found in %v", expectedLabel, completionLabels)
+			}
+		})
+	}
+}
+
+func TestGetTerragruntFileType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		filename string
+		name     string
+		expected completion.TerragruntFileType
+	}{
+		{
+			name:     "terragrunt.hcl file",
+			filename: "/path/to/terragrunt.hcl",
+			expected: completion.TerragruntFileTypeConfig,
+		},
+		{
+			name:     "terragrunt.stack.hcl file",
+			filename: "/path/to/terragrunt.stack.hcl",
+			expected: completion.TerragruntFileTypeStack,
+		},
+		{
+			name:     "terragrunt.values.hcl file",
+			filename: "/path/to/terragrunt.values.hcl",
+			expected: completion.TerragruntFileTypeValues,
+		},
+		{
+			name:     "other .hcl file",
+			filename: "/path/to/variables.hcl",
+			expected: completion.TerragruntFileTypeConfig,
+		},
+		{
+			name:     "non-hcl file",
+			filename: "/path/to/main.tf",
+			expected: completion.TerragruntFileTypeUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := completion.GetTerragruntFileType(tt.filename)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

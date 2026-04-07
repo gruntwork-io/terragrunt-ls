@@ -47,7 +47,7 @@ func TestParseHCLFile(t *testing.T) {
 			contents: `include "root" {
 	path = local.root_path
 }
-		
+
 locals {
 	root_path = "root.hcl"
 }
@@ -216,49 +216,6 @@ func TestIsLocalsBlock(t *testing.T) {
 	}
 }
 
-func TestIsIncludeBlock(t *testing.T) {
-	t.Parallel()
-
-	tc := []struct {
-		name     string
-		content  string
-		pos      hcl.Pos
-		expected bool
-	}{
-		{
-			name: "not an include block",
-			content: `inputs = {
-	foo = "bar"
-}`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
-			expected: false,
-		},
-		{
-			name: "include block",
-			content: `include "root" {
-	path = "root.hcl"
-}`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tc {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			indexed, err := ast.ParseHCLFile("test.hcl", []byte(tt.content))
-			require.NoError(t, err)
-
-			require.NotNil(t, indexed)
-
-			node := indexed.FindNodeAt(tt.pos)
-
-			assert.Equal(t, tt.expected, ast.IsIncludeBlock(node))
-		})
-	}
-}
-
 func TestIsAttribute(t *testing.T) {
 	t.Parallel()
 
@@ -302,130 +259,6 @@ func TestIsAttribute(t *testing.T) {
 	}
 }
 
-func TestGetNodeIncludeLabel(t *testing.T) {
-	t.Parallel()
-
-	tc := []struct {
-		name     string
-		content  string
-		expected string
-		pos      hcl.Pos
-	}{
-		{
-			name: "not an include block",
-			content: `inputs = {
-	foo = "bar"
-}`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
-			expected: "",
-		},
-		{
-			name: "include block beginning of path",
-			content: `include "root" {
-	path = "root.hcl"
-}`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
-			expected: "root",
-		},
-		{
-			name: "include block end of path",
-			content: `include "root" {
-	path = "root.hcl"
-}`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
-			expected: "root",
-		},
-	}
-
-	for _, tt := range tc {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			indexed, err := ast.ParseHCLFile("test.hcl", []byte(tt.content))
-			require.NoError(t, err)
-
-			require.NotNil(t, indexed)
-
-			node := indexed.FindNodeAt(tt.pos)
-
-			path, ok := ast.GetNodeIncludeLabel(node)
-			if tt.expected == "" {
-				assert.False(t, ok)
-				return
-			}
-
-			assert.True(t, ok)
-			assert.Equal(t, tt.expected, path)
-		})
-	}
-}
-
-func TestGetNodeDependencyLabel(t *testing.T) {
-	t.Parallel()
-
-	tc := []struct {
-		name     string
-		content  string
-		expected string
-		pos      hcl.Pos
-	}{
-		{
-			name: "not a dependency block",
-			content: `inputs = {
-	foo = "bar"
-}`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
-			expected: "",
-		},
-		{
-			name: "dependency block beginning of path",
-			content: `dependency "vpc" {
-	config_path = "../vpc"
-}`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
-			expected: "vpc",
-		},
-		{
-			name: "dependency block end of path",
-			content: `dependency "vpc" {
-	config_path = "../vpc"
-}`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
-			expected: "vpc",
-		},
-		{
-			name: "dependency block wrong attribute",
-			content: `dependency "vpc" {
-	other_field = "../vpc"
-}`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
-			expected: "",
-		},
-	}
-
-	for _, tt := range tc {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			indexed, err := ast.ParseHCLFile("test.hcl", []byte(tt.content))
-			require.NoError(t, err)
-
-			require.NotNil(t, indexed)
-
-			node := indexed.FindNodeAt(tt.pos)
-
-			path, ok := ast.GetNodeDependencyLabel(node)
-			if tt.expected == "" {
-				assert.False(t, ok)
-				return
-			}
-
-			assert.True(t, ok)
-			assert.Equal(t, tt.expected, path)
-		})
-	}
-}
-
 func TestFindFirstParentMatch(t *testing.T) {
 	t.Parallel()
 
@@ -447,11 +280,11 @@ func TestFindFirstParentMatch(t *testing.T) {
 		},
 		{
 			name: "no matching parent",
-			content: `locals {
+			content: `inputs = {
 		foo = "bar"
 	}`,
 			pos:      hcl.Pos{Line: 2, Column: 2},
-			matcher:  ast.IsDependencyBlock,
+			matcher:  ast.IsLocalsBlock,
 			expected: false,
 		},
 	}
@@ -477,6 +310,7 @@ func TestFindFirstParentMatch(t *testing.T) {
 		})
 	}
 }
+
 func TestScope_Add(t *testing.T) {
 	t.Parallel()
 
@@ -511,7 +345,7 @@ func TestScope_Add(t *testing.T) {
 	})
 }
 
-// Test that include and local scopes are updated in parsing
+// Test that local scopes are updated in parsing
 func TestIndexedAST_Scopes(t *testing.T) {
 	t.Parallel()
 
@@ -519,10 +353,6 @@ func TestIndexedAST_Scopes(t *testing.T) {
 locals {
   region = "us-west-2"
   env    = "dev"
-}
-
-include "root" {
-  path = find_in_parent_folders()
 }
 `
 	indexed, err := ast.ParseHCLFile("test.hcl", []byte(content))
@@ -533,9 +363,4 @@ include "root" {
 	assert.NotNil(t, locals, "Locals scope should not be nil")
 	assert.Contains(t, locals, "region", "Should contain 'region' local")
 	assert.Contains(t, locals, "env", "Should contain 'env' local")
-
-	// Test includes scope existence
-	includes := indexed.Includes
-	assert.NotNil(t, includes, "Includes scope should not be nil")
-	assert.Contains(t, includes, "root", "Should contain 'root' include")
 }

@@ -36,12 +36,12 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 		return "", DefinitionContextNull
 	}
 
-	if include, ok := ast.GetNodeIncludeLabel(node); ok {
+	if include, ok := store.AST.GetIncludeLabel(node); ok {
 		l.Debug("Found include", "label", include)
 		return include, DefinitionContextInclude
 	}
 
-	if dep, ok := ast.GetNodeDependencyLabel(node); ok {
+	if dep, ok := store.AST.GetDependencyLabel(node); ok {
 		l.Debug("Found dependency", "label", dep)
 		return dep, DefinitionContextDependency
 	}
