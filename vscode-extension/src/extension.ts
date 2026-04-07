@@ -55,7 +55,10 @@ export function activate(context: ExtensionContext) {
 	// Options to control the language client
 	const clientOptions: LanguageClientOptions = {
 		// Register the server for Terragrunt files
-		documentSelector: [{ scheme: 'file', language: 'hcl' }],
+		documentSelector: [
+			{ scheme: 'file', language: 'terragrunt' },
+			{ scheme: 'file', language: 'hcl' },
+		],
 		synchronize: {
 			// Notify the server about file changes to Terragrunt files
 			fileEvents: workspace.createFileSystemWatcher('**/*.hcl')
