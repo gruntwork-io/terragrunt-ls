@@ -23,6 +23,16 @@
 	],
 	"main": "./out/extension",
 	"contributes": {
+		"languages": [
+			{
+				"id": "hcl",
+				"filenames": [
+					"terragrunt.hcl",
+					"terragrunt.stack.hcl",
+					"terragrunt.values.hcl"
+				]
+			}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "Example configuration",
