@@ -29,7 +29,7 @@
 			"patterns": [
 				{
 					"name": "meta.block.hcl",
-					"begin": "(\\b(?:unit|stack|dependency|dependencies|include|terraform|remote_state|locals|inputs|generate|feature|exclude|errors|engine|catalog)\\b)(?:\\s+(\"[^\"]*\"))?\\s*\\{",
+					"begin": "(\\b(?:unit|stack|dependency|dependencies|include|terraform|remote_state|locals|generate|feature|exclude|errors|engine|catalog|retry|ignore|extra_arguments|before_hook|after_hook|error_hook)\\b)(?:\\s+(\"[^\"]*\"))?\\s*\\{",
 					"beginCaptures": {
 						"1": { "name": "entity.name.type.hcl" },
 						"2": { "name": "string.quoted.double.hcl" }

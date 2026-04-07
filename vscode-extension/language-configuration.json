@@ -21,7 +21,7 @@
 		["\"", "\""]
 	],
 	"indentationRules": {
-		"increaseIndentPattern": "^\\s*(resource|data|variable|output|locals|module|terraform|provider|unit|stack|dependency|dependencies|include|remote_state|generate|feature|exclude|errors|engine|catalog)\\b.*\\{\\s*$|^\\s*\\w+\\s*=\\s*\\{\\s*$|^\\s*\\{\\s*$",
+		"increaseIndentPattern": "^\\s*(locals|terraform|unit|stack|dependency|dependencies|include|remote_state|generate|feature|exclude|errors|engine|catalog|retry|ignore|extra_arguments|before_hook|after_hook|error_hook)\\b.*\\{\\s*$|^\\s*\\w+\\s*=\\s*\\{\\s*$|^\\s*\\{\\s*$",
 		"decreaseIndentPattern": "^\\s*\\}"
 	}
 }
