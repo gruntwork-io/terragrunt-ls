@@ -1,0 +1,103 @@
+name: Build Go
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
+          - os: windows
+            arch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+        with:
+          version: 2025.6.8
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: go-cache-paths
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Go Build Cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}-${{ matrix.os }}-${{ matrix.arch }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
+
+      - name: Go Mod Cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-mod-
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "0"
+        run: |
+          OUTPUT="terragrunt-ls_${GOOS}_${GOARCH}"
+          if [[ "${GOOS}" == "windows" ]]; then
+            OUTPUT="${OUTPUT}.exe"
+          fi
+          go build -o "${OUTPUT}" -trimpath -ldflags "-s -w" .
+
+      - name: Verify static linking
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          OUTPUT="terragrunt-ls_${GOOS}_${GOARCH}"
+          if [[ "${GOOS}" == "windows" ]]; then
+            OUTPUT="${OUTPUT}.exe"
+          fi
+
+          FILE_INFO=$(file "$OUTPUT")
+          echo "$FILE_INFO"
+
+          case "$GOOS" in
+            linux)
+              echo "$FILE_INFO" | grep -q "statically linked"
+              echo "Linux binary is statically linked"
+              ;;
+            darwin)
+              echo "$FILE_INFO" | grep -q "Mach-O.*executable"
+              echo "macOS binary is Mach-O executable"
+              ;;
+            windows)
+              echo "$FILE_INFO" | grep -q "PE32.*executable.*Windows"
+              echo "Windows binary is PE32 executable"
+              ;;
+          esac
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terragrunt-ls_${{ matrix.os }}_${{ matrix.arch }}
+          path: terragrunt-ls_${{ matrix.os }}_${{ matrix.arch }}*

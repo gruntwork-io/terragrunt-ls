@@ -1,4 +1,5 @@
 terragrunt-ls
+dist/
 
 # Put temporary fixtures here.
 tmp-fixtures
