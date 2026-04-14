@@ -102,7 +102,7 @@ jobs:
       - name: Generate SHA256SUMS
         run: |
           cd bin
-          sha256sum terragrunt-ls_* > SHA256SUMS
+          sha256sum *.zip *.tar.gz > SHA256SUMS
           echo "SHA256SUMS:"
           cat SHA256SUMS
 
@@ -120,7 +120,7 @@ jobs:
 
           echo "Uploading assets to release $VERSION..."
           cd bin
-          for file in *; do
+          for file in *.zip *.tar.gz SHA256SUMS; do
             echo "Uploading $file..."
             gh release upload "$VERSION" "$file" $CLOBBER_FLAG
           done
@@ -144,7 +144,7 @@ jobs:
             if [[ "$platform" == windows_* ]]; then
               bin="${bin}.exe"
             fi
-            EXPECTED_FILES+=("$bin" "${bin}.zip" "${bin}.tar.gz")
+            EXPECTED_FILES+=("${bin}.zip" "${bin}.tar.gz")
           done
 
           MISSING=0
