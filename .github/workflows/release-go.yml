@@ -1,0 +1,165 @@
+name: Release Go
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.1.0)'
+        required: true
+        type: string
+      clobber:
+        description: 'Overwrite existing release assets (--clobber)'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    name: Build All Binaries
+    uses: ./.github/workflows/build-go.yml
+    secrets: inherit
+
+  upload-assets:
+    name: Upload Release Assets
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Get version
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_TAG"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+
+          if [[ -z "$VERSION" ]]; then
+            echo "ERROR: Could not determine version" >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+
+      - name: Check if release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! gh release view "$VERSION" > /dev/null 2>&1; then
+            echo "ERROR: Release not found for tag $VERSION" >&2
+            echo "Create a GitHub release for this tag before running the workflow." >&2
+            exit 1
+          fi
+          echo "Found existing release for $VERSION"
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: bin/
+          merge-multiple: true
+
+      - name: Verify binaries downloaded
+        run: |
+          echo "Downloaded binaries:"
+          ls -lahrt bin/
+          BINARY_COUNT=$(find bin/ -type f | wc -l)
+          echo "Total binaries: $BINARY_COUNT"
+          if [[ "$BINARY_COUNT" -lt 6 ]]; then
+            echo "ERROR: Expected at least 6 binaries, found $BINARY_COUNT" >&2
+            exit 1
+          fi
+
+      - name: Set execution permissions
+        run: chmod +x bin/terragrunt-ls_darwin_* bin/terragrunt-ls_linux_*
+
+      - name: Create archives
+        run: |
+          cd bin
+          for binary in terragrunt-ls_*; do
+            if [[ "$binary" == *.zip ]] || [[ "$binary" == *.tar.gz ]]; then
+              continue
+            fi
+            zip "${binary}.zip" "$binary"
+            tar -czf "${binary}.tar.gz" "$binary"
+            echo "Created archives for $binary"
+          done
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd bin
+          sha256sum *.zip *.tar.gz > SHA256SUMS
+          echo "SHA256SUMS:"
+          cat SHA256SUMS
+
+      - name: Upload assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          CLOBBER: ${{ github.event_name == 'workflow_dispatch' && inputs.clobber || 'false' }}
+        run: |
+          CLOBBER_FLAG=""
+          if [[ "$CLOBBER" == "true" ]]; then
+            CLOBBER_FLAG="--clobber"
+            echo "Overwrite mode enabled"
+          fi
+
+          echo "Uploading assets to release $VERSION..."
+          cd bin
+          for file in *.zip *.tar.gz SHA256SUMS; do
+            echo "Uploading $file..."
+            gh release upload "$VERSION" "$file" $CLOBBER_FLAG
+          done
+          echo "All assets uploaded"
+
+      - name: Verify assets uploaded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ASSETS=$(gh release view "$VERSION" --json 'assets' --jq '.assets[].name')
+          echo "Release assets:"
+          echo "$ASSETS"
+
+          EXPECTED_FILES=(
+            "SHA256SUMS"
+          )
+
+          for platform in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
+            bin="terragrunt-ls_${platform}"
+            if [[ "$platform" == windows_* ]]; then
+              bin="${bin}.exe"
+            fi
+            EXPECTED_FILES+=("${bin}.zip" "${bin}.tar.gz")
+          done
+
+          MISSING=0
+          for expected in "${EXPECTED_FILES[@]}"; do
+            if echo "$ASSETS" | grep -q "^${expected}$"; then
+              echo "$expected present"
+            else
+              echo "MISSING: $expected" >&2
+              MISSING=1
+            fi
+          done
+
+          if [[ "$MISSING" -eq 1 ]]; then
+            echo "ERROR: Some expected assets are missing from the release" >&2
+            exit 1
+          fi
+
+          echo "All expected assets verified"
