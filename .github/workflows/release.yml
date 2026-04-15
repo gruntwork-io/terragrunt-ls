@@ -85,4 +85,4 @@ jobs:
       - name: Publish to Marketplace
         run: npx @vscode/vsce publish --packagePath $(find . -iname '*.vsix')
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
