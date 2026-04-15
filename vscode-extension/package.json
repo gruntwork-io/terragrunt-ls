@@ -1,6 +1,6 @@
 {
 	"name": "terragrunt-ls",
-	"displayName": "Terragrunt Language Server",
+	"displayName": "Terragrunt Language Server (Official)",
 	"description": "Official Terragrunt Language Server extension by Gruntwork",
 	"author": "Gruntwork",
 	"license": "MPL-2.0",
