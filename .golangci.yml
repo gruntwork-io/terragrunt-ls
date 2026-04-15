@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.24"
+  go: "1.26"
   issues-exit-code: 1
   tests: true
 output:
@@ -119,6 +119,7 @@ linters:
       - _ci
       - .github
       - .circleci
+      - node_modules
       - third_party$
       - builtin$
       - examples$
@@ -138,6 +139,7 @@ formatters:
       - _ci
       - .github
       - .circleci
+      - node_modules
       - third_party$
       - builtin$
       - examples$

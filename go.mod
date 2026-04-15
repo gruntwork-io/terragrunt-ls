@@ -1,6 +1,6 @@
 module terragrunt-ls
 
-go 1.24.4
+go 1.26.2
 
 require (
 	github.com/gruntwork-io/terragrunt v0.82.3

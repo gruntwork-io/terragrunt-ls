@@ -145,7 +145,7 @@ func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
-	diags := []protocol.Diagnostic{}
+	diags := make([]protocol.Diagnostic, 0, len(hclDiags))
 
 	for _, diag := range hclDiags {
 		diags = append(diags, protocol.Diagnostic{
