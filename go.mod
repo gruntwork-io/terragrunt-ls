@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/gruntwork-io/terragrunt v0.82.3
-	github.com/hashicorp/hcl/v2 v2.23.0
+	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.17.0
