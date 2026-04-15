@@ -1,6 +1,6 @@
 [tools]
 go = "1.26.2"
-golangci-lint = "2.1.6"
+golangci-lint = "2.11.4"
 lua = "5.4.7"
 node = "23.10.0"
 rust = "1.85.1"
