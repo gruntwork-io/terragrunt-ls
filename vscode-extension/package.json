@@ -67,7 +67,9 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run compile && ./scripts/package.sh",
+		"vscode:prepublish": "npm run bundle && ./scripts/package.sh",
+		"bundle": "node esbuild.js --production",
+		"bundle:watch": "node esbuild.js --watch",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
 		"lint": "eslint"
@@ -83,6 +85,7 @@
 		"@types/node": "^20",
 		"@types/vscode": "^1.75.1",
 		"@vscode/test-electron": "^2.3.9",
+		"esbuild": "^0.28.0",
 		"eslint": "^9.13.0",
 		"mocha": "^10.3.0",
 		"nodemon": "^3.1.9",
