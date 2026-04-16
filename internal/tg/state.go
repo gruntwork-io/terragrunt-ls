@@ -114,7 +114,10 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 }
 
 func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	st := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return newEmptyHoverResponse(id)
+	}
 
 	l.Debug(
 		"Hovering over character",
@@ -193,7 +196,10 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 }
 
 func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	st := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
 
 	l.Debug(
 		"Definition requested",
@@ -357,7 +363,15 @@ func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position pr
 }
 
 func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
-	items := completion.GetCompletions(l, s.Configs[docURI.Filename()], position)
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return lsp.CompletionResponse{
+			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+			Result:   []protocol.CompletionItem{},
+		}
+	}
+
+	items := completion.GetCompletions(l, st, position)
 
 	response := lsp.CompletionResponse{
 		Response: lsp.Response{
@@ -371,7 +385,13 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 }
 
 func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.DocumentURI) lsp.FormatResponse {
-	st := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok {
+		return lsp.FormatResponse{
+			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+			Result:   []protocol.TextEdit{},
+		}
+	}
 
 	l.Debug(
 		"Formatting requested",

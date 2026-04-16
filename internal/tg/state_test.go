@@ -537,7 +537,8 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
-	_ = state.OpenDocument(context.Background(), l, stackURI, "uni")
+	diags := state.OpenDocument(context.Background(), l, stackURI, "uni")
+	require.NotEmpty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
 
