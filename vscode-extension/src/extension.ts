@@ -57,7 +57,6 @@ export function activate(context: ExtensionContext) {
 		// Register the server for Terragrunt files
 		documentSelector: [
 			{ scheme: 'file', language: 'terragrunt' },
-			{ scheme: 'file', language: 'hcl' },
 		],
 		synchronize: {
 			// Notify the server about file changes to Terragrunt files
