@@ -40,7 +40,7 @@ func TestDetectFileType(t *testing.T) {
 		{
 			name:     "arbitrary hcl file",
 			filename: "/some/path/other.hcl",
-			expected: store.FileTypeTerragrunt,
+			expected: store.FileTypeUnknown,
 		},
 	}
 

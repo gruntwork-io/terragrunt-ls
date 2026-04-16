@@ -173,12 +173,14 @@ func DetectFileType(filename string) store.FileType {
 	base := filepath.Base(filename)
 
 	switch base {
+	case "terragrunt.hcl":
+		return store.FileTypeTerragrunt
 	case "terragrunt.stack.hcl":
 		return store.FileTypeStack
 	case "terragrunt.values.hcl":
 		return store.FileTypeValues
 	default:
-		return store.FileTypeTerragrunt
+		return store.FileTypeUnknown
 	}
 }
 

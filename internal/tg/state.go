@@ -103,6 +103,9 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 	case store.FileTypeValues:
 		// Values files are generated; only store the document for formatting.
 		diags = []protocol.Diagnostic{}
+
+	case store.FileTypeUnknown:
+		diags = []protocol.Diagnostic{}
 	}
 
 	s.Configs[filename] = st

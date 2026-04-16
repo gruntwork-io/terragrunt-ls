@@ -22,6 +22,8 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 		candidates = newStackCompletions(position)
 	case store.FileTypeValues:
 		return []protocol.CompletionItem{}
+	case store.FileTypeUnknown:
+		return []protocol.CompletionItem{}
 	}
 
 	completions := []protocol.CompletionItem{}

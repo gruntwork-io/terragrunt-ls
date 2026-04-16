@@ -44,7 +44,7 @@ func TestState_OpenDocument(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the URI for the unit file
-	unitPath := filepath.Join(unitDir, "bar.hcl")
+	unitPath := filepath.Join(unitDir, "terragrunt.hcl")
 
 	unitURI := uri.File(unitPath)
 
@@ -196,22 +196,22 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///foo/bar.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
 
 			if len(tt.expected) != 0 {
-				assert.Equal(t, tt.expected, state.Configs["/foo/bar.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expected, state.Configs["/foo/terragrunt.hcl"].Cfg.Locals)
 			}
 
-			diags = state.UpdateDocument(context.Background(), l, "file:///foo/bar.hcl", tt.updated)
+			diags = state.UpdateDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.updated)
 			assert.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
 
 			if len(tt.expectedUpdated) != 0 {
-				assert.Equal(t, tt.expectedUpdated, state.Configs["/foo/bar.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expectedUpdated, state.Configs["/foo/terragrunt.hcl"].Cfg.Locals)
 			}
 		})
 	}
@@ -283,12 +283,12 @@ func TestState_Hover(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///foo/bar.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
 
-			hover := state.Hover(l, 1, "file:///foo/bar.hcl", tt.position)
+			hover := state.Hover(l, 1, "file:///foo/terragrunt.hcl", tt.position)
 			assert.Equal(t, tt.expected, hover)
 		})
 	}
@@ -321,7 +321,7 @@ func TestState_Definition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the URI for the unit file
-	unitPath := filepath.Join(unitDir, "bar.hcl")
+	unitPath := filepath.Join(unitDir, "terragrunt.hcl")
 
 	unitURI := uri.File(unitPath)
 
@@ -513,14 +513,14 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///terragrunt.hcl", tt.document)
 			if tt.expectDiagnostics {
 				require.NotEmpty(t, diags)
 			} else {
 				require.Empty(t, diags)
 			}
 
-			completion := state.TextDocumentCompletion(l, 1, "file:///test.hcl", tt.position)
+			completion := state.TextDocumentCompletion(l, 1, "file:///terragrunt.hcl", tt.position)
 			assert.Equal(t, tt.expected, completion)
 		})
 	}
@@ -709,11 +709,11 @@ bar=   "baz"
 			l := testutils.NewTestLogger(t)
 
 			// First open the document to populate the state
-			diags := state.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///terragrunt.hcl", tt.document)
 			require.Empty(t, diags)
 
 			// Request formatting
-			response := state.TextDocumentFormatting(l, 1, "file:///test.hcl")
+			response := state.TextDocumentFormatting(l, 1, "file:///terragrunt.hcl")
 
 			// Verify the formatting result
 			require.Len(t, response.Result, 1)
