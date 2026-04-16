@@ -90,7 +90,7 @@ stack "service" {
 			name:     "empty stack config",
 			content:  "",
 			wantCfg:  false,
-			wantDiag: true,
+			wantDiag: false,
 		},
 		{
 			name: "unit missing source",

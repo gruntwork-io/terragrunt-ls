@@ -186,6 +186,15 @@ func DetectFileType(filename string) store.FileType {
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
+	var parseDiags hcl.Diagnostics
+
+	parseOptions := []hclparse.Option{
+		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
+			parseDiags = append(parseDiags, hclDiags...)
+			return hclDiags, nil
+		}),
+	}
+
 	tgLogger := tgLog.New(
 		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
@@ -199,23 +208,17 @@ func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text strin
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
 	pctx.Writers.Writer = io.Discard
 	pctx.Writers.ErrWriter = io.Discard
+	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
 
 	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
 	if err != nil {
+		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
-
-		return cfg, []protocol.Diagnostic{
-			{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: 0, Character: 0},
-					End:   protocol.Position{Line: 0, Character: 0},
-				},
-				Message:  err.Error(),
-				Severity: protocol.DiagnosticSeverityError,
-				Source:   "HCL",
-			},
-		}
 	}
 
-	return cfg, []protocol.Diagnostic{}
+	filteredDiags := filterHCLDiags(l, parseDiags, filename)
+
+	diags := hclDiagsToLSPDiags(filteredDiags)
+
+	return cfg, diags
 }
