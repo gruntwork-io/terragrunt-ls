@@ -183,14 +183,14 @@ func DetectFileType(filename string) store.FileType {
 }
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
-func ParseStackBuffer(l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
+func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := tgLog.New(
 		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
 		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
-	ctx, pctx := config.NewParsingContext(context.TODO(), tgLogger)
+	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
 	pctx.SkipOutput = true

@@ -537,7 +537,7 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
-	_ = state.OpenDocument(l, stackURI, "uni")
+	_ = state.OpenDocument(context.Background(), l, stackURI, "uni")
 
 	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
 
@@ -555,7 +555,7 @@ func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(l, valuesURI, "loc")
+	diags := state.OpenDocument(context.Background(), l, valuesURI, "loc")
 	assert.Empty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, valuesURI, protocol.Position{Line: 0, Character: 3})
@@ -573,7 +573,7 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(l, stackURI, `unit "vpc" {
+	diags := state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -598,7 +598,7 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(l, valuesURI, `some_var = "hello"`)
+	diags := state.OpenDocument(context.Background(), l, valuesURI, `some_var = "hello"`)
 	assert.Empty(t, diags)
 
 	require.Len(t, state.Configs, 1)
@@ -618,7 +618,7 @@ func TestState_Hover_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -637,7 +637,7 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(l, valuesURI, `some_var = "hello"`)
+	_ = state.OpenDocument(context.Background(), l, valuesURI, `some_var = "hello"`)
 
 	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
 	assert.Empty(t, hover.Result.Contents.Value)
@@ -653,7 +653,7 @@ func TestState_Definition_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)

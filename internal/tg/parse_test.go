@@ -140,7 +140,7 @@ stack "service" {
 			filename := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseStackBuffer(l, filename, tt.content)
+			cfg, diags := tg.ParseStackBuffer(t.Context(), l, filename, tt.content)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")

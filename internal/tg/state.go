@@ -89,7 +89,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 		diags = unitDiags
 
 	case store.FileTypeStack:
-		stackCfg, stackDiags := ParseStackBuffer(l, filename, text)
+		stackCfg, stackDiags := ParseStackBuffer(ctx, l, filename, text)
 
 		l.Debug(
 			"Stack Config",
