@@ -8,15 +8,16 @@ import (
 
 	"terragrunt-ls/internal/logger"
 
-	"github.com/gruntwork-io/terragrunt/config"
-	"github.com/gruntwork-io/terragrunt/config/hclparse"
-	"github.com/gruntwork-io/terragrunt/options"
+	"github.com/gruntwork-io/terragrunt/pkg/config"
+	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
 	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
 )
+
+const defaultMaxFoldersToCheck = 100
 
 func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	var parseDiags hcl.Diagnostics
@@ -28,36 +29,22 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 		}),
 	}
 
-	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
-	if err != nil {
-		return nil, []protocol.Diagnostic{
-			{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: 0, Character: 0},
-					End:   protocol.Position{Line: 0, Character: 0},
-				},
-				Message:  err.Error(),
-				Severity: protocol.DiagnosticSeverityError,
-				Source:   "HCL",
-			},
-		}
-	}
-
-	opts.SkipOutput = true
-	opts.NonInteractive = true
-	opts.Writer = io.Discard
-	opts.ErrWriter = io.Discard
-
 	tgLogger := tgLog.New(
 		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
 		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
-	ctx := config.NewParsingContext(context.TODO(), tgLogger, opts)
-	ctx.ParserOptions = parseOptions
+	ctx, pctx := config.NewParsingContext(context.TODO(), tgLogger)
+	pctx.TerragruntConfigPath = filename
+	pctx.WorkingDir = filepath.Dir(filename)
+	pctx.SkipOutput = true
+	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
+	pctx.Writers.Writer = io.Discard
+	pctx.Writers.ErrWriter = io.Discard
+	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
 
-	cfg, err := config.ParseConfigString(ctx, tgLogger, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -74,6 +61,12 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl
 	filtered := hcl.Diagnostics{}
 
 	for _, diag := range diags {
+		if diag.Subject == nil {
+			filtered = append(filtered, diag)
+
+			continue
+		}
+
 		l.Debug(
 			"Checking to see diag can be filtered.",
 			"diag", diag,
@@ -148,8 +141,10 @@ func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 	diags := make([]protocol.Diagnostic, 0, len(hclDiags))
 
 	for _, diag := range hclDiags {
-		diags = append(diags, protocol.Diagnostic{
-			Range: protocol.Range{
+		var diagRange protocol.Range
+
+		if diag.Subject != nil {
+			diagRange = protocol.Range{
 				Start: protocol.Position{
 					Line:      uint32(diag.Subject.Start.Line) - 1,
 					Character: uint32(diag.Subject.Start.Column) - 1,
@@ -158,7 +153,11 @@ func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 					Line:      uint32(diag.Subject.End.Line) - 1,
 					Character: uint32(diag.Subject.End.Column) - 1,
 				},
-			},
+			}
+		}
+
+		diags = append(diags, protocol.Diagnostic{
+			Range:    diagRange,
 			Severity: protocol.DiagnosticSeverity(diag.Severity),
 			Source:   "HCL",
 			Message:  diag.Summary + ": " + diag.Detail,

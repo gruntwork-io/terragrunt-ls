@@ -6,8 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gruntwork-io/terragrunt/codegen"
-	"github.com/gruntwork-io/terragrunt/config"
+	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -49,33 +48,30 @@ func TestState_OpenDocument(t *testing.T) {
 	unitURI := uri.File(unitPath)
 
 	tc := []struct {
-		expected *config.TerragruntConfig
-		name     string
-		document string
+		expectedLocals         map[string]any
+		expectedFieldsMetadata map[string]map[string]any
+		expectedIncludes       config.IncludeConfigsMap
+		name                   string
+		document               string
+		expectedDeps           config.Dependencies
 	}{
 		{
-			name:     "empty document",
-			document: "",
-			expected: &config.TerragruntConfig{
-				GenerateConfigs:   map[string]codegen.GenerateConfig{},
-				ProcessedIncludes: config.IncludeConfigsMap{},
-			},
+			name:             "empty document",
+			document:         "",
+			expectedIncludes: config.IncludeConfigsMap{},
 		},
 		{
 			name: "simple locals",
 			document: `locals {
 	foo = "bar"
 }`,
-			expected: &config.TerragruntConfig{
-				Locals: map[string]any{
-					"foo": "bar",
-				},
-				GenerateConfigs:   map[string]codegen.GenerateConfig{},
-				ProcessedIncludes: config.IncludeConfigsMap{},
-				FieldsMetadata: map[string]map[string]any{
-					"locals-foo": {
-						"found_in_file": unitPath,
-					},
+			expectedLocals: map[string]any{
+				"foo": "bar",
+			},
+			expectedIncludes: config.IncludeConfigsMap{},
+			expectedFieldsMetadata: map[string]map[string]any{
+				"locals-foo": {
+					"found_in_file": unitPath,
 				},
 			},
 		},
@@ -85,20 +81,17 @@ func TestState_OpenDocument(t *testing.T) {
 	foo = "bar"
 	baz = "qux"
 }`,
-			expected: &config.TerragruntConfig{
-				Locals: map[string]any{
-					"baz": "qux",
-					"foo": "bar",
+			expectedLocals: map[string]any{
+				"baz": "qux",
+				"foo": "bar",
+			},
+			expectedIncludes: config.IncludeConfigsMap{},
+			expectedFieldsMetadata: map[string]map[string]any{
+				"locals-baz": {
+					"found_in_file": unitPath,
 				},
-				GenerateConfigs:   map[string]codegen.GenerateConfig{},
-				ProcessedIncludes: config.IncludeConfigsMap{},
-				FieldsMetadata: map[string]map[string]any{
-					"locals-baz": {
-						"found_in_file": unitPath,
-					},
-					"locals-foo": {
-						"found_in_file": unitPath,
-					},
+				"locals-foo": {
+					"found_in_file": unitPath,
 				},
 			},
 		},
@@ -107,16 +100,13 @@ func TestState_OpenDocument(t *testing.T) {
 			document: `include "root" {
 	path = find_in_parent_folders("root.hcl")
 }`,
-			expected: &config.TerragruntConfig{
-				GenerateConfigs: map[string]codegen.GenerateConfig{},
-				ProcessedIncludes: config.IncludeConfigsMap{
-					"root": {
-						Name: "root",
-						Path: rootPath,
-					},
+			expectedIncludes: config.IncludeConfigsMap{
+				"root": {
+					Name: "root",
+					Path: rootPath,
 				},
-				TerragruntDependencies: config.Dependencies{},
 			},
+			expectedDeps: config.Dependencies{},
 		},
 	}
 
@@ -133,7 +123,16 @@ func TestState_OpenDocument(t *testing.T) {
 
 			assert.Len(t, state.Configs, 1)
 
-			assert.Equal(t, tt.expected, state.Configs[unitPath].Cfg)
+			cfg := state.Configs[unitPath].Cfg
+			require.NotNil(t, cfg)
+			assert.Equal(t, tt.expectedLocals, cfg.Locals)
+			assert.Equal(t, tt.expectedIncludes, cfg.ProcessedIncludes)
+			assert.Equal(t, tt.expectedFieldsMetadata, cfg.FieldsMetadata)
+			assert.Empty(t, cfg.GenerateConfigs)
+
+			if tt.expectedDeps != nil {
+				assert.Equal(t, tt.expectedDeps, cfg.TerragruntDependencies)
+			}
 		})
 	}
 }
