@@ -150,6 +150,8 @@ stack "service" {
 
 			if tt.wantCfg {
 				assert.NotNil(t, cfg, "expected config to not be nil")
+			} else {
+				assert.Nil(t, cfg, "expected config to be nil")
 			}
 		})
 	}
