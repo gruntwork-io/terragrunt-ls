@@ -4,7 +4,7 @@
 package store
 
 import (
-	"github.com/gruntwork-io/terragrunt/config"
+	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/zclconf/go-cty/cty"
 
 	"terragrunt-ls/internal/ast"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -29,6 +30,7 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
 
+	ctx := context.Background()
 	state := tg.NewState()
 	writer := os.Stdout
 
@@ -42,11 +44,11 @@ func main() {
 			continue
 		}
 
-		handleMessage(l, writer, state, method, contents)
+		handleMessage(ctx, l, writer, state, method, contents)
 	}
 }
 
-func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
+func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
 	l.Debug("Received msg", "method", method, "contents", string(contents))
 
 	switch method {
@@ -83,7 +85,7 @@ func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method str
 			"Text", notification.Params.TextDocument.Text,
 		)
 
-		diagnostics := state.OpenDocument(l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
+		diagnostics := state.OpenDocument(ctx, l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
 		writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 			Notification: lsp.Notification{
 				RPC:    lsp.RPCVersion,
@@ -123,7 +125,7 @@ func handleMessage(l logger.Logger, writer io.Writer, state tg.State, method str
 				"Text", change.Text,
 			)
 
-			diagnostics := state.UpdateDocument(l, notification.Params.TextDocument.URI, change.Text)
+			diagnostics := state.UpdateDocument(ctx, l, notification.Params.TextDocument.URI, change.Text)
 			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 				Notification: lsp.Notification{
 					RPC:    lsp.RPCVersion,

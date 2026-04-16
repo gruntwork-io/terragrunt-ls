@@ -1,6 +1,7 @@
 package definition_test
 
 import (
+	"context"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 	"terragrunt-ls/internal/tg/definition"
@@ -55,7 +56,7 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			s := tg.NewState()
 
-			s.OpenDocument(l, "file:///test.hcl", tt.document)
+			s.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
 
 			target, context := definition.GetDefinitionTargetWithContext(l, s.Configs["/test.hcl"], tt.position)
 
