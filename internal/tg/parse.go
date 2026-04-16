@@ -184,31 +184,21 @@ func DetectFileType(filename string) store.FileType {
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
-	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
-	if err != nil {
-		return nil, []protocol.Diagnostic{
-			{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: 0, Character: 0},
-					End:   protocol.Position{Line: 0, Character: 0},
-				},
-				Message:  err.Error(),
-				Severity: protocol.DiagnosticSeverityError,
-				Source:   "HCL",
-			},
-		}
-	}
-
-	opts.SkipOutput = true
-	opts.NonInteractive = true
-
 	tgLogger := tgLog.New(
 		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
 		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
-	cfg, err := config.ReadStackConfigString(context.TODO(), tgLogger, opts, filename, text, nil)
+	ctx, pctx := config.NewParsingContext(context.TODO(), tgLogger)
+	pctx.TerragruntConfigPath = filename
+	pctx.WorkingDir = filepath.Dir(filename)
+	pctx.SkipOutput = true
+	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
+	pctx.Writers.Writer = io.Discard
+	pctx.Writers.ErrWriter = io.Discard
+
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
 	if err != nil {
 		l.Error("Error parsing stack config", "error", err)
 
