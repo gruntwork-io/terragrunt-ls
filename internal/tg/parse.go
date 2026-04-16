@@ -51,14 +51,14 @@ func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text 
 		l.Error("Error parsing Terragrunt config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, parseDiags, filename)
+	filteredDiags := filterHCLDiags(l, parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
 	return cfg, diags
 }
 
-func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl.Diagnostics {
+func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
 	filtered := hcl.Diagnostics{}
 
 	for _, diag := range diags {
@@ -87,6 +87,16 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename string) hcl
 		if isParentFileNotFoundDiag(diag) {
 			l.Debug(
 				"Filtering parent file not found diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		if isValuesAttributeDiag(diag, text) {
+			l.Debug(
+				"Filtering values attribute diag",
 				"diag", diag,
 				"filename", filename,
 			)
@@ -136,6 +146,46 @@ func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
 	}
 
 	return strings.HasPrefix(diag.Detail, ParentFileNotFoundErrorDetailPartial)
+}
+
+const (
+	valuesPrefix = "values."
+
+	// UnknownVariableSummary is the summary for an unknown variable diagnostic.
+	UnknownVariableSummary = "Unknown variable"
+
+	// ValuesUnknownVariableDetail is the detail for a missing "values" variable diagnostic.
+	ValuesUnknownVariableDetail = `There is no variable named "values".`
+)
+
+// isValuesAttributeDiag checks whether the diagnostic is an "Unsupported attribute"
+// or "Unknown variable" error caused by referencing the `values` object, which is
+// populated at runtime from terragrunt.values.hcl and cannot be resolved during
+// LS parsing.
+func isValuesAttributeDiag(diag *hcl.Diagnostic, text string) bool {
+	if diag.Summary == UnknownVariableSummary && diag.Detail == ValuesUnknownVariableDetail {
+		return true
+	}
+
+	if diag.Summary != UnsupportedAttributeSummary {
+		return false
+	}
+
+	lines := strings.Split(text, "\n")
+	line := diag.Subject.Start.Line - 1 // HCL lines are 1-based
+
+	if line < 0 || line >= len(lines) {
+		return false
+	}
+
+	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based
+	prefixLen := len(valuesPrefix)
+
+	if col < prefixLen {
+		return false
+	}
+
+	return lines[line][col-prefixLen:col] == valuesPrefix
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
@@ -216,7 +266,7 @@ func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text strin
 		l.Error("Error parsing stack config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, parseDiags, filename)
+	filteredDiags := filterHCLDiags(l, parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 

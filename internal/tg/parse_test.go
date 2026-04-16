@@ -222,6 +222,19 @@ inputs = {
 `,
 			wantDiag: false,
 		},
+		{
+			name: "values attribute access should not show diagnostic",
+			setup: func(t *testing.T, tmpDir string) string {
+				t.Helper()
+
+				return filepath.Join(tmpDir, "terragrunt.hcl")
+			},
+			content: `locals {
+  environment = values.environment
+}
+`,
+			wantDiag: false,
+		},
 	}
 
 	for _, tt := range tests {
