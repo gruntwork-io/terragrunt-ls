@@ -1,6 +1,7 @@
 package tg_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"terragrunt-ls/internal/testutils"
@@ -90,7 +91,7 @@ inputs = {
 			filename := tt.setup(t, tmpDir)
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseTerragruntBuffer(l, filename, tt.content)
+			cfg, diags := tg.ParseTerragruntBuffer(context.Background(), l, filename, tt.content)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")

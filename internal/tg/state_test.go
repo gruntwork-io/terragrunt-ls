@@ -1,6 +1,7 @@
 package tg_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,7 +119,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, unitURI, tt.document)
+			diags := state.OpenDocument(context.Background(), l, unitURI, tt.document)
 			require.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -195,7 +196,7 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -204,7 +205,7 @@ func TestState_UpdateDocument(t *testing.T) {
 				assert.Equal(t, tt.expected, state.Configs["/foo/bar.hcl"].Cfg.Locals)
 			}
 
-			diags = state.UpdateDocument(l, "file:///foo/bar.hcl", tt.updated)
+			diags = state.UpdateDocument(context.Background(), l, "file:///foo/bar.hcl", tt.updated)
 			assert.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -282,7 +283,7 @@ func TestState_Hover(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, "file:///foo/bar.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///foo/bar.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -428,7 +429,7 @@ func TestState_Definition(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, unitURI, tt.document)
+			diags := state.OpenDocument(context.Background(), l, unitURI, tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -512,7 +513,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(l, "file:///test.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
 			if tt.expectDiagnostics {
 				require.NotEmpty(t, diags)
 			} else {
@@ -570,7 +571,7 @@ bar=   "baz"
 			l := testutils.NewTestLogger(t)
 
 			// First open the document to populate the state
-			diags := state.OpenDocument(l, "file:///test.hcl", tt.document)
+			diags := state.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
 			require.Empty(t, diags)
 
 			// Request formatting

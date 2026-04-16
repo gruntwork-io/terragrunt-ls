@@ -19,7 +19,7 @@ import (
 
 const defaultMaxFoldersToCheck = 100
 
-func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	var parseDiags hcl.Diagnostics
 
 	parseOptions := []hclparse.Option{
@@ -35,7 +35,7 @@ func ParseTerragruntBuffer(l logger.Logger, filename, text string) (*config.Terr
 		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
-	ctx, pctx := config.NewParsingContext(context.TODO(), tgLogger)
+	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
 	pctx.SkipOutput = true

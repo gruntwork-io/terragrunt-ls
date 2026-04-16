@@ -1,6 +1,7 @@
 package tg
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,31 +30,31 @@ func NewState() State {
 	return State{Configs: map[string]store.Store{}}
 }
 
-func (s *State) OpenDocument(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) OpenDocument(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Opening document",
 		"uri", docURI,
 		"text", text,
 	)
 
-	return s.updateState(l, docURI, text)
+	return s.updateState(ctx, l, docURI, text)
 }
 
-func (s *State) UpdateDocument(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) UpdateDocument(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Updating document",
 		"uri", docURI,
 		"text", text,
 	)
 
-	return s.updateState(l, docURI, text)
+	return s.updateState(ctx, l, docURI, text)
 }
 
-func (s *State) updateState(l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
 	// Ignore errors from AST indexing since we'll get the same errors from the Terragrunt parser just below
 	ast, _ := ast.ParseHCLFile(docURI.Filename(), []byte(text))
 
-	cfg, diags := ParseTerragruntBuffer(l, docURI.Filename(), text)
+	cfg, diags := ParseTerragruntBuffer(ctx, l, docURI.Filename(), text)
 
 	l.Debug(
 		"Config",
