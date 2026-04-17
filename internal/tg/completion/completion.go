@@ -10,11 +10,25 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func GetCompletions(l logger.Logger, store store.Store, position protocol.Position) []protocol.CompletionItem {
-	word := text.GetCursorWord(store.Document, position)
+func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) []protocol.CompletionItem {
+	word := text.GetCursorWord(s.Document, position)
+
+	var candidates []protocol.CompletionItem
+
+	switch s.FileType {
+	case store.FileTypeUnit:
+		candidates = newUnitCompletions(position)
+	case store.FileTypeStack:
+		candidates = newStackCompletions(position)
+	case store.FileTypeValues:
+		return []protocol.CompletionItem{}
+	case store.FileTypeUnknown:
+		return []protocol.CompletionItem{}
+	}
+
 	completions := []protocol.CompletionItem{}
 
-	for _, completion := range newCompletions(position) {
+	for _, completion := range candidates {
 		if strings.HasPrefix(completion.Label, word) {
 			completions = append(completions, completion)
 		}
@@ -23,11 +37,11 @@ func GetCompletions(l logger.Logger, store store.Store, position protocol.Positi
 	return completions
 }
 
-// newCompletions returns a list of completions for the given position.
+// newUnitCompletions returns a list of completions for terragrunt.hcl files.
 //
 // TODO: Add detection via the AST index to determine
 // whether the cursor is in the context of a block or expression.
-func newCompletions(position protocol.Position) []protocol.CompletionItem {
+func newUnitCompletions(position protocol.Position) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
 		{
 			Label: "dependency",
@@ -403,6 +417,71 @@ The terragrunt_version_constraint attribute is used to specify which versions of
 					End:   protocol.Position{Line: position.Line, Character: position.Character},
 				},
 				NewText: `terragrunt_version_constraint = ">= ${1:0.23}"`,
+			},
+		},
+	}
+}
+
+// newStackCompletions returns a list of completions for terragrunt.stack.hcl files.
+func newStackCompletions(position protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		{
+			Label: "unit",
+			Documentation: protocol.MarkupContent{
+				Kind: protocol.Markdown,
+				Value: `# unit
+The unit block references a Terragrunt unit to include in this stack.`,
+			},
+			Kind:             protocol.CompletionItemKindClass,
+			InsertTextFormat: protocol.InsertTextFormatSnippet,
+			TextEdit: &protocol.TextEdit{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: position.Line, Character: 0},
+					End:   protocol.Position{Line: position.Line, Character: position.Character},
+				},
+				NewText: `unit "${1}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+			},
+		},
+		{
+			Label: "stack",
+			Documentation: protocol.MarkupContent{
+				Kind: protocol.Markdown,
+				Value: `# stack
+The stack block references another Terragrunt stack to nest within this stack.`,
+			},
+			Kind:             protocol.CompletionItemKindClass,
+			InsertTextFormat: protocol.InsertTextFormatSnippet,
+			TextEdit: &protocol.TextEdit{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: position.Line, Character: 0},
+					End:   protocol.Position{Line: position.Line, Character: position.Character},
+				},
+				NewText: `stack "${1}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+			},
+		},
+		{
+			Label: "locals",
+			Documentation: protocol.MarkupContent{
+				Kind: protocol.Markdown,
+				Value: `# locals
+The locals block defines aliases for expressions reusable within the stack file.`,
+			},
+			Kind:             protocol.CompletionItemKindClass,
+			InsertTextFormat: protocol.InsertTextFormatSnippet,
+			TextEdit: &protocol.TextEdit{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: position.Line, Character: 0},
+					End:   protocol.Position{Line: position.Line, Character: position.Character},
+				},
+				NewText: `locals {
+	${1} = ${2}
+}`,
 			},
 		},
 	}

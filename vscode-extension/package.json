@@ -19,7 +19,9 @@
 		"vscode": "^1.98.0"
 	},
 	"activationEvents": [
-		"workspaceContains:**/terragrunt.hcl"
+		"workspaceContains:**/terragrunt.hcl",
+		"workspaceContains:**/terragrunt.stack.hcl",
+		"workspaceContains:**/terragrunt.values.hcl"
 	],
 	"main": "./out/extension",
 	"contributes": {

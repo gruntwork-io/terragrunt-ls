@@ -23,6 +23,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete dep",
 			store: store.Store{
 				Document: `dep`,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -68,6 +69,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete dependency",
 			store: store.Store{
 				Document: `dependency`,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -95,6 +97,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete include",
 			store: store.Store{
 				Document: `in`,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 1},
 			completions: []protocol.CompletionItem{
@@ -140,6 +143,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete include",
 			store: store.Store{
 				Document: `include`,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -167,6 +171,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete generate",
 			store: store.Store{
 				Document: `generate`,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -195,6 +200,101 @@ EOF
 					},
 				},
 			},
+		},
+		{
+			name: "stack file - complete unit",
+			store: store.Store{
+				Document: `uni`,
+				FileType: store.FileTypeStack,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "unit",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# unit\nThe unit block references a Terragrunt unit to include in this stack.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `unit "${1}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "stack file - complete stack",
+			store: store.Store{
+				Document: `sta`,
+				FileType: store.FileTypeStack,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "stack",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# stack\nThe stack block references another Terragrunt stack to nest within this stack.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `stack "${1}" {
+	source = "${2}"
+	path   = "${3}"
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "stack file - complete locals",
+			store: store.Store{
+				Document: `lo`,
+				FileType: store.FileTypeStack,
+			},
+			position: protocol.Position{Line: 0, Character: 2},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "locals",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# locals\nThe locals block defines aliases for expressions reusable within the stack file.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 2},
+						},
+						NewText: `locals {
+	${1} = ${2}
+}`,
+					},
+				},
+			},
+		},
+		{
+			name: "values file - no completions",
+			store: store.Store{
+				Document: `loc`,
+				FileType: store.FileTypeValues,
+			},
+			position:    protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{},
 		},
 	}
 

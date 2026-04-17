@@ -10,9 +10,25 @@ import (
 	"terragrunt-ls/internal/ast"
 )
 
+// FileType identifies the kind of Terragrunt configuration file.
+type FileType int
+
+const (
+	// FileTypeUnknown is the file type for unrecognized files.
+	FileTypeUnknown FileType = iota
+	// FileTypeUnit is the default file type for terragrunt.hcl files.
+	FileTypeUnit
+	// FileTypeStack is the file type for terragrunt.stack.hcl files.
+	FileTypeStack
+	// FileTypeValues is the file type for terragrunt.values.hcl files.
+	FileTypeValues
+)
+
 type Store struct {
 	AST      *ast.IndexedAST
 	Cfg      *config.TerragruntConfig
+	StackCfg *config.StackConfig
 	CfgAsCty cty.Value
 	Document string
+	FileType FileType
 }
