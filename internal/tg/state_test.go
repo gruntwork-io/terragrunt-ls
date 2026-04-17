@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,7 +118,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
 			require.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -196,7 +195,7 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -205,7 +204,7 @@ func TestState_UpdateDocument(t *testing.T) {
 				assert.Equal(t, tt.expected, state.Configs["/foo/terragrunt.hcl"].Cfg.Locals)
 			}
 
-			diags = state.UpdateDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.updated)
+			diags = state.UpdateDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.updated)
 			assert.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -283,7 +282,7 @@ func TestState_Hover(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -429,7 +428,7 @@ func TestState_Definition(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -513,7 +512,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(context.Background(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
 			if tt.expectDiagnostics {
 				require.NotEmpty(t, diags)
 			} else {
@@ -537,7 +536,7 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
-	diags := state.OpenDocument(context.Background(), l, stackURI, "uni")
+	diags := state.OpenDocument(t.Context(), l, stackURI, "uni")
 	require.NotEmpty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
@@ -556,7 +555,7 @@ func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(context.Background(), l, valuesURI, "loc")
+	diags := state.OpenDocument(t.Context(), l, valuesURI, "loc")
 	assert.Empty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, valuesURI, protocol.Position{Line: 0, Character: 3})
@@ -574,7 +573,7 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
+	diags := state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -599,7 +598,7 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(context.Background(), l, valuesURI, `some_var = "hello"`)
+	diags := state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
 	assert.Empty(t, diags)
 
 	require.Len(t, state.Configs, 1)
@@ -619,7 +618,7 @@ func TestState_Hover_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -638,7 +637,7 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(context.Background(), l, valuesURI, `some_var = "hello"`)
+	_ = state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
 
 	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
 	assert.Empty(t, hover.Result.Contents.Value)
@@ -654,7 +653,7 @@ func TestState_Definition_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(context.Background(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -710,7 +709,7 @@ bar=   "baz"
 			l := testutils.NewTestLogger(t)
 
 			// First open the document to populate the state
-			diags := state.OpenDocument(context.Background(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
 			require.Empty(t, diags)
 
 			// Request formatting
