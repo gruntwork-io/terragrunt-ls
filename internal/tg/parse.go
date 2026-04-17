@@ -107,9 +107,9 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 			continue
 		}
 
-		if isValuesAttributeDiag(diag, text) {
+		if isUnresolvableAttributeDiag(diag, text) {
 			l.Debug(
-				"Filtering values attribute diag",
+				"Filtering unresolvable attribute diag",
 				"diag", diag,
 				"filename", filename,
 			)
@@ -162,8 +162,6 @@ func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
 }
 
 const (
-	valuesKeyword = "values"
-
 	// UnknownVariableSummary is the summary for an unknown variable diagnostic.
 	UnknownVariableSummary = "Unknown variable"
 
@@ -171,11 +169,16 @@ const (
 	ValuesUnknownVariableDetail = `There is no variable named "values".`
 )
 
-// isValuesAttributeDiag checks whether the diagnostic is an "Unsupported attribute"
-// or "Unknown variable" error caused by referencing the `values` object, which is
-// populated at runtime from terragrunt.values.hcl and cannot be resolved during
-// LS parsing.
-func isValuesAttributeDiag(diag *hcl.Diagnostic, text string) bool {
+// unresolvableKeywords lists object names whose attributes may not be
+// available during LS parsing because they depend on runtime state:
+//   - "values": populated from terragrunt.values.hcl at runtime.
+//   - "local": locals that reference unresolvable values cascade failures.
+var unresolvableKeywords = []string{"values", "local"}
+
+// isUnresolvableAttributeDiag checks whether the diagnostic is an "Unsupported
+// attribute" or "Unknown variable" error caused by referencing an object that
+// cannot be fully resolved during LS parsing.
+func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 	if diag.Summary == UnknownVariableSummary && diag.Detail == ValuesUnknownVariableDetail {
 		return true
 	}
@@ -191,16 +194,23 @@ func isValuesAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 		return false
 	}
 
-	// The diagnostic start column points to the "." in "values.attr".
-	// Check that the characters immediately before the dot spell "values".
+	// The diagnostic start column points to the "." in "keyword.attr".
+	// Check that the characters immediately before the dot match a known keyword.
 	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based, convert to 0-based
-	keywordLen := len(valuesKeyword)
 
-	if col < keywordLen {
-		return false
+	for _, keyword := range unresolvableKeywords {
+		kLen := len(keyword)
+
+		if col < kLen {
+			continue
+		}
+
+		if lines[line][col-kLen:col] == keyword {
+			return true
+		}
 	}
 
-	return lines[line][col-keywordLen:col] == valuesKeyword
+	return false
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
