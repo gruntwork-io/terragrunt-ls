@@ -23,11 +23,18 @@ const defaultMaxFoldersToCheck = 100
 // parsingSetup holds the shared state for parsing terragrunt config files.
 type parsingSetup struct {
 	pctx       *config.ParsingContext
-	tgLogger   tgLog.Logger
 	parseDiags hcl.Diagnostics
 }
 
-func newParsingSetup(ctx context.Context, l logger.Logger, filename string) (context.Context, *parsingSetup) {
+func newTGLogger(l logger.Logger) tgLog.Logger {
+	return tgLog.New(
+		tgLog.WithOutput(l.Writer()),
+		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
+		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
+	)
+}
+
+func newParsingSetup(ctx context.Context, tgLogger tgLog.Logger, filename string) (context.Context, *parsingSetup) {
 	s := &parsingSetup{}
 
 	parseOptions := []hclparse.Option{
@@ -37,13 +44,7 @@ func newParsingSetup(ctx context.Context, l logger.Logger, filename string) (con
 		}),
 	}
 
-	s.tgLogger = tgLog.New(
-		tgLog.WithOutput(l.Writer()),
-		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
-		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
-	)
-
-	ctx, s.pctx = config.NewParsingContext(ctx, s.tgLogger)
+	ctx, s.pctx = config.NewParsingContext(ctx, tgLogger)
 	s.pctx.TerragruntConfigPath = filename
 	s.pctx.WorkingDir = filepath.Dir(filename)
 	s.pctx.SkipOutput = true
@@ -56,9 +57,10 @@ func newParsingSetup(ctx context.Context, l logger.Logger, filename string) (con
 }
 
 func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
-	ctx, s := newParsingSetup(ctx, l, filename)
+	tgLogger := newTGLogger(l)
+	ctx, s := newParsingSetup(ctx, tgLogger, filename)
 
-	cfg, err := config.ParseConfigString(ctx, s.pctx, s.tgLogger, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, s.pctx, tgLogger, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -261,9 +263,10 @@ func DetectFileType(filename string) store.FileType {
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
-	ctx, s := newParsingSetup(ctx, l, filename)
+	tgLogger := newTGLogger(l)
+	ctx, s := newParsingSetup(ctx, tgLogger, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, s.tgLogger, s.pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, s.pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
