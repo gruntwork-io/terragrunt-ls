@@ -32,7 +32,11 @@
 					"terragrunt.stack.hcl",
 					"terragrunt.values.hcl"
 				],
-				"configuration": "./language-configuration.json"
+				"configuration": "./language-configuration.json",
+				"icon": {
+					"light": "./images/icon-light.svg",
+					"dark": "./images/icon-dark.svg"
+				}
 			}
 		],
 		"grammars": [
