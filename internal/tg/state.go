@@ -131,7 +131,9 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 		return s.hoverUnit(l, id, st, position)
 	case store.FileTypeStack:
 		return s.hoverStack(l, id, st, position)
-	case store.FileTypeUnknown, store.FileTypeValues:
+	case store.FileTypeValues:
+		return s.hoverValues(l, id, st, position)
+	case store.FileTypeUnknown:
 		return newEmptyHoverResponse(id)
 	}
 
@@ -267,6 +269,53 @@ func newStackBlockHoverResponse(id int, stackName string) lsp.HoverResponse {
 	}
 }
 
+func (s *State) hoverValues(l logger.Logger, id int, st store.Store, position protocol.Position) lsp.HoverResponse {
+	target, context := hover.GetValuesHoverTargetWithContext(l, st, position)
+
+	l.Debug(
+		"Values hover with context",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyHoverResponse(id)
+	}
+
+	switch context {
+	case hover.HoverContextValuesVariable:
+		return newValuesVariableHoverResponse(id, target)
+	case hover.HoverContextValuesDependency:
+		return newValuesDependencyHoverResponse(id, target)
+	}
+
+	return newEmptyHoverResponse(id)
+}
+
+func newValuesVariableHoverResponse(id int, variable string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Variable: `" + variable + "`**\n\nThis appears to be a variable defined in the values block.\n\nValues files are used to define dynamic input values for units in Terragrunt stacks.",
+			},
+		},
+	}
+}
+
+func newValuesDependencyHoverResponse(id int, dependency string) lsp.HoverResponse {
+	return lsp.HoverResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result: lsp.HoverResult{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "**Dependency: `" + dependency + "`**\n\nThis is a reference to a dependency unit defined elsewhere in your Terragrunt configuration.\n\nThe dependency must be declared before it can be referenced in a values file.",
+			},
+		},
+	}
+}
+
 func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	return lsp.HoverResponse{
 		Response: lsp.Response{
@@ -294,7 +343,9 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		return s.definitionUnit(l, id, st, docURI, position)
 	case store.FileTypeStack:
 		return s.definitionStack(l, id, st, docURI, position)
-	case store.FileTypeUnknown, store.FileTypeValues:
+	case store.FileTypeValues:
+		return s.definitionValues(l, id, st, docURI, position)
+	case store.FileTypeUnknown:
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
@@ -483,6 +534,32 @@ func (s *State) definitionStack(l logger.Logger, id int, st store.Store, docURI 
 		l.Debug("Could not resolve stack source location", "source", target)
 	case definition.DefinitionContextStackPath:
 		return newStackDefinitionResponse(id, target)
+	}
+
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
+func (s *State) definitionValues(l logger.Logger, id int, st store.Store, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+	target, context := definition.GetValuesDefinitionTargetWithContext(l, st, position)
+
+	l.Debug(
+		"Values definition discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	//nolint:gocritic
+	switch context {
+	case definition.DefinitionContextValuesDependency:
+		if resolved, ok := definition.ResolveValuesDependencyPath(target, docURI.Filename()); ok {
+			return newStackDefinitionResponse(id, resolved)
+		}
+
+		l.Debug("Could not resolve values dependency path", "dependency", target)
 	}
 
 	return newEmptyDefinitionResponse(id, docURI, position)
