@@ -611,20 +611,60 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 func TestState_Hover_StackFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
-	stackURI := uri.File(stackPath)
-
-	state := tg.NewState()
-	l := testutils.NewTestLogger(t)
-
-	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	document := `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
-}`)
+}
+`
 
-	hover := state.Hover(l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
-	assert.Empty(t, hover.Result.Contents.Value)
+	tc := []struct {
+		name           string
+		expectFragment string
+		position       protocol.Position
+		expectNonEmpty bool
+	}{
+		{
+			name:           "outside blocks",
+			position:       protocol.Position{Line: 4, Character: 0},
+			expectNonEmpty: false,
+		},
+		{
+			name:           "unit source attribute",
+			position:       protocol.Position{Line: 1, Character: 15},
+			expectNonEmpty: true,
+			expectFragment: "Source",
+		},
+		{
+			name:           "unit path attribute",
+			position:       protocol.Position{Line: 2, Character: 12},
+			expectNonEmpty: true,
+			expectFragment: "Path",
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
+			stackURI := uri.File(stackPath)
+
+			state := tg.NewState()
+			l := testutils.NewTestLogger(t)
+
+			_ = state.OpenDocument(t.Context(), l, stackURI, document)
+
+			hover := state.Hover(l, 1, stackURI, tt.position)
+
+			if tt.expectNonEmpty {
+				assert.NotEmpty(t, hover.Result.Contents.Value)
+				assert.Contains(t, hover.Result.Contents.Value, tt.expectFragment)
+			} else {
+				assert.Empty(t, hover.Result.Contents.Value)
+			}
+		})
+	}
 }
 
 func TestState_Hover_ValuesFile(t *testing.T) {
@@ -646,7 +686,14 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 func TestState_Definition_StackFile(t *testing.T) {
 	t.Parallel()
 
+	// Seed a fake unit source directory so ResolveUnitSourceLocation
+	// can navigate to main.tf.
 	tmpDir := t.TempDir()
+	unitDir := filepath.Join(tmpDir, "units", "vpc")
+	require.NoError(t, os.MkdirAll(unitDir, 0o755))
+	mainTF := filepath.Join(unitDir, "main.tf")
+	require.NoError(t, os.WriteFile(mainTF, []byte("# main.tf"), 0o644))
+
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
@@ -658,10 +705,22 @@ func TestState_Definition_StackFile(t *testing.T) {
 	path   = "vpc"
 }`)
 
-	pos := protocol.Position{Line: 0, Character: 0}
-	def := state.Definition(l, 1, stackURI, pos)
-	assert.Equal(t, stackURI, def.Result.URI)
-	assert.Equal(t, pos, def.Result.Range.Start)
+	t.Run("outside blocks returns empty definition", func(t *testing.T) {
+		t.Parallel()
+
+		pos := protocol.Position{Line: 3, Character: 1}
+		def := state.Definition(l, 1, stackURI, pos)
+		assert.Equal(t, stackURI, def.Result.URI)
+		assert.Equal(t, pos, def.Result.Range.Start)
+	})
+
+	t.Run("unit source jumps to main.tf", func(t *testing.T) {
+		t.Parallel()
+
+		pos := protocol.Position{Line: 1, Character: 15}
+		def := state.Definition(l, 1, stackURI, pos)
+		assert.Equal(t, uri.File(mainTF), def.Result.URI)
+	})
 }
 
 func TestState_TextDocumentFormatting(t *testing.T) {
