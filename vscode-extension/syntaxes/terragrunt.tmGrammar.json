@@ -139,6 +139,12 @@
 		"attribute": {
 			"patterns": [
 				{
+					"match": "(\\b(?:inputs|values)\\b)\\s*=(?!=)",
+					"captures": {
+						"1": { "name": "entity.name.type.hcl" }
+					}
+				},
+				{
 					"match": "(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)\\s*=(?!=)",
 					"captures": {
 						"1": { "name": "variable.other.assignment.hcl" }
@@ -149,7 +155,7 @@
 		"object_key": {
 			"patterns": [
 				{
-					"match": "\\b(local|dependency|include|each|var|module)\\b\\s*\\.\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+					"match": "\\b(local|dependency|include|each|var|module|values)\\b\\s*\\.\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
 					"captures": {
 						"1": { "name": "support.type.hcl" },
 						"2": { "name": "variable.other.member.hcl" }

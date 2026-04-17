@@ -20,38 +20,51 @@ import (
 
 const defaultMaxFoldersToCheck = 100
 
-func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
-	var parseDiags hcl.Diagnostics
+// parsingSetup holds the shared state for parsing terragrunt config files.
+type parsingSetup struct {
+	pctx       *config.ParsingContext
+	tgLogger   tgLog.Logger
+	parseDiags hcl.Diagnostics
+}
+
+func newParsingSetup(ctx context.Context, l logger.Logger, filename string) (context.Context, *parsingSetup) {
+	s := &parsingSetup{}
 
 	parseOptions := []hclparse.Option{
 		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-			parseDiags = append(parseDiags, hclDiags...)
+			s.parseDiags = append(s.parseDiags, hclDiags...)
 			return hclDiags, nil
 		}),
 	}
 
-	tgLogger := tgLog.New(
+	s.tgLogger = tgLog.New(
 		tgLog.WithOutput(l.Writer()),
 		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
 		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
 	)
 
-	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
-	pctx.TerragruntConfigPath = filename
-	pctx.WorkingDir = filepath.Dir(filename)
-	pctx.SkipOutput = true
-	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
-	pctx.Writers.Writer = io.Discard
-	pctx.Writers.ErrWriter = io.Discard
-	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
+	ctx, s.pctx = config.NewParsingContext(ctx, s.tgLogger)
+	s.pctx.TerragruntConfigPath = filename
+	s.pctx.WorkingDir = filepath.Dir(filename)
+	s.pctx.SkipOutput = true
+	s.pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
+	s.pctx.Writers.Writer = io.Discard
+	s.pctx.Writers.ErrWriter = io.Discard
+	s.pctx.ParserOptions = append(s.pctx.ParserOptions, parseOptions...)
 
-	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
+	return ctx, s
+}
+
+func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+	ctx, s := newParsingSetup(ctx, l, filename)
+
+	cfg, err := config.ParseConfigString(ctx, s.pctx, s.tgLogger, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, parseDiags, filename, text)
+	filteredDiags := filterHCLDiags(l, s.parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
@@ -149,7 +162,7 @@ func isParentFileNotFoundDiag(diag *hcl.Diagnostic) bool {
 }
 
 const (
-	valuesPrefix = "values."
+	valuesKeyword = "values"
 
 	// UnknownVariableSummary is the summary for an unknown variable diagnostic.
 	UnknownVariableSummary = "Unknown variable"
@@ -178,14 +191,16 @@ func isValuesAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 		return false
 	}
 
-	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based
-	prefixLen := len(valuesPrefix)
+	// The diagnostic start column points to the "." in "values.attr".
+	// Check that the characters immediately before the dot spell "values".
+	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based, convert to 0-based
+	keywordLen := len(valuesKeyword)
 
-	if col < prefixLen {
+	if col < keywordLen {
 		return false
 	}
 
-	return lines[line][col-prefixLen:col] == valuesPrefix
+	return lines[line][col-keywordLen:col] == valuesKeyword
 }
 
 func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
@@ -236,37 +251,15 @@ func DetectFileType(filename string) store.FileType {
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
-	var parseDiags hcl.Diagnostics
+	ctx, s := newParsingSetup(ctx, l, filename)
 
-	parseOptions := []hclparse.Option{
-		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-			parseDiags = append(parseDiags, hclDiags...)
-			return hclDiags, nil
-		}),
-	}
-
-	tgLogger := tgLog.New(
-		tgLog.WithOutput(l.Writer()),
-		tgLog.WithLevel(tgLog.FromLogrusLevel(logrus.Level(l.Level()))),
-		tgLog.WithFormatter(format.NewFormatter(format.NewJSONFormatPlaceholders())),
-	)
-
-	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
-	pctx.TerragruntConfigPath = filename
-	pctx.WorkingDir = filepath.Dir(filename)
-	pctx.SkipOutput = true
-	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
-	pctx.Writers.Writer = io.Discard
-	pctx.Writers.ErrWriter = io.Discard
-	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
-
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, s.tgLogger, s.pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, parseDiags, filename, text)
+	filteredDiags := filterHCLDiags(l, s.parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
