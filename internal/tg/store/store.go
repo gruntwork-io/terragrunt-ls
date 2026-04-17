@@ -16,8 +16,8 @@ type FileType int
 const (
 	// FileTypeUnknown is the file type for unrecognized files.
 	FileTypeUnknown FileType = iota
-	// FileTypeTerragrunt is the default file type for terragrunt.hcl files.
-	FileTypeTerragrunt
+	// FileTypeUnit is the default file type for terragrunt.hcl files.
+	FileTypeUnit
 	// FileTypeStack is the file type for terragrunt.stack.hcl files.
 	FileTypeStack
 	// FileTypeValues is the file type for terragrunt.values.hcl files.

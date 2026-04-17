@@ -25,7 +25,7 @@ func TestDetectFileType(t *testing.T) {
 		{
 			name:     "regular terragrunt file",
 			filename: "/some/path/terragrunt.hcl",
-			expected: store.FileTypeTerragrunt,
+			expected: store.FileTypeUnit,
 		},
 		{
 			name:     "stack file",

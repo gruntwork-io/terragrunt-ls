@@ -249,7 +249,7 @@ func DetectFileType(filename string) store.FileType {
 
 	switch base {
 	case "terragrunt.hcl":
-		return store.FileTypeTerragrunt
+		return store.FileTypeUnit
 	case "terragrunt.stack.hcl":
 		return store.FileTypeStack
 	case "terragrunt.values.hcl":

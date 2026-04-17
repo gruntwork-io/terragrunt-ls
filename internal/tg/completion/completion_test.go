@@ -23,7 +23,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete dep",
 			store: store.Store{
 				Document: `dep`,
-				FileType: store.FileTypeTerragrunt,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -69,7 +69,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete dependency",
 			store: store.Store{
 				Document: `dependency`,
-				FileType: store.FileTypeTerragrunt,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -97,7 +97,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete include",
 			store: store.Store{
 				Document: `in`,
-				FileType: store.FileTypeTerragrunt,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 1},
 			completions: []protocol.CompletionItem{
@@ -143,7 +143,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete include",
 			store: store.Store{
 				Document: `include`,
-				FileType: store.FileTypeTerragrunt,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{
@@ -171,7 +171,7 @@ func TestGetCompletions(t *testing.T) {
 			name: "complete generate",
 			store: store.Store{
 				Document: `generate`,
-				FileType: store.FileTypeTerragrunt,
+				FileType: store.FileTypeUnit,
 			},
 			position: protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{

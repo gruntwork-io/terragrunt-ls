@@ -16,8 +16,8 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 	var candidates []protocol.CompletionItem
 
 	switch s.FileType {
-	case store.FileTypeTerragrunt:
-		candidates = newTerragruntCompletions(position)
+	case store.FileTypeUnit:
+		candidates = newUnitCompletions(position)
 	case store.FileTypeStack:
 		candidates = newStackCompletions(position)
 	case store.FileTypeValues:
@@ -37,11 +37,11 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 	return completions
 }
 
-// newTerragruntCompletions returns a list of completions for terragrunt.hcl files.
+// newUnitCompletions returns a list of completions for terragrunt.hcl files.
 //
 // TODO: Add detection via the AST index to determine
 // whether the cursor is in the context of a block or expression.
-func newTerragruntCompletions(position protocol.Position) []protocol.CompletionItem {
+func newUnitCompletions(position protocol.Position) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
 		{
 			Label: "dependency",

@@ -67,7 +67,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 	var diags []protocol.Diagnostic
 
 	switch fileType {
-	case store.FileTypeTerragrunt:
+	case store.FileTypeUnit:
 		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, filename, text)
 
 		l.Debug(
@@ -125,7 +125,7 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 		"position", position,
 	)
 
-	if st.FileType != store.FileTypeTerragrunt {
+	if st.FileType != store.FileTypeUnit {
 		return newEmptyHoverResponse(id)
 	}
 
@@ -207,7 +207,7 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		"position", position,
 	)
 
-	if st.FileType != store.FileTypeTerragrunt {
+	if st.FileType != store.FileTypeUnit {
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
