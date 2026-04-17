@@ -20,12 +20,6 @@ import (
 
 const defaultMaxFoldersToCheck = 100
 
-// parsingSetup holds the shared state for parsing terragrunt config files.
-type parsingSetup struct {
-	pctx       *config.ParsingContext
-	parseDiags hcl.Diagnostics
-}
-
 func newTGLogger(l logger.Logger) tgLog.Logger {
 	return tgLog.New(
 		tgLog.WithOutput(l.Writer()),
@@ -34,39 +28,41 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 	)
 }
 
-func newParsingSetup(ctx context.Context, tgLogger tgLog.Logger, filename string) (context.Context, *parsingSetup) {
-	s := &parsingSetup{}
+// newParsingContext builds a terragrunt ParsingContext for the given file and
+// returns a pointer to the HCL diagnostics slice that the parser will populate.
+func newParsingContext(ctx context.Context, tgLogger tgLog.Logger, filename string) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
+	parseDiags := &hcl.Diagnostics{}
 
 	parseOptions := []hclparse.Option{
 		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-			s.parseDiags = append(s.parseDiags, hclDiags...)
+			*parseDiags = append(*parseDiags, hclDiags...)
 			return hclDiags, nil
 		}),
 	}
 
-	ctx, s.pctx = config.NewParsingContext(ctx, tgLogger)
-	s.pctx.TerragruntConfigPath = filename
-	s.pctx.WorkingDir = filepath.Dir(filename)
-	s.pctx.SkipOutput = true
-	s.pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
-	s.pctx.Writers.Writer = io.Discard
-	s.pctx.Writers.ErrWriter = io.Discard
-	s.pctx.ParserOptions = append(s.pctx.ParserOptions, parseOptions...)
+	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
+	pctx.TerragruntConfigPath = filename
+	pctx.WorkingDir = filepath.Dir(filename)
+	pctx.SkipOutput = true
+	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
+	pctx.Writers.Writer = io.Discard
+	pctx.Writers.ErrWriter = io.Discard
+	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
 
-	return ctx, s
+	return ctx, pctx, parseDiags
 }
 
 func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, s := newParsingSetup(ctx, tgLogger, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 
-	cfg, err := config.ParseConfigString(ctx, s.pctx, tgLogger, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, s.parseDiags, filename, text)
+	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
@@ -264,15 +260,15 @@ func DetectFileType(filename string) store.FileType {
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, s := newParsingSetup(ctx, tgLogger, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, s.pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
 	}
 
-	filteredDiags := filterHCLDiags(l, s.parseDiags, filename, text)
+	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
