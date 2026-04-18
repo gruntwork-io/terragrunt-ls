@@ -39,15 +39,6 @@ stack "nested" {
 	// Create StackAST
 	stackAST := stack.NewStackAST(indexedAST)
 	require.NotNil(t, stackAST)
-
-	// Test interface methods exist and work
-	assert.NotNil(t, stackAST.FindNodeAt)
-	assert.NotNil(t, stackAST.GetUnitLabel)
-	assert.NotNil(t, stackAST.GetStackLabel)
-	assert.NotNil(t, stackAST.GetUnitSource)
-	assert.NotNil(t, stackAST.GetUnitPath)
-	assert.NotNil(t, stackAST.FindUnitAt)
-	assert.NotNil(t, stackAST.FindStackAt)
 }
 
 func TestStackAST_Methods(t *testing.T) {
@@ -82,8 +73,6 @@ stack "nested" {
 `,
 			testFunc: func(t *testing.T, stackAST stack.StackAST) {
 				t.Helper()
-				// Test that it implements the interface
-				var _ = stackAST
 				assert.NotNil(t, stackAST)
 			},
 		},

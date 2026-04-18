@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // StackAST provides methods for working with terragrunt.stack.hcl files.
@@ -39,42 +40,28 @@ func (s *stackAST) FindNodeAt(pos hcl.Pos) *ast.IndexedNode {
 
 // GetUnitLabel returns the label of the given node, if it is a unit block
 func (s *stackAST) GetUnitLabel(node *ast.IndexedNode) (string, bool) {
-	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
-	if attr == nil {
-		return "", false
-	}
-
-	unitBlock := ast.FindFirstParentMatch(attr, isUnitBlock)
-	if unitBlock == nil {
-		return "", false
-	}
-
-	name := ""
-	if labels := unitBlock.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
+	return firstLabelFromContainingBlock(node, isUnitBlock)
 }
 
 // GetStackLabel returns the label of the given node, if it is a stack block
 func (s *stackAST) GetStackLabel(node *ast.IndexedNode) (string, bool) {
+	return firstLabelFromContainingBlock(node, isStackBlock)
+}
+
+// firstLabelFromContainingBlock walks up to the containing attribute and then the
+// nearest block matching blockMatcher, returning that block's first label.
+func firstLabelFromContainingBlock(node *ast.IndexedNode, blockMatcher func(*ast.IndexedNode) bool) (string, bool) {
 	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
 	if attr == nil {
 		return "", false
 	}
 
-	stackBlock := ast.FindFirstParentMatch(attr, isStackBlock)
-	if stackBlock == nil {
+	block := ast.FindFirstParentMatch(attr, blockMatcher)
+	if block == nil {
 		return "", false
 	}
 
-	name := ""
-	if labels := stackBlock.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
+	return block.Node.(*hclsyntax.Block).Labels[0], true
 }
 
 // GetUnitSource returns the source attribute value from a unit block
@@ -162,14 +149,14 @@ func (s *stackAST) getBlockAttribute(node *ast.IndexedNode, blockMatcher func(*a
 func (s *stackAST) extractStringValue(expr hclsyntax.Expression) (string, bool) {
 	switch e := expr.(type) {
 	case *hclsyntax.LiteralValueExpr:
-		if e.Val.Type().FriendlyName() == "string" {
+		if e.Val.Type() == cty.String {
 			return e.Val.AsString(), true
 		}
 	case *hclsyntax.TemplateExpr:
 		// Handle quoted strings which are parsed as TemplateExpr
 		if len(e.Parts) == 1 {
 			if literal, ok := e.Parts[0].(*hclsyntax.LiteralValueExpr); ok {
-				if literal.Val.Type().FriendlyName() == "string" {
+				if literal.Val.Type() == cty.String {
 					return literal.Val.AsString(), true
 				}
 			}

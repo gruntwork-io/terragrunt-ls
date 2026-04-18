@@ -283,8 +283,11 @@ func TestFindFirstParentMatch(t *testing.T) {
 			content: `locals {
 		foo = "bar"
 	}`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
-			matcher:  func(*ast.IndexedNode) bool { return false },
+			pos: hcl.Pos{Line: 2, Column: 2},
+			matcher: func(n *ast.IndexedNode) bool {
+				block, ok := n.Node.(*hclsyntax.Block)
+				return ok && block.Type == "inputs"
+			},
 			expected: false,
 		},
 	}
