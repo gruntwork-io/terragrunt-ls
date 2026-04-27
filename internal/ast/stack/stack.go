@@ -48,15 +48,11 @@ func (s *stackAST) GetStackLabel(node *ast.IndexedNode) (string, bool) {
 	return firstLabelFromContainingBlock(node, isStackBlock)
 }
 
-// firstLabelFromContainingBlock walks up to the containing attribute and then the
-// nearest block matching blockMatcher, returning that block's first label.
+// firstLabelFromContainingBlock walks up from the given node to the nearest
+// block matching blockMatcher (including the node itself) and returns that
+// block's first label.
 func firstLabelFromContainingBlock(node *ast.IndexedNode, blockMatcher func(*ast.IndexedNode) bool) (string, bool) {
-	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
-	if attr == nil {
-		return "", false
-	}
-
-	block := ast.FindFirstParentMatch(attr, blockMatcher)
+	block := ast.FindFirstParentMatch(node, blockMatcher)
 	if block == nil {
 		return "", false
 	}
