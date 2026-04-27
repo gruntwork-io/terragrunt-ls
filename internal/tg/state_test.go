@@ -670,17 +670,93 @@ func TestState_Hover_StackFile(t *testing.T) {
 func TestState_Hover_ValuesFile(t *testing.T) {
 	t.Parallel()
 
+	tc := []struct {
+		name           string
+		document       string
+		expectFragment string
+		position       protocol.Position
+		expectNonEmpty bool
+	}{
+		{
+			name:           "plain variable",
+			document:       `some_var = "hello"`,
+			position:       protocol.Position{Line: 0, Character: 2},
+			expectNonEmpty: true,
+			expectFragment: "Variable",
+		},
+		{
+			name:           "dependency reference",
+			document:       `vpc_id = dependency.vpc.outputs.id`,
+			position:       protocol.Position{Line: 0, Character: 22},
+			expectNonEmpty: true,
+			expectFragment: "Dependency",
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
+			valuesURI := uri.File(valuesPath)
+
+			state := tg.NewState()
+			l := testutils.NewTestLogger(t)
+
+			_ = state.OpenDocument(t.Context(), l, valuesURI, tt.document)
+
+			hover := state.Hover(l, 1, valuesURI, tt.position)
+
+			if tt.expectNonEmpty {
+				assert.NotEmpty(t, hover.Result.Contents.Value)
+				assert.Contains(t, hover.Result.Contents.Value, tt.expectFragment)
+			} else {
+				assert.Empty(t, hover.Result.Contents.Value)
+			}
+		})
+	}
+}
+
+func TestState_Definition_ValuesFile(t *testing.T) {
+	t.Parallel()
+
+	// Seed a fake dependency unit directory structure:
+	// tmp/
+	//   values/terragrunt.values.hcl (the file under test)
+	//   vpc/terragrunt.hcl          (the dependency)
 	tmpDir := t.TempDir()
-	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
+	valuesDir := filepath.Join(tmpDir, "values")
+	require.NoError(t, os.MkdirAll(valuesDir, 0o755))
+	depDir := filepath.Join(tmpDir, "vpc")
+	require.NoError(t, os.MkdirAll(depDir, 0o755))
+	depFile := filepath.Join(depDir, "terragrunt.hcl")
+	require.NoError(t, os.WriteFile(depFile, []byte(""), 0o644))
+
+	valuesPath := filepath.Join(valuesDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
+	_ = state.OpenDocument(t.Context(), l, valuesURI, `vpc_id = dependency.vpc.outputs.id`)
 
-	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
-	assert.Empty(t, hover.Result.Contents.Value)
+	t.Run("dependency reference jumps to terragrunt.hcl", func(t *testing.T) {
+		t.Parallel()
+
+		pos := protocol.Position{Line: 0, Character: 22}
+		def := state.Definition(l, 1, valuesURI, pos)
+		assert.Equal(t, uri.File(depFile), def.Result.URI)
+	})
+
+	t.Run("plain variable returns empty definition", func(t *testing.T) {
+		t.Parallel()
+
+		pos := protocol.Position{Line: 0, Character: 2}
+		def := state.Definition(l, 1, valuesURI, pos)
+		assert.Equal(t, valuesURI, def.Result.URI)
+		assert.Equal(t, pos, def.Result.Range.Start)
+	})
 }
 
 func TestState_Definition_StackFile(t *testing.T) {
