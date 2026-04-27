@@ -15,7 +15,6 @@ type StackAST interface {
 
 	GetUnitLabel(node *ast.IndexedNode) (string, bool)
 	GetStackLabel(node *ast.IndexedNode) (string, bool)
-	BlockLabel(node *ast.IndexedNode) (string, bool)
 	GetUnitSource(node *ast.IndexedNode) (string, bool)
 	GetUnitPath(node *ast.IndexedNode) (string, bool)
 	GetStackSource(node *ast.IndexedNode) (string, bool)
@@ -49,27 +48,11 @@ func (s *stackAST) GetStackLabel(node *ast.IndexedNode) (string, bool) {
 	return firstLabelFromContainingBlock(node, isStackBlock)
 }
 
-// BlockLabel returns the first label of the given node when it is an HCL block.
-// Unlike GetUnitLabel/GetStackLabel, it does not require an attribute ancestor —
-// use this when you already have a reference to the block (e.g. from FindUnitAt).
-func (s *stackAST) BlockLabel(node *ast.IndexedNode) (string, bool) {
-	block, ok := node.Node.(*hclsyntax.Block)
-	if !ok || len(block.Labels) == 0 {
-		return "", false
-	}
-
-	return block.Labels[0], true
-}
-
-// firstLabelFromContainingBlock walks up to the containing attribute and then the
-// nearest block matching blockMatcher, returning that block's first label.
+// firstLabelFromContainingBlock walks up from the given node to the nearest
+// block matching blockMatcher (including the node itself) and returns that
+// block's first label.
 func firstLabelFromContainingBlock(node *ast.IndexedNode, blockMatcher func(*ast.IndexedNode) bool) (string, bool) {
-	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
-	if attr == nil {
-		return "", false
-	}
-
-	block := ast.FindFirstParentMatch(attr, blockMatcher)
+	block := ast.FindFirstParentMatch(node, blockMatcher)
 	if block == nil {
 		return "", false
 	}

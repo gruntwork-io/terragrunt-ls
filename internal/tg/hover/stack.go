@@ -43,20 +43,24 @@ func GetStackHoverTargetWithContext(l logger.Logger, s store.Store, position pro
 		return "", HoverContextNull
 	}
 
+	onAttribute := ast.FindFirstParentMatch(node, ast.IsAttribute) != nil
+
 	if unitBlock, ok := stackAST.FindUnitAt(pos); ok {
 		if source, ok := stackAST.GetUnitSource(node); ok {
 			l.Debug("Found unit source hover", "source", source)
 			return source, HoverContextStackSource
 		}
 
-		if blockName, ok := stackAST.GetUnitLabel(node); ok {
-			if path, ok := stackutils.LookupUnitPath(s.StackCfg, blockName); ok {
-				l.Debug("Found unit path hover from parsed config", "blockName", blockName, "path", path)
-				return path, HoverContextStackPath
+		if onAttribute {
+			if blockName, ok := stackAST.GetUnitLabel(node); ok {
+				if path, ok := stackutils.LookupUnitPath(s.StackCfg, blockName); ok {
+					l.Debug("Found unit path hover from parsed config", "blockName", blockName, "path", path)
+					return path, HoverContextStackPath
+				}
 			}
 		}
 
-		if unitLabel, ok := stackAST.BlockLabel(unitBlock); ok {
+		if unitLabel, ok := stackAST.GetUnitLabel(unitBlock); ok {
 			l.Debug("Found unit block (general) hover", "unit", unitLabel)
 			return unitLabel, HoverContextStackUnit
 		}
@@ -68,14 +72,16 @@ func GetStackHoverTargetWithContext(l logger.Logger, s store.Store, position pro
 			return source, HoverContextStackSource
 		}
 
-		if blockName, ok := stackAST.GetStackLabel(node); ok {
-			if path, ok := stackutils.LookupStackPath(s.StackCfg, blockName); ok {
-				l.Debug("Found stack path hover from parsed config", "blockName", blockName, "path", path)
-				return path, HoverContextStackPath
+		if onAttribute {
+			if blockName, ok := stackAST.GetStackLabel(node); ok {
+				if path, ok := stackutils.LookupStackPath(s.StackCfg, blockName); ok {
+					l.Debug("Found stack path hover from parsed config", "blockName", blockName, "path", path)
+					return path, HoverContextStackPath
+				}
 			}
 		}
 
-		if stackLabel, ok := stackAST.BlockLabel(stackBlock); ok {
+		if stackLabel, ok := stackAST.GetStackLabel(stackBlock); ok {
 			l.Debug("Found stack block (general) hover", "stack", stackLabel)
 			return stackLabel, HoverContextStackBlock
 		}
