@@ -37,13 +37,6 @@ locals {
 	configAST := config.NewConfigAST(indexedAST)
 	require.NotNil(t, configAST)
 
-	// Test interface methods exist and work
-	assert.NotNil(t, configAST.FindNodeAt)
-	assert.NotNil(t, configAST.GetIncludeLabel)
-	assert.NotNil(t, configAST.GetDependencyLabel)
-	assert.NotNil(t, configAST.GetLocals)
-	assert.NotNil(t, configAST.GetIncludes)
-
 	// Test that locals and includes are captured
 	locals := configAST.GetLocals()
 	assert.NotNil(t, locals)
@@ -86,8 +79,6 @@ dependency "vpc" {
 `,
 			testFunc: func(t *testing.T, configAST config.ConfigAST) {
 				t.Helper()
-				// Test that it implements the interface
-				var _ = configAST
 				assert.NotNil(t, configAST)
 			},
 		},

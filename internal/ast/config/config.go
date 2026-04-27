@@ -81,12 +81,7 @@ func (c *configAST) GetIncludeLabel(node *ast.IndexedNode) (string, bool) {
 		return "", false
 	}
 
-	name := ""
-	if labels := includeBlock.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
+	return includeBlock.Node.(*hclsyntax.Block).Labels[0], true
 }
 
 // GetDependencyLabel returns the label of the given node, if it is a dependency block
@@ -105,12 +100,7 @@ func (c *configAST) GetDependencyLabel(node *ast.IndexedNode) (string, bool) {
 		return "", false
 	}
 
-	name := ""
-	if labels := depBlock.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
+	return depBlock.Node.(*hclsyntax.Block).Labels[0], true
 }
 
 // GetLocals returns the locals scope
