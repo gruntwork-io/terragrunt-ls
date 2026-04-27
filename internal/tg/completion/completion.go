@@ -21,7 +21,7 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 	case store.FileTypeStack:
 		candidates = newStackCompletions(position)
 	case store.FileTypeValues:
-		return []protocol.CompletionItem{}
+		candidates = newValuesCompletions(position)
 	case store.FileTypeUnknown:
 		return []protocol.CompletionItem{}
 	}
@@ -35,6 +35,43 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 	}
 
 	return completions
+}
+
+// createCompletionItem builds a snippet-style block CompletionItem (Kind=Class) whose
+// TextEdit replaces the text from the start of the current line to the cursor.
+// Used to reduce boilerplate across the stack and values block-completion lists.
+func createCompletionItem(label, docValue, newText string, position protocol.Position) protocol.CompletionItem {
+	return protocol.CompletionItem{
+		Label: label,
+		Documentation: protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: docValue,
+		},
+		Kind:             protocol.CompletionItemKindClass,
+		InsertTextFormat: protocol.InsertTextFormatSnippet,
+		TextEdit: &protocol.TextEdit{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: position.Line, Character: 0},
+				End:   protocol.Position{Line: position.Line, Character: position.Character},
+			},
+			NewText: newText,
+		},
+	}
+}
+
+// newValuesCompletions returns a list of completions for terragrunt.values.hcl files.
+func newValuesCompletions(position protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		createCompletionItem(
+			"values",
+			`# values
+The values block is used to define dynamic values for units in Terragrunt stacks.`,
+			`values {
+	${1:key} = "${2:value}"
+}`,
+			position,
+		),
+	}
 }
 
 // newUnitCompletions returns a list of completions for terragrunt.hcl files.
@@ -425,64 +462,34 @@ The terragrunt_version_constraint attribute is used to specify which versions of
 // newStackCompletions returns a list of completions for terragrunt.stack.hcl files.
 func newStackCompletions(position protocol.Position) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
-		{
-			Label: "unit",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
-				Value: `# unit
+		createCompletionItem(
+			"unit",
+			`# unit
 The unit block references a Terragrunt unit to include in this stack.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `unit "${1}" {
+			`unit "${1}" {
 	source = "${2}"
 	path   = "${3}"
 }`,
-			},
-		},
-		{
-			Label: "stack",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
-				Value: `# stack
+			position,
+		),
+		createCompletionItem(
+			"stack",
+			`# stack
 The stack block references another Terragrunt stack to nest within this stack.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `stack "${1}" {
+			`stack "${1}" {
 	source = "${2}"
 	path   = "${3}"
 }`,
-			},
-		},
-		{
-			Label: "locals",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
-				Value: `# locals
+			position,
+		),
+		createCompletionItem(
+			"locals",
+			`# locals
 The locals block defines aliases for expressions reusable within the stack file.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `locals {
+			`locals {
 	${1} = ${2}
 }`,
-			},
-		},
+			position,
+		),
 	}
 }

@@ -288,13 +288,50 @@ EOF
 			},
 		},
 		{
-			name: "values file - no completions",
+			name: "values file - no match for loc",
 			store: store.Store{
 				Document: `loc`,
 				FileType: store.FileTypeValues,
 			},
 			position:    protocol.Position{Line: 0, Character: 3},
 			completions: []protocol.CompletionItem{},
+		},
+		{
+			name: "values file - dep does not complete",
+			store: store.Store{
+				Document: `dep`,
+				FileType: store.FileTypeValues,
+			},
+			position:    protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{},
+		},
+		{
+			name: "values file - complete val",
+			store: store.Store{
+				Document: `val`,
+				FileType: store.FileTypeValues,
+			},
+			position: protocol.Position{Line: 0, Character: 3},
+			completions: []protocol.CompletionItem{
+				{
+					Label: "values",
+					Documentation: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "# values\nThe values block is used to define dynamic values for units in Terragrunt stacks.",
+					},
+					Kind:             protocol.CompletionItemKindClass,
+					InsertTextFormat: protocol.InsertTextFormatSnippet,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 0, Character: 0},
+							End:   protocol.Position{Line: 0, Character: 3},
+						},
+						NewText: `values {
+	${1:key} = "${2:value}"
+}`,
+					},
+				},
+			},
 		},
 	}
 
