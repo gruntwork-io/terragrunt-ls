@@ -15,6 +15,7 @@ type StackAST interface {
 
 	GetUnitLabel(node *ast.IndexedNode) (string, bool)
 	GetStackLabel(node *ast.IndexedNode) (string, bool)
+	BlockLabel(node *ast.IndexedNode) (string, bool)
 	GetUnitSource(node *ast.IndexedNode) (string, bool)
 	GetUnitPath(node *ast.IndexedNode) (string, bool)
 	GetStackSource(node *ast.IndexedNode) (string, bool)
@@ -46,6 +47,18 @@ func (s *stackAST) GetUnitLabel(node *ast.IndexedNode) (string, bool) {
 // GetStackLabel returns the label of the given node, if it is a stack block
 func (s *stackAST) GetStackLabel(node *ast.IndexedNode) (string, bool) {
 	return firstLabelFromContainingBlock(node, isStackBlock)
+}
+
+// BlockLabel returns the first label of the given node when it is an HCL block.
+// Unlike GetUnitLabel/GetStackLabel, it does not require an attribute ancestor —
+// use this when you already have a reference to the block (e.g. from FindUnitAt).
+func (s *stackAST) BlockLabel(node *ast.IndexedNode) (string, bool) {
+	block, ok := node.Node.(*hclsyntax.Block)
+	if !ok || len(block.Labels) == 0 {
+		return "", false
+	}
+
+	return block.Labels[0], true
 }
 
 // firstLabelFromContainingBlock walks up to the containing attribute and then the

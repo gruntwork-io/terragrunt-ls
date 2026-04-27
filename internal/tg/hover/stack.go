@@ -43,7 +43,7 @@ func GetStackHoverTargetWithContext(l logger.Logger, s store.Store, position pro
 		return "", HoverContextNull
 	}
 
-	if _, ok := stackAST.FindUnitAt(pos); ok {
+	if unitBlock, ok := stackAST.FindUnitAt(pos); ok {
 		if source, ok := stackAST.GetUnitSource(node); ok {
 			l.Debug("Found unit source hover", "source", source)
 			return source, HoverContextStackSource
@@ -56,15 +56,13 @@ func GetStackHoverTargetWithContext(l logger.Logger, s store.Store, position pro
 			}
 		}
 
-		if unitBlock, ok := stackAST.FindUnitAt(pos); ok {
-			if unitLabel, ok := stackAST.GetUnitLabel(unitBlock); ok {
-				l.Debug("Found unit block (general) hover", "unit", unitLabel)
-				return unitLabel, HoverContextStackUnit
-			}
+		if unitLabel, ok := stackAST.BlockLabel(unitBlock); ok {
+			l.Debug("Found unit block (general) hover", "unit", unitLabel)
+			return unitLabel, HoverContextStackUnit
 		}
 	}
 
-	if _, ok := stackAST.FindStackAt(pos); ok {
+	if stackBlock, ok := stackAST.FindStackAt(pos); ok {
 		if source, ok := stackAST.GetStackSource(node); ok {
 			l.Debug("Found stack source hover", "source", source)
 			return source, HoverContextStackSource
@@ -77,11 +75,9 @@ func GetStackHoverTargetWithContext(l logger.Logger, s store.Store, position pro
 			}
 		}
 
-		if stackBlock, ok := stackAST.FindStackAt(pos); ok {
-			if stackLabel, ok := stackAST.GetStackLabel(stackBlock); ok {
-				l.Debug("Found stack block (general) hover", "stack", stackLabel)
-				return stackLabel, HoverContextStackBlock
-			}
+		if stackLabel, ok := stackAST.BlockLabel(stackBlock); ok {
+			l.Debug("Found stack block (general) hover", "stack", stackLabel)
+			return stackLabel, HoverContextStackBlock
 		}
 	}
 
