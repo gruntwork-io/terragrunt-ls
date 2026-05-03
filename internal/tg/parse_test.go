@@ -260,3 +260,65 @@ inputs = {
 		})
 	}
 }
+
+// TestParseTerragruntBuffer_DoesNotPanic is a regression test for
+// gruntwork-io/terragrunt-ls#134, where opening a root.hcl that uses
+// read_terragrunt_config / find_in_parent_folders together with a remote_state
+// block caused the upstream Terragrunt parser to panic with a nil-pointer
+// dereference, crashing the language server. Whatever the underlying behavior,
+// the LS must not panic on user input — it should return whatever it can and
+// log the error.
+func TestParseTerragruntBuffer_DoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	// This is a reduced version of the user's reproducer from issue #134.
+	// The remote_state config references locals that depend on
+	// read_terragrunt_config calls whose target files do not exist, so the
+	// remote_state block cannot be fully resolved during LS parsing.
+	const rootHCL = `
+locals {
+  account_vars = read_terragrunt_config(find_in_parent_folders("account.hcl"))
+
+  terraform_state_bucket = try(
+    local.account_vars.locals.terraform_state_bucket,
+    "fallback-bucket",
+  )
+  terraform_assume_role_arn = try(
+    local.account_vars.locals.terraform_assume_role_arn,
+    "",
+  )
+}
+
+remote_state {
+  backend = "s3"
+  generate = {
+    path      = "backend.tf"
+    if_exists = "overwrite_terragrunt"
+  }
+  config = merge({
+    bucket  = local.terraform_state_bucket
+    key     = "${path_relative_to_include()}/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+    },
+    local.terraform_assume_role_arn != "" ? {
+      assume_role = {
+        role_arn = local.terraform_assume_role_arn
+      }
+  } : {})
+}
+`
+
+	tmpDir := t.TempDir()
+	filename := filepath.Join(tmpDir, "root.hcl")
+
+	l := testutils.NewTestLogger(t)
+
+	// The call must not panic. We deliberately do not assert on the returned
+	// cfg/diags shape: the goal is to prove the LS survives malformed or
+	// unresolvable inputs that previously caused a panic in the upstream
+	// Terragrunt parser.
+	require.NotPanics(t, func() {
+		tg.ParseTerragruntBuffer(context.Background(), l, filename, rootHCL)
+	})
+}
