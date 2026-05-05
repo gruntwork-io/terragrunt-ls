@@ -63,3 +63,28 @@ inputs = {
 		assert.Nil(t, locs)
 	})
 }
+
+func TestGetReferences_IncludeLabel(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	content := `include "root" {
+  path = "root.hcl"
+}
+
+inputs = {
+  region = include.root.locals.region
+}
+`
+	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	require.NoError(t, err)
+
+	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
+	l := testutils.NewTestLogger(t)
+	s := tg.NewState()
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
+
+	// Cursor on the reference (`root` in include.root.locals.region).
+	locs := references.GetReferences(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 20}, tgPath, true)
+	require.Len(t, locs, 2, "label definition + traversal reference")
+}
