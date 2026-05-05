@@ -28,8 +28,12 @@ func NewInitializeResponse(id int) InitializeResponse {
 				TextDocumentSync:           1,
 				HoverProvider:              true,
 				DefinitionProvider:         true,
+				ReferencesProvider:         true,
 				CompletionProvider:         &protocol.CompletionOptions{},
 				DocumentFormattingProvider: true,
+				RenameProvider: &protocol.RenameOptions{
+					PrepareProvider: true,
+				},
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    name,
