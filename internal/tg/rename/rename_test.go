@@ -89,32 +89,6 @@ inputs = {
 			expectedContext: rename.RenameContextLocal,
 		},
 		{
-			name: "cursor on dependency label",
-			document: `dependency "vpc" {
-  config_path = "../vpc"
-}`,
-			position:        protocol.Position{Line: 0, Character: 13},
-			expectedName:    "vpc",
-			expectedContext: rename.RenameContextDependency,
-		},
-		{
-			name: "cursor on dependency outputs reference",
-			document: `inputs = {
-  id = dependency.vpc.outputs.id
-}`,
-			position:        protocol.Position{Line: 1, Character: 19},
-			expectedName:    "vpc",
-			expectedContext: rename.RenameContextDependency,
-		},
-		{
-			name: "cursor on outputs step is not renameable",
-			document: `inputs = {
-  id = dependency.vpc.outputs.id
-}`,
-			position:        protocol.Position{Line: 1, Character: 24},
-			expectedContext: rename.RenameContextNull,
-		},
-		{
 			name: "cursor on unrelated traversal root",
 			document: `inputs = {
   v = path.module
@@ -310,35 +284,4 @@ func TestFindAllOccurrences_PrefersInMemoryAST(t *testing.T) {
 
 	occs := rename.FindAllOccurrences(l, target, tgPath, configs)
 	require.Len(t, occs, 2, "definition (from in-memory common) + reference")
-}
-
-func TestFindAllOccurrences_DependencyLabel(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	content := `dependency "vpc" {
-  config_path = "../vpc"
-}
-
-inputs = {
-  vpc_id = dependency.vpc.outputs.id
-}
-`
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), content)
-
-	// Cursor on the dependency label "vpc".
-	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 13})
-	require.Equal(t, rename.RenameContextDependency, target.Context)
-	require.Equal(t, "vpc", target.Name)
-
-	occs := rename.FindAllOccurrences(l, target, tgPath, s.Configs)
-	require.Len(t, occs, 2, "definition label + outputs reference")
 }

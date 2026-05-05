@@ -46,16 +46,6 @@ inputs = { v = local.foo }`,
 			wantEnd:   protocol.Position{Line: 1, Character: 24},
 		},
 		{
-			name: "dependency label excludes quotes",
-			document: `dependency "vpc" {
-  config_path = "../vpc"
-}`,
-			position:  protocol.Position{Line: 0, Character: 13},
-			wantPlace: "vpc",
-			wantStart: protocol.Position{Line: 0, Character: 12},
-			wantEnd:   protocol.Position{Line: 0, Character: 15},
-		},
-		{
 			name: "non-renameable position returns nil",
 			document: `locals {
   foo = "bar"
@@ -153,36 +143,6 @@ inputs = {
 		tgEdits := resp.Result.Changes[uri.File(tgPath)]
 		require.Len(t, tgEdits, 1)
 		assert.Equal(t, "renamed", tgEdits[0].NewText)
-	})
-
-	t.Run("renames dependency label and reference", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		content := `dependency "vpc" {
-  config_path = "../vpc"
-}
-
-inputs = {
-  vpc_id = dependency.vpc.outputs.id
-}
-`
-		_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
-		require.NoError(t, err)
-
-		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-		l := testutils.NewTestLogger(t)
-		s := tg.NewState()
-		s.OpenDocument(context.Background(), l, uri.File(tgPath), content)
-
-		resp := s.TextDocumentRename(l, 1, uri.File(tgPath), protocol.Position{Line: 0, Character: 13}, "network")
-		require.NotNil(t, resp.Result)
-
-		edits := resp.Result.Changes[uri.File(tgPath)]
-		require.Len(t, edits, 2)
-		for _, e := range edits {
-			assert.Equal(t, "network", e.NewText)
-		}
 	})
 
 	t.Run("returns nil for non-renameable position", func(t *testing.T) {
