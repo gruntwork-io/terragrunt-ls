@@ -71,3 +71,28 @@ inputs = {
 		assert.Nil(t, locs)
 	})
 }
+
+func TestGetReferences_DependencyLabel(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	content := `dependency "vpc" {
+  config_path = "../vpc"
+}
+
+inputs = {
+  vpc_id = dependency.vpc.outputs.id
+}
+`
+	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	require.NoError(t, err)
+
+	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
+	l := testutils.NewTestLogger(t)
+	s := tg.NewState()
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
+
+	// Cursor on the reference (`vpc` in dependency.vpc.outputs.id).
+	locs := references.GetReferences(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 23}, tgPath, s.Configs, true)
+	require.Len(t, locs, 2, "label definition + outputs reference")
+}
