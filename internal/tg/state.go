@@ -11,6 +11,7 @@ import (
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
 	"terragrunt-ls/internal/tg/hover"
+	"terragrunt-ls/internal/tg/rename"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
@@ -418,6 +419,90 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 			},
 		},
 	}
+}
+
+func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.PrepareRenameResponse {
+	empty := lsp.PrepareRenameResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result:   nil,
+	}
+
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok || !canRename(st) {
+		return empty
+	}
+
+	target := rename.GetRenameTarget(l, st, position)
+	if target.Context == rename.RenameContextNull {
+		return empty
+	}
+
+	return lsp.PrepareRenameResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result: &lsp.PrepareRenameResult{
+			Range:       target.IdentRange,
+			Placeholder: target.Name,
+		},
+	}
+}
+
+func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, newName string) lsp.RenameResponse {
+	empty := lsp.RenameResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result:   nil,
+	}
+
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok || !canRename(st) {
+		return empty
+	}
+
+	if !rename.IsValidIdentifier(newName) {
+		l.Debug(
+			"Rejecting invalid identifier",
+			"newName", newName,
+		)
+
+		return empty
+	}
+
+	target := rename.GetRenameTarget(l, st, position)
+	if target.Context == rename.RenameContextNull {
+		return empty
+	}
+
+	occurrences := rename.FindAllOccurrences(l, target, docURI.Filename(), s.Configs)
+	if len(occurrences) == 0 {
+		return empty
+	}
+
+	changes := map[protocol.DocumentURI][]protocol.TextEdit{}
+
+	for _, occ := range occurrences {
+		fileURI := uri.File(occ.File)
+		changes[fileURI] = append(changes[fileURI], protocol.TextEdit{
+			Range:   occ.Range,
+			NewText: newName,
+		})
+	}
+
+	return lsp.RenameResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result: &protocol.WorkspaceEdit{
+			Changes: changes,
+		},
+	}
+}
+
+// canRename reports whether rename can run against this store. It accepts any
+// HCL config or auxiliary file (e.g., common.hcl) but not stack/values files,
+// whose syntax does not have the renameable `local`/`include`/`dependency` constructs.
+func canRename(st store.Store) bool {
+	if st.AST == nil {
+		return false
+	}
+
+	return st.FileType == store.FileTypeUnit || st.FileType == store.FileTypeUnknown
 }
 
 func getEndOfDocument(doc string) protocol.Position {

@@ -30,6 +30,9 @@ func NewInitializeResponse(id int) InitializeResponse {
 				DefinitionProvider:         true,
 				CompletionProvider:         &protocol.CompletionOptions{},
 				DocumentFormattingProvider: true,
+				RenameProvider: &protocol.RenameOptions{
+					PrepareProvider: true,
+				},
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    name,
