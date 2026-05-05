@@ -1,7 +1,6 @@
 package references_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -43,7 +42,7 @@ inputs = {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), tgContent)
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
 
 	t.Run("includes declaration when requested", func(t *testing.T) {
 		t.Parallel()

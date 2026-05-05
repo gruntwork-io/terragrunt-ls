@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -34,7 +33,7 @@ inputs = {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, docURI, content)
 
 	// Cursor on `foo` in `local.foo`.
 	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 5, Character: 14})
@@ -73,7 +72,7 @@ inputs = {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), tgContent)
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
 
 	// Cursor on `shared` in `local.shared`.
 	resp := s.Definition(l, 1, uri.File(tgPath), protocol.Position{Line: 5, Character: 14})
@@ -99,7 +98,7 @@ func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, docURI, content)
 
 	// Cursor on `nonexistent` — no `locals` block defines it.
 	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 1, Character: 18})

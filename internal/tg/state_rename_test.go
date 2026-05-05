@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -65,7 +64,7 @@ inputs = { v = local.foo }`,
 
 			l := testutils.NewTestLogger(t)
 			s := tg.NewState()
-			s.OpenDocument(context.Background(), l, docURI, tt.document)
+			s.OpenDocument(t.Context(), l, docURI, tt.document)
 
 			resp := s.PrepareRename(l, 1, docURI, tt.position)
 
@@ -94,7 +93,7 @@ func TestState_TextDocumentRename(t *testing.T) {
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(context.Background(), l, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "1invalid")
 		assert.Nil(t, resp.Result)
@@ -128,7 +127,7 @@ inputs = {
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(context.Background(), l, uri.File(tgPath), tgContent)
+		s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
 
 		resp := s.TextDocumentRename(l, 1, uri.File(tgPath), protocol.Position{Line: 5, Character: 14}, "renamed")
 		require.NotNil(t, resp.Result)
@@ -154,7 +153,7 @@ inputs = {
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(context.Background(), l, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 0}, "valid")
 		assert.Nil(t, resp.Result)
@@ -169,7 +168,7 @@ inputs = {
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(context.Background(), l, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "renamed")
 		require.NotNil(t, resp.Result)

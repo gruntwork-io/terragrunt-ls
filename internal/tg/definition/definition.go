@@ -67,7 +67,7 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 }
 
 // traversalDefinitionTarget extracts a (name, context) pair from a
-// `<root>.<name>` traversal where root is one of local/include/dependency.
+// `local.<name>` traversal.
 func traversalDefinitionTarget(expr *hclsyntax.ScopeTraversalExpr) (string, string, bool) {
 	if len(expr.Traversal) < ast.MinReferenceTraversalLen {
 		return "", "", false

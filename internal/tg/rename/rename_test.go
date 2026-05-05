@@ -1,7 +1,6 @@
 package rename_test
 
 import (
-	"context"
 	"path/filepath"
 	"sort"
 	"terragrunt-ls/internal/testutils"
@@ -122,7 +121,7 @@ inputs = {
 			s := tg.NewState()
 
 			docURI := uri.File("/test/terragrunt.hcl")
-			s.OpenDocument(context.Background(), l, docURI, tt.document)
+			s.OpenDocument(t.Context(), l, docURI, tt.document)
 
 			target := rename.GetRenameTarget(l, s.Configs[docURI.Filename()], tt.position)
 
@@ -158,7 +157,7 @@ dependency "b" {
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
 	docURI := uri.File(hclPath)
-	s.OpenDocument(context.Background(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, docURI, content)
 
 	target := rename.GetRenameTarget(l, s.Configs[hclPath], protocol.Position{Line: 1, Character: 3})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
@@ -202,7 +201,7 @@ inputs = {
 	s := tg.NewState()
 
 	// Open only terragrunt.hcl in the editor; common.hcl stays on disk only.
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), tgContent)
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
 
 	// Cursor on the local.shared reference.
 	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 14})
@@ -238,7 +237,7 @@ inputs = { v = local.foo }
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), mainContent)
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), mainContent)
 
 	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 9})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
@@ -271,8 +270,8 @@ func TestFindAllOccurrences_PrefersInMemoryAST(t *testing.T) {
 
 	// Open both files; for common.hcl provide an in-memory version that
 	// matches the local name `shared`.
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), tgContent)
-	s.OpenDocument(context.Background(), l, uri.File(commonPath), `locals { shared = "v" }`)
+	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
+	s.OpenDocument(t.Context(), l, uri.File(commonPath), `locals { shared = "v" }`)
 
 	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 22})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
