@@ -11,6 +11,7 @@ import (
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/definition"
 	"terragrunt-ls/internal/tg/hover"
+	"terragrunt-ls/internal/tg/references"
 	"terragrunt-ls/internal/tg/rename"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
@@ -503,6 +504,28 @@ func canRename(st store.Store) bool {
 	}
 
 	return st.FileType == store.FileTypeUnit || st.FileType == store.FileTypeUnknown
+}
+
+func (s *State) TextDocumentReferences(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, includeDeclaration bool) lsp.ReferencesResponse {
+	empty := lsp.ReferencesResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result:   nil,
+	}
+
+	st, ok := s.Configs[docURI.Filename()]
+	if !ok || !canRename(st) {
+		return empty
+	}
+
+	locations := references.GetReferences(l, st, position, docURI.Filename(), s.Configs, includeDeclaration)
+	if len(locations) == 0 {
+		return empty
+	}
+
+	return lsp.ReferencesResponse{
+		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		Result:   locations,
+	}
 }
 
 func getEndOfDocument(doc string) protocol.Position {

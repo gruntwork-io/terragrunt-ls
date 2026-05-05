@@ -227,6 +227,27 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 		writeResponse(l, writer, response)
 
+	case protocol.MethodTextDocumentReferences:
+		var request lsp.ReferencesRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			l.Error(
+				"Failed to parse references request",
+				"error",
+				err,
+			)
+		}
+
+		l.Debug(
+			"References",
+			"URI", request.Params.TextDocument.URI,
+			"Position", request.Params.Position,
+			"IncludeDeclaration", request.Params.Context.IncludeDeclaration,
+		)
+
+		response := state.TextDocumentReferences(l, request.ID, request.Params.TextDocument.URI, request.Params.Position, request.Params.Context.IncludeDeclaration)
+
+		writeResponse(l, writer, response)
+
 	case protocol.MethodTextDocumentPrepareRename:
 		var request lsp.PrepareRenameRequest
 		if err := json.Unmarshal(contents, &request); err != nil {

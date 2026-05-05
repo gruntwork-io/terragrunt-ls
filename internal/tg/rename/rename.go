@@ -46,10 +46,12 @@ type RenameTarget struct {
 	IdentRange protocol.Range
 }
 
-// Occurrence is a single text span (in a specific file) that must be rewritten.
+// Occurrence is a single text span (in a specific file) of the target symbol.
+// IsDefinition is true for the symbol's declaration site, false for references.
 type Occurrence struct {
-	File  string
-	Range protocol.Range
+	File         string
+	Range        protocol.Range
+	IsDefinition bool
 }
 
 // skippedFiles lists base names that are part of the same folder but represent
@@ -234,8 +236,9 @@ func FindAllOccurrences(l logger.Logger, target RenameTarget, originFile string,
 
 		ast.WalkReferences(body, target.Context, target.Name, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
 			occurrences = append(occurrences, Occurrence{
-				File:  file,
-				Range: ast.FromHCLRange(r),
+				File:         file,
+				Range:        ast.FromHCLRange(r),
+				IsDefinition: false,
 			})
 		})
 	}
@@ -274,8 +277,9 @@ func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAS
 		}
 
 		occs = append(occs, Occurrence{
-			File:  file,
-			Range: ast.FromHCLRange(attr.NameRange),
+			File:         file,
+			Range:        ast.FromHCLRange(attr.NameRange),
+			IsDefinition: true,
 		})
 
 	case RenameContextInclude, RenameContextDependency:
@@ -293,8 +297,9 @@ func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAS
 			}
 
 			occs = append(occs, Occurrence{
-				File:  file,
-				Range: labelInnerRange(blk.LabelRanges[0]),
+				File:         file,
+				Range:        labelInnerRange(blk.LabelRanges[0]),
+				IsDefinition: true,
 			})
 		}
 	}
