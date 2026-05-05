@@ -44,44 +44,6 @@ inputs = {
 	assert.Equal(t, uint32(5), resp.Result.Range.End.Character)
 }
 
-func TestState_Definition_LocalReference_CrossFile(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	commonContent := `locals {
-  shared = "value"
-}
-`
-	_, err := testutils.CreateFile(tmpDir, "common.hcl", commonContent)
-	require.NoError(t, err)
-
-	tgContent := `include "common" {
-  path = "common.hcl"
-}
-
-inputs = {
-  v = local.shared
-}
-`
-	_, err = testutils.CreateFile(tmpDir, "terragrunt.hcl", tgContent)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-	commonPath := filepath.Join(tmpDir, "common.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
-
-	// Cursor on `shared` in `local.shared`.
-	resp := s.Definition(l, 1, uri.File(tgPath), protocol.Position{Line: 5, Character: 14})
-
-	assert.Equal(t, uri.File(commonPath), resp.Result.URI, "should jump to common.hcl")
-	assert.Equal(t, uint32(1), resp.Result.Range.Start.Line)
-	assert.Equal(t, uint32(2), resp.Result.Range.Start.Character)
-}
-
 func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 	t.Parallel()
 

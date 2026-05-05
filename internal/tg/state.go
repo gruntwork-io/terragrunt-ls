@@ -355,15 +355,15 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 	return newEmptyDefinitionResponse(id, docURI, position)
 }
 
-// findLocalDefinition locates the `<name> = ...` declaration in any sibling
-// .hcl file's locals block. Returns the location of the bare identifier.
+// findLocalDefinition locates the `<name> = ...` declaration in the current
+// file's locals block. Returns the location of the bare identifier.
 func (s *State) findLocalDefinition(l logger.Logger, st store.Store, docURI protocol.DocumentURI, position protocol.Position, name string) (protocol.Location, bool) {
 	target := rename.GetRenameTarget(l, st, position)
 	if target.Context != rename.RenameContextLocal || target.Name != name {
 		return protocol.Location{}, false
 	}
 
-	for _, occ := range rename.FindAllOccurrences(l, target, docURI.Filename(), s.Configs) {
+	for _, occ := range rename.FindAllOccurrences(target, docURI.Filename(), st) {
 		if !occ.IsDefinition {
 			continue
 		}
@@ -501,7 +501,7 @@ func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.Docu
 		return empty
 	}
 
-	occurrences := rename.FindAllOccurrences(l, target, docURI.Filename(), s.Configs)
+	occurrences := rename.FindAllOccurrences(target, docURI.Filename(), st)
 	if len(occurrences) == 0 {
 		return empty
 	}
@@ -546,7 +546,7 @@ func (s *State) TextDocumentReferences(l logger.Logger, id int, docURI protocol.
 		return empty
 	}
 
-	locations := references.GetReferences(l, st, position, docURI.Filename(), s.Configs, includeDeclaration)
+	locations := references.GetReferences(l, st, position, docURI.Filename(), includeDeclaration)
 	if len(locations) == 0 {
 		return empty
 	}

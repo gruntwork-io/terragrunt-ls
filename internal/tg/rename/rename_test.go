@@ -2,11 +2,9 @@ package rename_test
 
 import (
 	"path/filepath"
-	"sort"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 	"terragrunt-ls/internal/tg/rename"
-	"terragrunt-ls/internal/tg/store"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -133,7 +131,7 @@ inputs = {
 	}
 }
 
-func TestFindAllOccurrences_LocalSingleFile(t *testing.T) {
+func TestFindAllOccurrences_Local(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -159,128 +157,54 @@ dependency "b" {
 	docURI := uri.File(hclPath)
 	s.OpenDocument(t.Context(), l, docURI, content)
 
-	target := rename.GetRenameTarget(l, s.Configs[hclPath], protocol.Position{Line: 1, Character: 3})
+	st := s.Configs[hclPath]
+
+	target := rename.GetRenameTarget(l, st, protocol.Position{Line: 1, Character: 3})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
 	require.Equal(t, "foo", target.Name)
 
-	occs := rename.FindAllOccurrences(l, target, hclPath, s.Configs)
+	occs := rename.FindAllOccurrences(target, hclPath, st)
 	require.Len(t, occs, 3)
+
+	var defs int
 
 	for _, occ := range occs {
 		assert.Equal(t, hclPath, occ.File)
+
+		if occ.IsDefinition {
+			defs++
+		}
 	}
+
+	assert.Equal(t, 1, defs, "exactly one definition occurrence")
 }
 
-func TestFindAllOccurrences_LocalCrossFile(t *testing.T) {
+func TestFindAllOccurrences_NoDefinition(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
+	hclPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
-	commonContent := `locals {
-  shared = "value"
-}
-`
-	_, err := testutils.CreateFile(tmpDir, "common.hcl", commonContent)
-	require.NoError(t, err)
-
-	tgContent := `include "common" {
-  path = "common.hcl"
-}
-
-inputs = {
+	// References to a local that has no declaration in this file.
+	content := `inputs = {
   v = local.shared
 }
 `
-	_, err = testutils.CreateFile(tmpDir, "terragrunt.hcl", tgContent)
+	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-	commonPath := filepath.Join(tmpDir, "common.hcl")
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
+	docURI := uri.File(hclPath)
+	s.OpenDocument(t.Context(), l, docURI, content)
 
-	// Open only terragrunt.hcl in the editor; common.hcl stays on disk only.
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
+	st := s.Configs[hclPath]
 
-	// Cursor on the local.shared reference.
-	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 14})
+	target := rename.GetRenameTarget(l, st, protocol.Position{Line: 1, Character: 14})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
 	require.Equal(t, "shared", target.Name)
 
-	occs := rename.FindAllOccurrences(l, target, tgPath, s.Configs)
-	require.Len(t, occs, 2)
-
-	files := []string{occs[0].File, occs[1].File}
-	sort.Strings(files)
-	assert.Equal(t, []string{commonPath, tgPath}, files)
-}
-
-func TestFindAllOccurrences_SkipsStackAndValues(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	mainContent := `locals { foo = "v" }
-inputs = { v = local.foo }
-`
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", mainContent)
-	require.NoError(t, err)
-
-	// These would parse but should not be scanned.
-	_, err = testutils.CreateFile(tmpDir, "terragrunt.stack.hcl", `unit "x" { source = "./x" path = "x" }`)
-	require.NoError(t, err)
-	_, err = testutils.CreateFile(tmpDir, "terragrunt.values.hcl", `foo = "shadow"`)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), mainContent)
-
-	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 9})
-	require.Equal(t, rename.RenameContextLocal, target.Context)
-
-	occs := rename.FindAllOccurrences(l, target, tgPath, s.Configs)
-	for _, occ := range occs {
-		assert.Equal(t, "terragrunt.hcl", filepath.Base(occ.File), "must not include stack/values files")
-	}
-}
-
-func TestFindAllOccurrences_PrefersInMemoryAST(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	// On disk: defines a different name.
-	diskContent := `locals { other = "v" }`
-	_, err := testutils.CreateFile(tmpDir, "common.hcl", diskContent)
-	require.NoError(t, err)
-
-	tgContent := `inputs = { v = local.shared }`
-	_, err = testutils.CreateFile(tmpDir, "terragrunt.hcl", tgContent)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-	commonPath := filepath.Join(tmpDir, "common.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-
-	// Open both files; for common.hcl provide an in-memory version that
-	// matches the local name `shared`.
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
-	s.OpenDocument(t.Context(), l, uri.File(commonPath), `locals { shared = "v" }`)
-
-	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 22})
-	require.Equal(t, rename.RenameContextLocal, target.Context)
-
-	configs := map[string]store.Store{
-		tgPath:     s.Configs[tgPath],
-		commonPath: s.Configs[commonPath],
-	}
-
-	occs := rename.FindAllOccurrences(l, target, tgPath, configs)
-	require.Len(t, occs, 2, "definition (from in-memory common) + reference")
+	occs := rename.FindAllOccurrences(target, hclPath, st)
+	require.Len(t, occs, 1, "only the reference, no declaration in this file")
+	assert.False(t, occs[0].IsDefinition)
 }

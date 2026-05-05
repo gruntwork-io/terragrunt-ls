@@ -99,49 +99,38 @@ func TestState_TextDocumentRename(t *testing.T) {
 		assert.Nil(t, resp.Result)
 	})
 
-	t.Run("renames local across same-folder files", func(t *testing.T) {
+	t.Run("renames local declaration and references in same file", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
+		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
+		docURI := uri.File(tgPath)
 
-		commonContent := `locals {
+		content := `locals {
   shared = "value"
-}
-`
-		_, err := testutils.CreateFile(tmpDir, "common.hcl", commonContent)
-		require.NoError(t, err)
-
-		tgContent := `include "common" {
-  path = "common.hcl"
 }
 
 inputs = {
   v = local.shared
 }
 `
-		_, err = testutils.CreateFile(tmpDir, "terragrunt.hcl", tgContent)
+		_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
 		require.NoError(t, err)
-
-		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-		commonPath := filepath.Join(tmpDir, "common.hcl")
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(t.Context(), l, uri.File(tgPath), tgContent)
+		s.OpenDocument(t.Context(), l, docURI, content)
 
-		resp := s.TextDocumentRename(l, 1, uri.File(tgPath), protocol.Position{Line: 5, Character: 14}, "renamed")
+		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 5, Character: 14}, "renamed")
 		require.NotNil(t, resp.Result)
 		require.NotNil(t, resp.Result.Changes)
 
-		assert.Len(t, resp.Result.Changes, 2, "edits should span both files")
+		edits := resp.Result.Changes[docURI]
+		require.Len(t, edits, 2, "definition + reference in the same file")
 
-		commonEdits := resp.Result.Changes[uri.File(commonPath)]
-		require.Len(t, commonEdits, 1)
-		assert.Equal(t, "renamed", commonEdits[0].NewText)
-
-		tgEdits := resp.Result.Changes[uri.File(tgPath)]
-		require.Len(t, tgEdits, 1)
-		assert.Equal(t, "renamed", tgEdits[0].NewText)
+		for _, edit := range edits {
+			assert.Equal(t, "renamed", edit.NewText)
+		}
 	})
 
 	t.Run("returns nil for non-renameable position", func(t *testing.T) {

@@ -2,11 +2,8 @@
 package rename
 
 import (
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
 
 	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/logger"
@@ -43,13 +40,6 @@ type Occurrence struct {
 	File         string
 	Range        protocol.Range
 	IsDefinition bool
-}
-
-// skippedFiles lists base names that are part of the same folder but represent
-// a different file type and should not be scanned for rename occurrences.
-var skippedFiles = map[string]struct{}{
-	"terragrunt.stack.hcl":  {},
-	"terragrunt.values.hcl": {},
 }
 
 // hclIdentifierRE matches a valid HCL identifier (also accepts hyphens, which
@@ -146,53 +136,32 @@ func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Posit
 	}
 }
 
-// FindAllOccurrences returns every rename occurrence of target across all
-// sibling .hcl files in the same directory as originFile (including originFile
-// itself). When a file has an entry in configs with a parsed AST, that AST is
-// used; otherwise the file is read from disk and parsed. Files that fail to
-// read or parse are skipped.
-func FindAllOccurrences(l logger.Logger, target RenameTarget, originFile string, configs map[string]store.Store) []Occurrence {
-	if target.Context == RenameContextNull {
+// FindAllOccurrences returns every occurrence of target within the given file's
+// AST: the declaration site (when present) plus all references. The returned
+// slice is sorted by (line, column) for determinism.
+func FindAllOccurrences(target RenameTarget, file string, st store.Store) []Occurrence {
+	if target.Context == RenameContextNull || st.AST == nil || st.AST.HCLFile == nil {
 		return nil
 	}
 
-	files, err := siblingHCLFiles(filepath.Dir(originFile), configs)
-	if err != nil {
-		l.Error("Failed to list sibling HCL files", "dir", filepath.Dir(originFile), "error", err)
+	body, ok := st.AST.HCLFile.Body.(*hclsyntax.Body)
+	if !ok || body == nil {
 		return nil
 	}
 
-	var occurrences []Occurrence
+	occurrences := definitionOccurrences(target, file, st.AST)
 
-	for _, file := range files {
-		iast := getOrParseAST(file, configs, l)
-		if iast == nil || iast.HCLFile == nil {
-			continue
-		}
-
-		body, ok := iast.HCLFile.Body.(*hclsyntax.Body)
-		if !ok || body == nil {
-			continue
-		}
-
-		occurrences = append(occurrences, definitionOccurrences(target, file, iast)...)
-
-		ast.WalkReferences(body, target.Context, target.Name, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
-			occurrences = append(occurrences, Occurrence{
-				File:         file,
-				Range:        ast.FromHCLRange(r),
-				IsDefinition: false,
-			})
+	ast.WalkReferences(body, target.Context, target.Name, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
+		occurrences = append(occurrences, Occurrence{
+			File:         file,
+			Range:        ast.FromHCLRange(r),
+			IsDefinition: false,
 		})
-	}
+	})
 
 	// HCL walks attributes in map iteration order, which is non-deterministic.
 	// Sort for stable test output and predictable client-side application.
 	sort.Slice(occurrences, func(i, j int) bool {
-		if occurrences[i].File != occurrences[j].File {
-			return occurrences[i].File < occurrences[j].File
-		}
-
 		if occurrences[i].Range.Start.Line != occurrences[j].Range.Start.Line {
 			return occurrences[i].Range.Start.Line < occurrences[j].Range.Start.Line
 		}
@@ -224,80 +193,6 @@ func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAS
 		Range:        ast.FromHCLRange(attr.NameRange),
 		IsDefinition: true,
 	}}
-}
-
-// siblingHCLFiles returns absolute paths of *.hcl files in dir, excluding
-// stack and values files. Files present in configs (open in the editor but
-// possibly not yet saved to disk) are included even if they don't exist on disk.
-func siblingHCLFiles(dir string, configs map[string]store.Store) ([]string, error) {
-	seen := map[string]struct{}{}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-
-		name := e.Name()
-		if !isRenameableHCLFile(name) {
-			continue
-		}
-
-		seen[filepath.Join(dir, name)] = struct{}{}
-	}
-
-	for path := range configs {
-		if filepath.Dir(path) != dir {
-			continue
-		}
-
-		if !isRenameableHCLFile(filepath.Base(path)) {
-			continue
-		}
-
-		seen[path] = struct{}{}
-	}
-
-	files := make([]string, 0, len(seen))
-	for f := range seen {
-		files = append(files, f)
-	}
-
-	return files, nil
-}
-
-// isRenameableHCLFile returns true if the base name is a .hcl file that should
-// be scanned for rename occurrences (excludes stack and values files).
-func isRenameableHCLFile(base string) bool {
-	if !strings.HasSuffix(base, ".hcl") {
-		return false
-	}
-
-	_, skip := skippedFiles[base]
-
-	return !skip
-}
-
-// getOrParseAST returns the parsed IndexedAST for path, preferring an
-// already-parsed in-memory AST (so unsaved editor edits are honored).
-func getOrParseAST(path string, configs map[string]store.Store, l logger.Logger) *ast.IndexedAST {
-	if st, ok := configs[path]; ok && st.AST != nil {
-		return st.AST
-	}
-
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		l.Debug("Skipping file (read error)", "file", path, "error", err)
-		return nil
-	}
-
-	iast, _ := ast.ParseHCLFile(path, contents)
-
-	return iast
 }
 
 // rangeContainsPosition reports whether p (LSP coordinates) is inside r (HCL
