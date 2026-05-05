@@ -526,7 +526,7 @@ func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.Docu
 
 // canRename reports whether rename can run against this store. It accepts any
 // HCL config or auxiliary file (e.g., common.hcl) but not stack/values files,
-// whose syntax does not have the renameable `local`/`include`/`dependency` constructs.
+// whose syntax does not have the renameable `local`/`include` constructs.
 func canRename(st store.Store) bool {
 	if st.AST == nil {
 		return false
