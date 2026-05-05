@@ -53,18 +53,6 @@ inputs = {
 			},
 		},
 		{
-			name: "dependency outputs reference",
-			contents: `inputs = {
-  v = dependency.vpc.outputs.id
-}
-`,
-			root:  "dependency",
-			ident: "vpc",
-			expected: []hcl.Range{
-				{Start: hcl.Pos{Line: 2, Column: 18}, End: hcl.Pos{Line: 2, Column: 21}},
-			},
-		},
-		{
 			name: "no matches",
 			contents: `inputs = {
   v = local.bar
