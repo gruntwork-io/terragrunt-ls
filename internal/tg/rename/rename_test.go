@@ -89,15 +89,6 @@ inputs = {
 			expectedContext: rename.RenameContextLocal,
 		},
 		{
-			name: "cursor on include label",
-			document: `include "root" {
-  path = "root.hcl"
-}`,
-			position:        protocol.Position{Line: 0, Character: 10},
-			expectedName:    "root",
-			expectedContext: rename.RenameContextInclude,
-		},
-		{
 			name: "cursor on dependency label",
 			document: `dependency "vpc" {
   config_path = "../vpc"
@@ -350,34 +341,4 @@ inputs = {
 
 	occs := rename.FindAllOccurrences(l, target, tgPath, s.Configs)
 	require.Len(t, occs, 2, "definition label + outputs reference")
-}
-
-func TestFindAllOccurrences_IncludeLabel(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	content := `include "root" {
-  path = "root.hcl"
-}
-
-inputs = {
-  region = include.root.locals.region
-}
-`
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-	s.OpenDocument(context.Background(), l, uri.File(tgPath), content)
-
-	target := rename.GetRenameTarget(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 10})
-	require.Equal(t, rename.RenameContextInclude, target.Context)
-	require.Equal(t, "root", target.Name)
-
-	occs := rename.FindAllOccurrences(l, target, tgPath, s.Configs)
-	require.Len(t, occs, 2, "definition label + include.root.* reference")
 }

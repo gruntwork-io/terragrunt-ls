@@ -46,14 +46,14 @@ inputs = { v = local.foo }`,
 			wantEnd:   protocol.Position{Line: 1, Character: 24},
 		},
 		{
-			name: "include label excludes quotes",
-			document: `include "root" {
-  path = "root.hcl"
+			name: "dependency label excludes quotes",
+			document: `dependency "vpc" {
+  config_path = "../vpc"
 }`,
-			position:  protocol.Position{Line: 0, Character: 11},
-			wantPlace: "root",
-			wantStart: protocol.Position{Line: 0, Character: 9},
-			wantEnd:   protocol.Position{Line: 0, Character: 13},
+			position:  protocol.Position{Line: 0, Character: 13},
+			wantPlace: "vpc",
+			wantStart: protocol.Position{Line: 0, Character: 12},
+			wantEnd:   protocol.Position{Line: 0, Character: 15},
 		},
 		{
 			name: "non-renameable position returns nil",

@@ -86,8 +86,6 @@ func traversalDefinitionTarget(expr *hclsyntax.ScopeTraversalExpr) (string, stri
 	switch rootStep.Name {
 	case "local":
 		return attrStep.Name, DefinitionContextLocal, true
-	case "include":
-		return attrStep.Name, DefinitionContextInclude, true
 	case "dependency":
 		return attrStep.Name, DefinitionContextDependency, true
 	}

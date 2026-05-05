@@ -26,10 +26,6 @@ const (
 	// label (`dependency "name" {}` and `dependency.name.outputs.X` references).
 	RenameContextDependency = "dependency"
 
-	// RenameContextInclude is the context for renaming an include block label
-	// (`include "name" {}` and `include.name.X` references).
-	RenameContextInclude = "include"
-
 	// RenameContextNull means the cursor is not on a renameable identifier.
 	RenameContextNull = "null"
 )
@@ -194,8 +190,6 @@ func contextForRoot(name string) (string, bool) {
 	switch name {
 	case "local":
 		return RenameContextLocal, true
-	case "include":
-		return RenameContextInclude, true
 	case "dependency":
 		return RenameContextDependency, true
 	}
@@ -282,7 +276,7 @@ func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAS
 			IsDefinition: true,
 		})
 
-	case RenameContextInclude, RenameContextDependency:
+	case RenameContextDependency:
 		for _, blk := range body.Blocks {
 			if blk.Type != target.Context {
 				continue
