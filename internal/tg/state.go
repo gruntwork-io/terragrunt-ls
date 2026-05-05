@@ -209,7 +209,7 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		"position", position,
 	)
 
-	if st.FileType != store.FileTypeUnit {
+	if !canRename(st) {
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
@@ -225,8 +225,15 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
-	//nolint:gocritic
 	switch context {
+	case definition.DefinitionContextLocal:
+		if loc, ok := s.findLocalDefinition(l, st, docURI, position, target); ok {
+			return lsp.DefinitionResponse{
+				Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+				Result:   loc,
+			}
+		}
+
 	case definition.DefinitionContextInclude:
 		l.Debug(
 			"Store content",
@@ -346,6 +353,28 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 	}
 
 	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
+// findLocalDefinition locates the `<name> = ...` declaration in any sibling
+// .hcl file's locals block. Returns the location of the bare identifier.
+func (s *State) findLocalDefinition(l logger.Logger, st store.Store, docURI protocol.DocumentURI, position protocol.Position, name string) (protocol.Location, bool) {
+	target := rename.GetRenameTarget(l, st, position)
+	if target.Context != rename.RenameContextLocal || target.Name != name {
+		return protocol.Location{}, false
+	}
+
+	for _, occ := range rename.FindAllOccurrences(l, target, docURI.Filename(), s.Configs) {
+		if !occ.IsDefinition {
+			continue
+		}
+
+		return protocol.Location{
+			URI:   uri.File(occ.File),
+			Range: occ.Range,
+		}, true
+	}
+
+	return protocol.Location{}, false
 }
 
 func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {

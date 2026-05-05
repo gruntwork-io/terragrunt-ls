@@ -7,10 +7,18 @@ import (
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"go.lsp.dev/protocol"
 )
 
 const (
+	// DefinitionContextLocal is the context for a local variable definition.
+	// This means that the user is trying to find the definition of a `local.X`
+	// reference, which resolves to a `locals { X = ... }` declaration in the
+	// current file or a sibling file in the same module folder.
+	DefinitionContextLocal = "local"
+
 	// DefinitionContextInclude is the context for an include definition.
 	// This means that the user is trying to find the definition of an include.
 	DefinitionContextInclude = "include"
@@ -46,7 +54,43 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 		return dep, DefinitionContextDependency
 	}
 
+	if expr, ok := node.Node.(*hclsyntax.ScopeTraversalExpr); ok {
+		if name, context, ok := traversalDefinitionTarget(expr); ok {
+			l.Debug("Found traversal target", "name", name, "context", context)
+			return name, context
+		}
+	}
+
 	l.Debug("No definition found at", "line", position.Line, "character", position.Character)
 
 	return "", DefinitionContextNull
+}
+
+// traversalDefinitionTarget extracts a (name, context) pair from a
+// `<root>.<name>` traversal where root is one of local/include/dependency.
+func traversalDefinitionTarget(expr *hclsyntax.ScopeTraversalExpr) (string, string, bool) {
+	if len(expr.Traversal) < ast.MinReferenceTraversalLen {
+		return "", "", false
+	}
+
+	rootStep, ok := expr.Traversal[0].(hcl.TraverseRoot)
+	if !ok {
+		return "", "", false
+	}
+
+	attrStep, ok := expr.Traversal[1].(hcl.TraverseAttr)
+	if !ok {
+		return "", "", false
+	}
+
+	switch rootStep.Name {
+	case "local":
+		return attrStep.Name, DefinitionContextLocal, true
+	case "include":
+		return attrStep.Name, DefinitionContextInclude, true
+	case "dependency":
+		return attrStep.Name, DefinitionContextDependency, true
+	}
+
+	return "", "", false
 }
