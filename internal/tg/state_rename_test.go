@@ -45,6 +45,16 @@ inputs = { v = local.foo }`,
 			wantEnd:   protocol.Position{Line: 1, Character: 24},
 		},
 		{
+			name: "include label excludes quotes",
+			document: `include "root" {
+  path = "root.hcl"
+}`,
+			position:  protocol.Position{Line: 0, Character: 11},
+			wantPlace: "root",
+			wantStart: protocol.Position{Line: 0, Character: 9},
+			wantEnd:   protocol.Position{Line: 0, Character: 13},
+		},
+		{
 			name: "non-renameable position returns nil",
 			document: `locals {
   foo = "bar"
@@ -130,6 +140,36 @@ inputs = {
 
 		for _, edit := range edits {
 			assert.Equal(t, "renamed", edit.NewText)
+		}
+	})
+
+	t.Run("renames include label and reference", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		content := `include "root" {
+  path = "root.hcl"
+}
+
+inputs = {
+  region = include.root.locals.region
+}
+`
+		_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+		require.NoError(t, err)
+
+		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
+		l := testutils.NewTestLogger(t)
+		s := tg.NewState()
+		s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
+
+		resp := s.TextDocumentRename(l, 1, uri.File(tgPath), protocol.Position{Line: 0, Character: 10}, "base")
+		require.NotNil(t, resp.Result)
+
+		edits := resp.Result.Changes[uri.File(tgPath)]
+		require.Len(t, edits, 2)
+		for _, e := range edits {
+			assert.Equal(t, "base", e.NewText)
 		}
 	})
 

@@ -19,6 +19,10 @@ const (
 	// (`locals { name = ... }` and `local.name` references).
 	RenameContextLocal = "local"
 
+	// RenameContextInclude is the context for renaming an include block label
+	// (`include "name" {}` and `include.name.X` references).
+	RenameContextInclude = "include"
+
 	// RenameContextNull means the cursor is not on a renameable identifier.
 	RenameContextNull = "null"
 )
@@ -30,7 +34,8 @@ type RenameTarget struct {
 	// Context is one of the RenameContext* constants.
 	Context string
 	// IdentRange is the LSP range covering only the identifier token, suitable
-	// for use as the prepare-rename range.
+	// for use as the prepare-rename range. For block labels this excludes the
+	// surrounding quotes.
 	IdentRange protocol.Range
 }
 
@@ -73,23 +78,28 @@ func GetRenameTarget(l logger.Logger, st store.Store, position protocol.Position
 	}
 
 	for cur := inode; cur != nil; cur = cur.Parent {
-		attr, ok := cur.Node.(*hclsyntax.Attribute)
-		if !ok {
-			continue
-		}
-
-		if !ast.IsLocalAttribute(cur) {
+		switch n := cur.Node.(type) {
+		case *hclsyntax.Block:
+			if t, ok := blockLabelTarget(n, position); ok {
+				return t
+			}
+			// We hit an enclosing block but the cursor isn't on its label.
 			return null
-		}
 
-		if !rangeContainsPosition(attr.NameRange, position) {
-			return null
-		}
+		case *hclsyntax.Attribute:
+			if !ast.IsLocalAttribute(cur) {
+				return null
+			}
 
-		return RenameTarget{
-			Name:       attr.Name,
-			Context:    RenameContextLocal,
-			IdentRange: ast.FromHCLRange(attr.NameRange),
+			if !rangeContainsPosition(n.NameRange, position) {
+				return null
+			}
+
+			return RenameTarget{
+				Name:       n.Name,
+				Context:    RenameContextLocal,
+				IdentRange: ast.FromHCLRange(n.NameRange),
+			}
 		}
 	}
 
@@ -97,7 +107,8 @@ func GetRenameTarget(l logger.Logger, st store.Store, position protocol.Position
 }
 
 // traversalTarget extracts a RenameTarget from a ScopeTraversalExpr if the
-// cursor is positioned on its first two traversal steps and the root is `local`.
+// cursor is positioned on its first two traversal steps and the root is a
+// supported kind.
 func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Position) RenameTarget {
 	null := RenameTarget{Context: RenameContextNull}
 
@@ -115,11 +126,8 @@ func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Posit
 		return null
 	}
 
-	if rootStep.Name != "local" {
-		return null
-	}
-
-	// Restrict cursor to the first two steps.
+	// Restrict cursor to the first two steps so that, e.g., `include.root.locals.x`
+	// only triggers rename when the cursor is on `include` or `root`.
 	firstTwo := hcl.Range{
 		Filename: rootStep.SrcRange.Filename,
 		Start:    rootStep.SrcRange.Start,
@@ -129,11 +137,54 @@ func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Posit
 		return null
 	}
 
+	context, ok := contextForRoot(rootStep.Name)
+	if !ok {
+		return null
+	}
+
 	return RenameTarget{
 		Name:       attrStep.Name,
-		Context:    RenameContextLocal,
+		Context:    context,
 		IdentRange: ast.FromHCLRange(ast.TraverseAttrIdentRange(attrStep)),
 	}
+}
+
+// blockLabelTarget returns a RenameTarget when the cursor is on the first
+// label of an `include` block.
+func blockLabelTarget(block *hclsyntax.Block, position protocol.Position) (RenameTarget, bool) {
+	null := RenameTarget{Context: RenameContextNull}
+
+	context, ok := contextForRoot(block.Type)
+	if !ok || context == RenameContextLocal {
+		return null, false
+	}
+
+	if len(block.Labels) == 0 || len(block.LabelRanges) == 0 {
+		return null, false
+	}
+
+	if !rangeContainsPosition(block.LabelRanges[0], position) {
+		return null, false
+	}
+
+	return RenameTarget{
+		Name:       block.Labels[0],
+		Context:    context,
+		IdentRange: labelInnerRange(block.LabelRanges[0]),
+	}, true
+}
+
+// contextForRoot maps an HCL root identifier (the first traversal step or a
+// block type) to a rename context. Returns false for unsupported names.
+func contextForRoot(name string) (string, bool) {
+	switch name {
+	case "local":
+		return RenameContextLocal, true
+	case "include":
+		return RenameContextInclude, true
+	}
+
+	return "", false
 }
 
 // FindAllOccurrences returns every occurrence of target within the given file's
@@ -149,7 +200,7 @@ func FindAllOccurrences(target RenameTarget, file string, st store.Store) []Occu
 		return nil
 	}
 
-	occurrences := definitionOccurrences(target, file, st.AST)
+	occurrences := definitionOccurrences(target, file, st.AST, body)
 
 	ast.WalkReferences(body, target.Context, target.Name, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
 		occurrences = append(occurrences, Occurrence{
@@ -173,26 +224,61 @@ func FindAllOccurrences(target RenameTarget, file string, st store.Store) []Occu
 }
 
 // definitionOccurrences finds the definition site(s) of target in the given file.
-func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAST) []Occurrence {
-	if target.Context != RenameContextLocal {
-		return nil
+func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAST, body *hclsyntax.Body) []Occurrence {
+	var occs []Occurrence
+
+	switch target.Context {
+	case RenameContextLocal:
+		def, ok := iast.Locals[target.Name]
+		if !ok {
+			return nil
+		}
+
+		attr, ok := def.Node.(*hclsyntax.Attribute)
+		if !ok {
+			return nil
+		}
+
+		occs = append(occs, Occurrence{
+			File:         file,
+			Range:        ast.FromHCLRange(attr.NameRange),
+			IsDefinition: true,
+		})
+
+	case RenameContextInclude:
+		for _, blk := range body.Blocks {
+			if blk.Type != target.Context {
+				continue
+			}
+
+			if len(blk.Labels) == 0 || blk.Labels[0] != target.Name {
+				continue
+			}
+
+			if len(blk.LabelRanges) == 0 {
+				continue
+			}
+
+			occs = append(occs, Occurrence{
+				File:         file,
+				Range:        labelInnerRange(blk.LabelRanges[0]),
+				IsDefinition: true,
+			})
+		}
 	}
 
-	def, ok := iast.Locals[target.Name]
-	if !ok {
-		return nil
-	}
+	return occs
+}
 
-	attr, ok := def.Node.(*hclsyntax.Attribute)
-	if !ok {
-		return nil
-	}
+// labelInnerRange returns the LSP range of a quoted label's contents, excluding
+// the surrounding double quotes.
+func labelInnerRange(r hcl.Range) protocol.Range {
+	r.Start.Column++
+	r.Start.Byte++
+	r.End.Column--
+	r.End.Byte--
 
-	return []Occurrence{{
-		File:         file,
-		Range:        ast.FromHCLRange(attr.NameRange),
-		IsDefinition: true,
-	}}
+	return ast.FromHCLRange(r)
 }
 
 // rangeContainsPosition reports whether p (LSP coordinates) is inside r (HCL
