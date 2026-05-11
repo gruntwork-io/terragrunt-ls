@@ -266,7 +266,7 @@ inputs = {
 // read_terragrunt_config / find_in_parent_folders together with a remote_state
 // block caused the upstream Terragrunt parser to panic with a nil-pointer
 // dereference, crashing the language server. Whatever the underlying behavior,
-// the LS must not panic on user input — it should return whatever it can and
+// the LS must not panic on user input, it should return whatever it can and
 // log the error.
 func TestParseTerragruntBuffer_DoesNotPanic(t *testing.T) {
 	t.Parallel()
