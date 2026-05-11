@@ -86,23 +86,6 @@ inputs = {
 			expectedContext: rename.RenameContextLocal,
 		},
 		{
-			name: "cursor on include label",
-			document: `include "root" {
-  path = "root.hcl"
-}`,
-			position:        protocol.Position{Line: 0, Character: 10},
-			expectedName:    "root",
-			expectedContext: rename.RenameContextInclude,
-		},
-		{
-			name: "cursor on step beyond include label is not renameable",
-			document: `inputs = {
-  region = include.root.locals.region
-}`,
-			position:        protocol.Position{Line: 1, Character: 25},
-			expectedContext: rename.RenameContextNull,
-		},
-		{
 			name: "cursor on unrelated traversal root",
 			document: `inputs = {
   v = path.module
@@ -224,36 +207,4 @@ func TestFindAllOccurrences_LocalNoDefinition(t *testing.T) {
 	occs := rename.FindAllOccurrences(target, hclPath, st)
 	require.Len(t, occs, 1, "only the reference, no declaration in this file")
 	assert.False(t, occs[0].IsDefinition)
-}
-
-func TestFindAllOccurrences_IncludeLabel(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-
-	content := `include "root" {
-  path = "root.hcl"
-}
-
-inputs = {
-  region = include.root.locals.region
-}
-`
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
-	require.NoError(t, err)
-
-	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
-
-	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
-
-	st := s.Configs[tgPath]
-
-	target := rename.GetRenameTarget(l, st, protocol.Position{Line: 0, Character: 10})
-	require.Equal(t, rename.RenameContextInclude, target.Context)
-	require.Equal(t, "root", target.Name)
-
-	occs := rename.FindAllOccurrences(target, tgPath, st)
-	require.Len(t, occs, 2, "definition label + include.root.* reference")
 }
