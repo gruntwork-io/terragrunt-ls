@@ -90,13 +90,13 @@ jobs:
 
             if [[ "$platform" == *windows* ]]; then
               binary="terragrunt-ls.exe"
+              (cd "$platform_dir" && zip "../${platform}.zip" "$binary")
             else
               binary="terragrunt-ls"
               chmod +x "${platform_dir}${binary}"
+              (cd "$platform_dir" && zip "../${platform}.zip" "$binary")
+              (cd "$platform_dir" && tar -czf "../${platform}.tar.gz" "$binary")
             fi
-
-            (cd "$platform_dir" && zip "../${platform}.zip" "$binary")
-            (cd "$platform_dir" && tar -czf "../${platform}.tar.gz" "$binary")
             echo "Created archives for $platform"
           done
 
@@ -141,7 +141,11 @@ jobs:
           )
 
           for platform in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
-            EXPECTED_FILES+=("terragrunt-ls_${platform}.zip" "terragrunt-ls_${platform}.tar.gz")
+            bin="terragrunt-ls_${platform}"
+            EXPECTED_FILES+=("${bin}.zip")
+            if [[ "$platform" != windows_* ]]; then
+              EXPECTED_FILES+=("${bin}.tar.gz")
+            fi
           done
 
           MISSING=0
