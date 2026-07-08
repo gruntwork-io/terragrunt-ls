@@ -62,7 +62,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: "0"
         run: |
-          OUTPUT="terragrunt-ls_${GOOS}_${GOARCH}"
+          OUTPUT="terragrunt-ls"
           if [[ "${GOOS}" == "windows" ]]; then
             OUTPUT="${OUTPUT}.exe"
           fi
@@ -73,7 +73,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          OUTPUT="terragrunt-ls_${GOOS}_${GOARCH}"
+          OUTPUT="terragrunt-ls"
           if [[ "${GOOS}" == "windows" ]]; then
             OUTPUT="${OUTPUT}.exe"
           fi
@@ -100,4 +100,4 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: terragrunt-ls_${{ matrix.os }}_${{ matrix.arch }}
-          path: terragrunt-ls_${{ matrix.os }}_${{ matrix.arch }}*
+          path: terragrunt-ls${{ matrix.os == 'windows' && '.exe' || '' }}
