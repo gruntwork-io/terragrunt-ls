@@ -1,6 +1,7 @@
 package tg_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -68,4 +69,38 @@ func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 	// Empty response points back at the cursor position.
 	assert.Equal(t, docURI, resp.Result.URI)
 	assert.Equal(t, protocol.Position{Line: 1, Character: 18}, resp.Result.Range.Start)
+}
+
+func TestState_Definition_IncludeTraversalReference(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	rootPath := filepath.Join(tmpDir, "root.hcl")
+	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
+	require.NoError(t, err)
+
+	unitDir := filepath.Join(tmpDir, "app")
+	require.NoError(t, os.MkdirAll(unitDir, 0o755))
+
+	content := `include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+inputs = {
+  v = include.root.locals.region
+}
+`
+	unitPath := filepath.Join(unitDir, "terragrunt.hcl")
+	_, err = testutils.CreateFile(unitDir, "terragrunt.hcl", content)
+	require.NoError(t, err)
+
+	l := testutils.NewTestLogger(t)
+	s := tg.NewState()
+	s.OpenDocument(t.Context(), l, uri.File(unitPath), content)
+
+	// Cursor on `root` in `include.root.locals.region`.
+	resp := s.Definition(l, 1, uri.File(unitPath), protocol.Position{Line: 5, Character: 16})
+
+	assert.Equal(t, uri.File(rootPath), resp.Result.URI, "should jump to root.hcl")
 }

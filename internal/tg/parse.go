@@ -163,22 +163,29 @@ const (
 	// UnknownVariableSummary is the summary for an unknown variable diagnostic.
 	UnknownVariableSummary = "Unknown variable"
 
-	// ValuesUnknownVariableDetail is the detail for a missing "values" variable diagnostic.
-	ValuesUnknownVariableDetail = `There is no variable named "values".`
+	// unknownVariableDetailPrefix is the start of an "Unknown variable" diagnostic
+	// detail; the keyword name follows in quotes.
+	unknownVariableDetailPrefix = `There is no variable named "`
 )
 
 // unresolvableKeywords lists object names whose attributes may not be
 // available during LS parsing because they depend on runtime state:
 //   - "values": populated from terragrunt.values.hcl at runtime.
 //   - "local": locals that reference unresolvable values cascade failures.
-var unresolvableKeywords = []string{"values", "local"}
+//   - "include": child-config exposed-include attributes (e.g.,
+//     `include.root.remote_state`) require resolving the parent file.
+var unresolvableKeywords = []string{"values", "local", "include"}
 
 // isUnresolvableAttributeDiag checks whether the diagnostic is an "Unsupported
 // attribute" or "Unknown variable" error caused by referencing an object that
 // cannot be fully resolved during LS parsing.
 func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
-	if diag.Summary == UnknownVariableSummary && diag.Detail == ValuesUnknownVariableDetail {
-		return true
+	if diag.Summary == UnknownVariableSummary {
+		for _, keyword := range unresolvableKeywords {
+			if diag.Detail == unknownVariableDetailPrefix+keyword+`".` {
+				return true
+			}
+		}
 	}
 
 	if diag.Summary != UnsupportedAttributeSummary {
