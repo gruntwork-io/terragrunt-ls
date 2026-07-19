@@ -46,6 +46,15 @@ jobs:
         run: npm ci
         working-directory: vscode-extension
 
+      # TODO: revisit — package.json keeps a stale version in-tree and only
+      # gets rewritten here at release time. Long-term we should keep the
+      # committed version in sync (e.g. bump on release PR) instead of
+      # deriving it from the tag.
+      - name: Set extension version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: vscode-extension
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
       - name: Package VSIX
         run: npx @vscode/vsce package --target ${{ matrix.vsce_target }}
         working-directory: vscode-extension
