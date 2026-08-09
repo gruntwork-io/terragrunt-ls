@@ -2,8 +2,10 @@ package tg
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"terragrunt-ls/internal/logger"
@@ -52,11 +54,27 @@ func newParsingContext(ctx context.Context, tgLogger tgLog.Logger, filename stri
 	return ctx, pctx, parseDiags
 }
 
+// safeParseConfigString invokes config.ParseConfigString while guarding against
+// panics raised inside the upstream Terragrunt parser. A language server must
+// never crash because of user input: a panic here would take the LS process
+// down and disable diagnostics for every open editor window. Any recovered
+// panic is converted to an error and logged.
+func safeParseConfigString(ctx context.Context, pctx *config.ParsingContext, tgLogger tgLog.Logger, filename, text string) (cfg *config.TerragruntConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic while parsing Terragrunt config %q: %v\n%s", filename, r, debug.Stack())
+			cfg = nil
+		}
+	}()
+
+	return config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
+}
+
 func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 
-	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
+	cfg, err := safeParseConfigString(ctx, pctx, tgLogger, filename, text)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -257,12 +275,26 @@ func DetectFileType(filename string) store.FileType {
 	}
 }
 
+// safeReadStackConfigString invokes config.ReadStackConfigString while guarding
+// against panics raised inside the upstream Terragrunt parser. See
+// safeParseConfigString for rationale.
+func safeReadStackConfigString(ctx context.Context, tgLogger tgLog.Logger, pctx *config.ParsingContext, filename, text string) (cfg *config.StackConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic while parsing Terragrunt stack config %q: %v\n%s", filename, r, debug.Stack())
+			cfg = nil
+		}
+	}()
+
+	return config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
+}
+
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
 func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
+	cfg, err := safeReadStackConfigString(ctx, tgLogger, pctx, filename, text)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
