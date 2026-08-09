@@ -179,13 +179,13 @@ dependency "b" {
 	assert.Equal(t, 1, defs, "exactly one definition occurrence")
 }
 
-func TestFindAllOccurrences_NoDefinition(t *testing.T) {
+func TestFindAllOccurrences_LocalNoDefinition(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
 	hclPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
-	// References to a local that has no declaration in this file.
+	// Reference to a local that has no declaration in this file.
 	content := `inputs = {
   v = local.shared
 }
