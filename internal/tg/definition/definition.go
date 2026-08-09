@@ -4,6 +4,7 @@ package definition
 
 import (
 	"terragrunt-ls/internal/ast"
+	astconfig "terragrunt-ls/internal/ast/config"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
@@ -38,18 +39,20 @@ func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position
 		return "", DefinitionContextNull
 	}
 
-	node := store.AST.FindNodeAt(ast.ToHCLPos(position))
+	cfgAST := astconfig.NewConfigAST(store.AST)
+
+	node := cfgAST.FindNodeAt(ast.ToHCLPos(position))
 	if node == nil {
 		l.Debug("No node found at", "line", position.Line, "character", position.Character)
 		return "", DefinitionContextNull
 	}
 
-	if include, ok := ast.GetNodeIncludeLabel(node); ok {
+	if include, ok := cfgAST.GetIncludeLabel(node); ok {
 		l.Debug("Found include", "label", include)
 		return include, DefinitionContextInclude
 	}
 
-	if dep, ok := ast.GetNodeDependencyLabel(node); ok {
+	if dep, ok := cfgAST.GetDependencyLabel(node); ok {
 		l.Debug("Found dependency", "label", dep)
 		return dep, DefinitionContextDependency
 	}
