@@ -271,6 +271,8 @@ github.com/cenkalti/backoff/v5 v5.0.3/go.mod h1:rkhZdG3JZukswDf7f0cwqPNk4K0sa+F9
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+github.com/charlievieth/fastwalk v1.0.14 h1:3Eh5uaFGwHZd8EGwTjJnSpBkfwfsak9h6ICgnWlhAyg=
+github.com/charlievieth/fastwalk v1.0.14/go.mod h1:diVcUreiU1aQ4/Wu3NbxxH4/KYdKpLDojrQ1Bb2KgNY=
 github.com/charmbracelet/colorprofile v0.4.2 h1:BdSNuMjRbotnxHSfxy+PCSa4xAmz7szw70ktAtWRYrY=
 github.com/charmbracelet/colorprofile v0.4.2/go.mod h1:0rTi81QpwDElInthtrQ6Ni7cG0sDtwAd4C4le060fT8=
 github.com/charmbracelet/ultraviolet v0.0.0-20260205113103-524a6607adb8 h1:eyFRbAmexyt43hVfeyBofiGSEmJ7krjLOYt/9CF5NKA=
@@ -542,8 +544,8 @@ github.com/gruntwork-io/boilerplate v0.15.0 h1:RCgo4fh9iLDDglVPIzdafp5+4S1b6d5EP
 github.com/gruntwork-io/boilerplate v0.15.0/go.mod h1:HBvGVVG3RBQB6IL+V1unkEsvx+PCIgNAU5T736Px4As=
 github.com/gruntwork-io/go-commons v0.17.2 h1:14dsCJ7M5Vv2X3BIPKeG9Kdy6vTMGhM8L4WZazxfTuY=
 github.com/gruntwork-io/go-commons v0.17.2/go.mod h1:zs7Q2AbUKuTarBPy19CIxJVUX/rBamfW8IwuWKniWkE=
-github.com/gruntwork-io/terragrunt v1.0.2 h1:M7tzLO9dPctcl1Q1gB1TLiuS1Si9QQPw1aqbwnaAUfU=
-github.com/gruntwork-io/terragrunt v1.0.2/go.mod h1:uhBUF9/vvy822q48iex696puhpAGWMdbLESvAkvfv3A=
+github.com/gruntwork-io/terragrunt v1.0.4 h1:yVG87R9hkcOVEs+9e/X93tcS2OALHp3Ys4U1qdpuXx8=
+github.com/gruntwork-io/terragrunt v1.0.4/go.mod h1:odxAqYksc48oAYYytjQmkb4ozySBqZVzvIYMeDC7Qfc=
 github.com/gruntwork-io/terragrunt-engine-go v0.1.0 h1:N/8q099DtaKUgzVGMW2oOYhV8kc5x3Wd/PKlh7G8TRA=
 github.com/gruntwork-io/terragrunt-engine-go v0.1.0/go.mod h1:bkjFHAYc8NBV8SkTQyHRhqBebbIsZyFv8mX5r/PAjcM=
 github.com/hashicorp/aws-sdk-go-base v0.6.0/go.mod h1:2fRjWDv3jJBeN6mVWFHV6hFTNeFBx2gpDLQaZNxUVAY=
