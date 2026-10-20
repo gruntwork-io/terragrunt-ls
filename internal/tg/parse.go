@@ -13,6 +13,7 @@ import (
 	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
 	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
+	"github.com/gruntwork-io/terragrunt/pkg/options"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
@@ -40,7 +41,11 @@ func newParsingContext(ctx context.Context, tgLogger tgLog.Logger, filename stri
 		}),
 	}
 
-	ctx, pctx := config.NewParsingContext(ctx, tgLogger)
+	ctx, pctx := config.NewParsingContext(
+		ctx,
+		tgLogger,
+		config.WithStrictControls(options.NewTerragruntOptions().StrictControls),
+	)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
 	pctx.SkipOutput = true
