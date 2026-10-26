@@ -196,6 +196,13 @@ func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 	// Check that the characters immediately before the dot match a known keyword.
 	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based, convert to 0-based
 
+	// Diagnostics may point at a different file than the buffer being parsed
+	// (e.g. an included config), so the position can exceed this buffer's
+	// line length. Slicing with it would panic.
+	if col > len(lines[line]) {
+		return false
+	}
+
 	for _, keyword := range unresolvableKeywords {
 		kLen := len(keyword)
 
