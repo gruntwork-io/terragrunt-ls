@@ -29,6 +29,19 @@ func TestIsUnresolvableAttributeDiag(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "column just past a line ending in a keyword must not match",
+			diag: &hcl.Diagnostic{
+				Summary: UnsupportedAttributeSummary,
+				Subject: &hcl.Range{
+					// One past the end of the line: valid to slice, but the
+					// position cannot point at a dot in this buffer.
+					Start: hcl.Pos{Line: 1, Column: 13},
+				},
+			},
+			text: "foo = values\n",
+			want: false,
+		},
+		{
 			name: "diagnostic column beyond buffer line must not panic",
 			diag: &hcl.Diagnostic{
 				Summary: UnsupportedAttributeSummary,

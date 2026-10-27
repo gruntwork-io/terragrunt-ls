@@ -199,7 +199,7 @@ func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 	// Diagnostics may point at a different file than the buffer being parsed
 	// (e.g. an included config), so the position can exceed this buffer's
 	// line length. Slicing with it would panic.
-	if col > len(lines[line]) {
+	if col >= len(lines[line]) {
 		return false
 	}
 
