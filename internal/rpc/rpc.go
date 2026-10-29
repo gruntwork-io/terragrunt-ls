@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+const contentLengthPrefix = "Content-Length: "
+
 func EncodeMessage(msg any) string {
 	content, err := json.Marshal(msg)
 	if err != nil {
@@ -29,10 +31,7 @@ func DecodeMessage(msg []byte) (string, []byte, error) {
 		return "", nil, errors.New("did not find separator")
 	}
 
-	// Content-Length: <number>
-	contentLengthBytes := header[len("Content-Length: "):]
-
-	contentLength, err := strconv.Atoi(string(contentLengthBytes))
+	contentLength, err := parseContentLength(header)
 	if err != nil {
 		return "", nil, err
 	}
@@ -54,10 +53,7 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 		return 0, nil, nil
 	}
 
-	// Content-Length: <number>
-	contentLengthBytes := header[len("Content-Length: "):]
-
-	contentLength, err := strconv.Atoi(string(contentLengthBytes))
+	contentLength, err := parseContentLength(header)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -71,4 +67,23 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	totalLength := len(header) + lenOfTwoRNs + contentLength
 
 	return totalLength, data[:totalLength], nil
+}
+
+// parseContentLength reads the body length from a `Content-Length: <number>` header.
+func parseContentLength(header []byte) (int, error) {
+	contentLengthBytes, found := bytes.CutPrefix(header, []byte(contentLengthPrefix))
+	if !found {
+		return 0, MissingContentLengthError{Header: string(header)}
+	}
+
+	contentLength, err := strconv.Atoi(string(contentLengthBytes))
+	if err != nil {
+		return 0, err
+	}
+
+	if contentLength < 0 {
+		return 0, NegativeContentLengthError{ContentLength: contentLength}
+	}
+
+	return contentLength, nil
 }

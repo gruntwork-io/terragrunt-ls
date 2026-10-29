@@ -11,19 +11,24 @@ import (
 func GetCursorWord(document string, position protocol.Position) string {
 	scanner := bufio.NewScanner(strings.NewReader(document))
 	for i := 0; i <= int(position.Line); i++ {
-		scanner.Scan()
+		if !scanner.Scan() {
+			return ""
+		}
 	}
 
 	line := scanner.Text()
 
+	// LSP treats a character past the end of the line as the end of the line.
+	character := min(position.Character, uint32(len(line)))
+
 	// Find the start of the word
-	start := position.Character
-	for start > 0 && int(start) <= len(line) && isWordChar(line[start-1]) {
+	start := character
+	for start > 0 && isWordChar(line[start-1]) {
 		start--
 	}
 
 	// Find the end of the word
-	end := position.Character
+	end := character
 	for int(end) < len(line) && isWordChar(line[end]) {
 		end++
 	}

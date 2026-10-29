@@ -53,6 +53,24 @@ func TestGetCursorWord(t *testing.T) {
 			position: protocol.Position{Line: 0, Character: 11},
 			expected: "world",
 		},
+		{
+			name:     "cursor past the end of the line",
+			document: "hello world",
+			position: protocol.Position{Line: 0, Character: 40},
+			expected: "world",
+		},
+		{
+			name:     "cursor past the end of a shorter line",
+			document: "hello\nhi",
+			position: protocol.Position{Line: 1, Character: 4},
+			expected: "hi",
+		},
+		{
+			name:     "line past the end of the document",
+			document: "hello\nworld",
+			position: protocol.Position{Line: 5, Character: 2},
+			expected: "",
+		},
 	}
 
 	for _, tt := range tc {
