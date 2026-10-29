@@ -36,6 +36,10 @@ func DecodeMessage(msg []byte) (string, []byte, error) {
 		return "", nil, err
 	}
 
+	if len(content) < contentLength {
+		return "", nil, TruncatedBodyError{ContentLength: contentLength, BodyLength: len(content)}
+	}
+
 	var baseMessage BaseMessage
 	if err := json.Unmarshal(content[:contentLength], &baseMessage); err != nil {
 		return "", nil, err
@@ -69,21 +73,25 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	return totalLength, data[:totalLength], nil
 }
 
-// parseContentLength reads the body length from a `Content-Length: <number>` header.
+// parseContentLength reads the body length from the `Content-Length: <number>` field of a header.
 func parseContentLength(header []byte) (int, error) {
-	contentLengthBytes, found := bytes.CutPrefix(header, []byte(contentLengthPrefix))
-	if !found {
-		return 0, MissingContentLengthError{Header: string(header)}
+	for field := range bytes.SplitSeq(header, []byte{'\r', '\n'}) {
+		contentLengthBytes, found := bytes.CutPrefix(field, []byte(contentLengthPrefix))
+		if !found {
+			continue
+		}
+
+		contentLength, err := strconv.Atoi(string(contentLengthBytes))
+		if err != nil {
+			return 0, err
+		}
+
+		if contentLength < 0 {
+			return 0, NegativeContentLengthError{ContentLength: contentLength}
+		}
+
+		return contentLength, nil
 	}
 
-	contentLength, err := strconv.Atoi(string(contentLengthBytes))
-	if err != nil {
-		return 0, err
-	}
-
-	if contentLength < 0 {
-		return 0, NegativeContentLengthError{ContentLength: contentLength}
-	}
-
-	return contentLength, nil
+	return 0, MissingContentLengthError{Header: string(header)}
 }

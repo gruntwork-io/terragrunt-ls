@@ -65,6 +65,18 @@ func TestSplit(t *testing.T) {
 			expectedToken:   "Content-Length: 2\r\n\r\n{}",
 		},
 		{
+			name:            "Content-Type after Content-Length",
+			data:            "Content-Length: 2\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{}",
+			expectedAdvance: 80,
+			expectedToken:   "Content-Length: 2\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{}",
+		},
+		{
+			name:            "Content-Type before Content-Length",
+			data:            "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: 2\r\n\r\n{}",
+			expectedAdvance: 80,
+			expectedToken:   "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: 2\r\n\r\n{}",
+		},
+		{
 			name: "body not fully read yet",
 			data: "Content-Length: 5\r\n\r\n{}",
 		},
@@ -81,6 +93,11 @@ func TestSplit(t *testing.T) {
 			name:        "empty header",
 			data:        "\r\n\r\n",
 			expectedErr: rpc.MissingContentLengthError{Header: ""},
+		},
+		{
+			name:        "header without Content-Length",
+			data:        "Content-Type: application/vscode-jsonrpc\r\n\r\n{}",
+			expectedErr: rpc.MissingContentLengthError{Header: "Content-Type: application/vscode-jsonrpc"},
 		},
 		{
 			name:        "Content-Length that is not a number",
@@ -117,11 +134,50 @@ func TestSplit(t *testing.T) {
 	}
 }
 
-func TestDecodeRejectsMalformedHeader(t *testing.T) {
+func TestDecodeMessage(t *testing.T) {
 	t.Parallel()
 
-	method, content, err := rpc.DecodeMessage([]byte("X\r\n\r\n{}"))
-	require.ErrorIs(t, err, rpc.MissingContentLengthError{Header: "X"})
-	assert.Empty(t, method)
-	assert.Nil(t, content)
+	tc := []struct {
+		expectedErr     error
+		name            string
+		msg             string
+		expectedMethod  string
+		expectedContent string
+	}{
+		{
+			name:            "Content-Type header",
+			msg:             "Content-Length: 15\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{\"method\":\"hi\"}",
+			expectedMethod:  "hi",
+			expectedContent: "{\"method\":\"hi\"}",
+		},
+		{
+			name:        "header without Content-Length",
+			msg:         "X\r\n\r\n{}",
+			expectedErr: rpc.MissingContentLengthError{Header: "X"},
+		},
+		{
+			name:        "body shorter than Content-Length",
+			msg:         "Content-Length: 10\r\n\r\n{}",
+			expectedErr: rpc.TruncatedBodyError{ContentLength: 10, BodyLength: 2},
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			method, content, err := rpc.DecodeMessage([]byte(tt.msg))
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+				assert.Empty(t, method)
+				assert.Nil(t, content)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedMethod, method)
+			assert.Equal(t, tt.expectedContent, string(content))
+		})
+	}
 }

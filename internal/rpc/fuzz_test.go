@@ -47,6 +47,7 @@ func FuzzSplit(f *testing.F) {
 func FuzzScanMessages(f *testing.F) {
 	f.Add([]byte("Content-Length: 15\r\n\r\n{\"method\":\"hi\"}Content-Length: 15\r\n\r\n{\"method\":\"yo\"}"))
 	f.Add([]byte("Content-Length: 2\r\n\r\n{}Content-Length: 1\r\n\r\n["))
+	f.Add([]byte("Content-Length: 15\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{\"method\":\"hi\"}"))
 	// Regression: an empty header panicked.
 	f.Add([]byte("\r\n\r\n"))
 
