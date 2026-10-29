@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+const contentLengthPrefix = "Content-Length: "
+
 func EncodeMessage(msg any) string {
 	content, err := json.Marshal(msg)
 	if err != nil {
@@ -23,18 +25,20 @@ type BaseMessage struct {
 	Method string `json:"method"`
 }
 
+// DecodeMessage returns the method and the JSON body of one framed LSP message.
 func DecodeMessage(msg []byte) (string, []byte, error) {
 	header, content, found := bytes.Cut(msg, []byte{'\r', '\n', '\r', '\n'})
 	if !found {
 		return "", nil, errors.New("did not find separator")
 	}
 
-	// Content-Length: <number>
-	contentLengthBytes := header[len("Content-Length: "):]
-
-	contentLength, err := strconv.Atoi(string(contentLengthBytes))
+	contentLength, err := parseContentLength(header)
 	if err != nil {
 		return "", nil, err
+	}
+
+	if len(content) < contentLength {
+		return "", nil, TruncatedBodyError{ContentLength: contentLength, BodyLength: len(content)}
 	}
 
 	var baseMessage BaseMessage
@@ -54,10 +58,7 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 		return 0, nil, nil
 	}
 
-	// Content-Length: <number>
-	contentLengthBytes := header[len("Content-Length: "):]
-
-	contentLength, err := strconv.Atoi(string(contentLengthBytes))
+	contentLength, err := parseContentLength(header)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -71,4 +72,37 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	totalLength := len(header) + lenOfTwoRNs + contentLength
 
 	return totalLength, data[:totalLength], nil
+}
+
+// parseContentLength reads the body length from the `Content-Length: <number>` fields of a header.
+func parseContentLength(header []byte) (int, error) {
+	contentLength, seen := 0, false
+
+	for field := range bytes.SplitSeq(header, []byte{'\r', '\n'}) {
+		contentLengthBytes, found := bytes.CutPrefix(field, []byte(contentLengthPrefix))
+		if !found {
+			continue
+		}
+
+		fieldLength, err := strconv.Atoi(string(bytes.TrimSpace(contentLengthBytes)))
+		if err != nil {
+			return 0, err
+		}
+
+		if fieldLength < 0 {
+			return 0, NegativeContentLengthError{ContentLength: fieldLength}
+		}
+
+		if seen && fieldLength != contentLength {
+			return 0, ConflictingContentLengthError{ContentLength: contentLength, OtherContentLength: fieldLength}
+		}
+
+		contentLength, seen = fieldLength, true
+	}
+
+	if !seen {
+		return 0, MissingContentLengthError{Header: string(header)}
+	}
+
+	return contentLength, nil
 }

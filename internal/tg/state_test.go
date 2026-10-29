@@ -238,7 +238,7 @@ func TestState_Hover(t *testing.T) {
 			expected: lsp.HoverResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
@@ -262,7 +262,7 @@ func TestState_Hover(t *testing.T) {
 			expected: lsp.HoverResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
@@ -343,7 +343,7 @@ func TestState_Definition(t *testing.T) {
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: protocol.Location{
 					URI: unitURI,
@@ -372,7 +372,7 @@ func TestState_Definition(t *testing.T) {
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: protocol.Location{
 					URI: rootURI,
@@ -401,7 +401,7 @@ func TestState_Definition(t *testing.T) {
 			expected: lsp.DefinitionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: protocol.Location{
 					URI: vpcURI,
@@ -461,7 +461,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			expected: lsp.CompletionResponse{
 				Response: lsp.Response{
 					RPC: "2.0",
-					ID:  testutils.PointerOfInt(1),
+					ID:  new(1),
 				},
 				Result: []protocol.CompletionItem{
 					{

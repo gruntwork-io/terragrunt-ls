@@ -1,8 +1,12 @@
 package rpc_test
 
 import (
+	"strconv"
 	"terragrunt-ls/internal/rpc"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type EncodingExample struct {
@@ -35,5 +39,164 @@ func TestDecode(t *testing.T) {
 
 	if method != "hi" {
 		t.Fatalf("Expected: 'hi', Got: %s", method)
+	}
+}
+
+// TestSplit tests that Split returns one whole message at a time and rejects a malformed header.
+func TestSplit(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		expectedErr     error
+		name            string
+		data            string
+		expectedToken   string
+		expectedAdvance int
+	}{
+		{
+			name:            "complete message",
+			data:            "Content-Length: 2\r\n\r\n{}",
+			expectedAdvance: 23,
+			expectedToken:   "Content-Length: 2\r\n\r\n{}",
+		},
+		{
+			name:            "first of two messages",
+			data:            "Content-Length: 2\r\n\r\n{}Content-Length: 2\r\n\r\n[]",
+			expectedAdvance: 23,
+			expectedToken:   "Content-Length: 2\r\n\r\n{}",
+		},
+		{
+			name:            "Content-Type after Content-Length",
+			data:            "Content-Length: 2\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{}",
+			expectedAdvance: 80,
+			expectedToken:   "Content-Length: 2\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{}",
+		},
+		{
+			name:            "Content-Type before Content-Length",
+			data:            "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: 2\r\n\r\n{}",
+			expectedAdvance: 80,
+			expectedToken:   "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: 2\r\n\r\n{}",
+		},
+		{
+			name:            "repeated Content-Length with the same value",
+			data:            "Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}",
+			expectedAdvance: 42,
+			expectedToken:   "Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}",
+		},
+		{
+			name:            "spaces around the Content-Length value",
+			data:            "Content-Length:  2 \r\n\r\n{}",
+			expectedAdvance: 25,
+			expectedToken:   "Content-Length:  2 \r\n\r\n{}",
+		},
+		{
+			name: "body not fully read yet",
+			data: "Content-Length: 5\r\n\r\n{}",
+		},
+		{
+			name: "header not fully read yet",
+			data: "Content-Length: 2\r\n",
+		},
+		{
+			name:        "header shorter than Content-Length",
+			data:        "X\r\n\r\n{}",
+			expectedErr: rpc.MissingContentLengthError{Header: "X"},
+		},
+		{
+			name:        "empty header",
+			data:        "\r\n\r\n",
+			expectedErr: rpc.MissingContentLengthError{Header: ""},
+		},
+		{
+			name:        "header without Content-Length",
+			data:        "Content-Type: application/vscode-jsonrpc\r\n\r\n{}",
+			expectedErr: rpc.MissingContentLengthError{Header: "Content-Type: application/vscode-jsonrpc"},
+		},
+		{
+			name:        "conflicting Content-Length fields",
+			data:        "Content-Length: 2\r\nContent-Length: 15\r\n\r\n{}",
+			expectedErr: rpc.ConflictingContentLengthError{ContentLength: 2, OtherContentLength: 15},
+		},
+		{
+			name:        "Content-Length that is not a number",
+			data:        "Content-Length: two\r\n\r\n{}",
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			name:        "negative Content-Length",
+			data:        "Content-Length: -100\r\n\r\n{}",
+			expectedErr: rpc.NegativeContentLengthError{ContentLength: -100},
+		},
+		{
+			name:        "Content-Length that points inside the header",
+			data:        "Content-Length: -4\r\n\r\n{}",
+			expectedErr: rpc.NegativeContentLengthError{ContentLength: -4},
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			advance, token, err := rpc.Split([]byte(tt.data), false)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedAdvance, advance)
+			assert.Equal(t, tt.expectedToken, string(token))
+		})
+	}
+}
+
+// TestDecodeMessage tests that DecodeMessage reads the method and body, and rejects a malformed message.
+func TestDecodeMessage(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		expectedErr     error
+		name            string
+		msg             string
+		expectedMethod  string
+		expectedContent string
+	}{
+		{
+			name:            "Content-Type header",
+			msg:             "Content-Length: 15\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{\"method\":\"hi\"}",
+			expectedMethod:  "hi",
+			expectedContent: "{\"method\":\"hi\"}",
+		},
+		{
+			name:        "header without Content-Length",
+			msg:         "X\r\n\r\n{}",
+			expectedErr: rpc.MissingContentLengthError{Header: "X"},
+		},
+		{
+			name:        "body shorter than Content-Length",
+			msg:         "Content-Length: 10\r\n\r\n{}",
+			expectedErr: rpc.TruncatedBodyError{ContentLength: 10, BodyLength: 2},
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			method, content, err := rpc.DecodeMessage([]byte(tt.msg))
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+				assert.Empty(t, method)
+				assert.Nil(t, content)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedMethod, method)
+			assert.Equal(t, tt.expectedContent, string(content))
+		})
 	}
 }

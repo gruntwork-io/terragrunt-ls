@@ -51,10 +51,6 @@ func (tw testWriter) Close() error {
 	return nil
 }
 
-func PointerOfInt(i int) *int {
-	return &i
-}
-
 func CreateFile(dir, name, content string) (string, error) {
 	const ownerRWGlobalR = 0644
 
