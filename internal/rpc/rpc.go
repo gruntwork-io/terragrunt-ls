@@ -25,6 +25,7 @@ type BaseMessage struct {
 	Method string `json:"method"`
 }
 
+// DecodeMessage returns the method and the JSON body of one framed LSP message.
 func DecodeMessage(msg []byte) (string, []byte, error) {
 	header, content, found := bytes.Cut(msg, []byte{'\r', '\n', '\r', '\n'})
 	if !found {
@@ -73,25 +74,35 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	return totalLength, data[:totalLength], nil
 }
 
-// parseContentLength reads the body length from the `Content-Length: <number>` field of a header.
+// parseContentLength reads the body length from the `Content-Length: <number>` fields of a header.
 func parseContentLength(header []byte) (int, error) {
+	contentLength, seen := 0, false
+
 	for field := range bytes.SplitSeq(header, []byte{'\r', '\n'}) {
 		contentLengthBytes, found := bytes.CutPrefix(field, []byte(contentLengthPrefix))
 		if !found {
 			continue
 		}
 
-		contentLength, err := strconv.Atoi(string(contentLengthBytes))
+		fieldLength, err := strconv.Atoi(string(bytes.TrimSpace(contentLengthBytes)))
 		if err != nil {
 			return 0, err
 		}
 
-		if contentLength < 0 {
-			return 0, NegativeContentLengthError{ContentLength: contentLength}
+		if fieldLength < 0 {
+			return 0, NegativeContentLengthError{ContentLength: fieldLength}
 		}
 
-		return contentLength, nil
+		if seen && fieldLength != contentLength {
+			return 0, ConflictingContentLengthError{ContentLength: contentLength, OtherContentLength: fieldLength}
+		}
+
+		contentLength, seen = fieldLength, true
 	}
 
-	return 0, MissingContentLengthError{Header: string(header)}
+	if !seen {
+		return 0, MissingContentLengthError{Header: string(header)}
+	}
+
+	return contentLength, nil
 }

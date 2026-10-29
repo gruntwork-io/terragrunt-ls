@@ -20,6 +20,16 @@ func (err NegativeContentLengthError) Error() string {
 	return fmt.Sprintf("message header declares a negative Content-Length of %d, expected the body length in bytes", err.ContentLength)
 }
 
+// ConflictingContentLengthError is returned when a message header has two `Content-Length` fields with different values.
+type ConflictingContentLengthError struct {
+	ContentLength      int
+	OtherContentLength int
+}
+
+func (err ConflictingContentLengthError) Error() string {
+	return fmt.Sprintf("message header declares a Content-Length of %d and of %d, expected one Content-Length with the body length in bytes", err.ContentLength, err.OtherContentLength)
+}
+
 // TruncatedBodyError is returned when a message body is shorter than the Content-Length in its header.
 type TruncatedBodyError struct {
 	ContentLength int

@@ -50,7 +50,7 @@ To fuzz every test in the module for 30 seconds each:
 
 Set `FUZZ_TIME` to change the time per test, for example `FUZZ_TIME=2m`. A failing fuzz test does not stop the script. It runs the rest, then lists the failures and exits non-zero.
 
-The `Fuzz` workflow runs the same script every day, on every push to `main`, and on demand. It keeps the generated corpus in the Actions cache between runs. When a fuzz test fails, the workflow uploads the failing input as the `fuzz-failures` artifact.
+The `Fuzz` workflow runs the same script every day, on every push to `main`, and on demand. It keeps the generated corpus in the Actions cache between runs and starts a new corpus every week. Go replays the whole corpus before it fuzzes, and that replay counts toward `-fuzztime`, so a corpus that keeps growing would leave no time to fuzz. When a fuzz test fails, the workflow uploads the failing input as the `fuzz-failures` artifact.
 
 To keep a failing input as a regression test, add it as an `f.Add` seed in that fuzz test. Put the seed and the fix in the same pull request, or `go test ./...` fails until the fix lands.
 

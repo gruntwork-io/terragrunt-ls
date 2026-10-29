@@ -8,6 +8,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
+// TestGetCursorWord tests the word found at a position, including positions past the end of a line or the document.
 func TestGetCursorWord(t *testing.T) {
 	t.Parallel()
 

@@ -35,8 +35,12 @@ jobs:
         echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
+    - id: corpus-week
+      run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+    # Restore only, so the fuzz corpus never lands in the build cache that test, lint and build save.
     - name: Go Build Cache
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
@@ -49,13 +53,15 @@ jobs:
 
     # Keyed by run id, not by commit: main rarely moves, and a key that already
     # exists is never saved again, so a per-commit key would stop the corpus growing.
+    # The week in the key starts a new corpus each week. Go replays the corpus inside
+    # -fuzztime before it fuzzes, so a corpus that only grows would use up FUZZ_TIME.
     - name: Fuzz Corpus Cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}/fuzz
-        key: ${{ runner.os }}-fuzz-corpus-${{ github.run_id }}
+        key: ${{ runner.os }}-fuzz-corpus-${{ steps.corpus-week.outputs.week }}-${{ github.run_id }}
         restore-keys: |
-          ${{ runner.os }}-fuzz-corpus-
+          ${{ runner.os }}-fuzz-corpus-${{ steps.corpus-week.outputs.week }}-
 
     - name: Run Fuzz Tests
       run: ./.github/scripts/run-fuzz.sh
