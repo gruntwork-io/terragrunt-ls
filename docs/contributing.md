@@ -32,6 +32,28 @@ go test ./...
 
 This will run all the tests for the project.
 
+### Fuzzing
+
+Packages that read client input have Go fuzz tests in `fuzz_test.go` files. `go test ./...` runs the seed inputs of each fuzz test as normal tests. The seeds include past crash inputs, so `go test ./...` fails if one of those crashes comes back.
+
+To fuzz one test for a minute:
+
+```bash
+go test ./internal/rpc/ -run '^$' -fuzz '^FuzzSplit$' -fuzztime=60s
+```
+
+To fuzz every test in the module for 30 seconds each:
+
+```bash
+./.github/scripts/run-fuzz.sh
+```
+
+Set `FUZZ_TIME` to change the time per test, for example `FUZZ_TIME=2m`. A failing fuzz test does not stop the script. It runs the rest, then lists the failures and exits non-zero.
+
+The `Fuzz` workflow runs the same script every day, on every push to `main`, and on demand. It keeps the generated corpus in the Actions cache between runs. When a fuzz test fails, the workflow uploads the failing input as the `fuzz-failures` artifact.
+
+To keep a failing input as a regression test, add it as an `f.Add` seed in that fuzz test. Put the seed and the fix in the same pull request, or `go test ./...` fails until the fix lands.
+
 ## Linting
 
 To lint the project, you can run the following command:
