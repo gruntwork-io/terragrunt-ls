@@ -62,7 +62,7 @@ jobs:
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
     - name: Test
-      run: go test -race ./...
+      run: go test ./...
 
   # The main branch ruleset requires a check named test, so this job reports the result of every OS under that name.
   test:

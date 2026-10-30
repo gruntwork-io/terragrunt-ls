@@ -36,7 +36,7 @@ go test ./...
 
 This will run all the tests for the project.
 
-CI runs `go test -race ./...` on Linux, macOS and Windows.
+The `Test` workflow runs `go test ./...` on Linux, macOS and Windows. The `Race Test` workflow runs `go test -race ./...` on Linux.
 
 ### Fuzzing
 
