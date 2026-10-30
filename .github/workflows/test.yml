@@ -7,18 +7,40 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  test-os:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos, windows]
+
+    defaults:
+      run:
+        # Windows defaults to PowerShell, which does not expand $GITHUB_OUTPUT.
+        shell: bash
 
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     - name: Set up mise
       uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
       with:
         version: 2025.6.8
         experimental: true
+        # The tests need only Go. The other tools in mise.toml are for the editor clients and CI checks.
+        install_args: go
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,4 +62,20 @@ jobs:
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
     - name: Test
-      run: go test ./...
+      run: go test -race ./...
+
+  # The main branch ruleset requires a check named test, so this job reports the result of every OS under that name.
+  test:
+    needs: [test-os]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check results
+      env:
+        RESULT: ${{ needs.test-os.result }}
+      run: |
+        if [[ "$RESULT" != "success" ]]; then
+          echo "::error::Tests did not pass on every OS: $RESULT"
+          exit 1
+        fi
