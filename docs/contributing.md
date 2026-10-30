@@ -12,6 +12,10 @@ mise install
 
 This will install all the necessary dependencies for the project.
 
+### Dependency updates
+
+Dependabot opens one grouped pull request a week for each of Go modules, GitHub Actions, the VS Code extension (npm) and the Zed extension (cargo). A Terragrunt bump gets its own pull request, because it changes how the server parses files. Security updates still come one pull request per advisory.
+
 ## Building
 
 To build the project, you can run the following command:
@@ -31,6 +35,8 @@ go test ./...
 ```
 
 This will run all the tests for the project.
+
+The `Test` workflow runs `go test ./...` on Linux, macOS and Windows. The `Race Test` workflow runs `go test -race ./...` on Linux.
 
 ### Fuzzing
 
@@ -63,6 +69,30 @@ golangci-lint run ./...
 ```
 
 This will run the linter on the project.
+
+## Static checks
+
+The `Static Checks` workflow runs these commands on every pull request. `mise install` installs the tools.
+
+```bash
+codespell
+go fix -diff ./...
+go mod tidy -diff
+git ls-files -z '*.sh' | xargs -0 -r shellcheck -x
+```
+
+`go fix -diff` and `go mod tidy -diff` print the changes they would make. Run them without `-diff` to apply the changes. On Go 1.26, `go fix -diff` exits 0 even when it prints a diff, so read its output.
+
+## Vulnerabilities
+
+The `Govulncheck` workflow runs `govulncheck` on every pull request and every Monday. A pull request fails only when it adds a vulnerability that the code can reach. The weekly run fails while any reachable vulnerability is left.
+
+To check the whole module, or only what your branch adds since `origin/main`:
+
+```bash
+govulncheck ./...
+./.github/scripts/govulncheck.sh origin/main
+```
 
 ## Logging
 

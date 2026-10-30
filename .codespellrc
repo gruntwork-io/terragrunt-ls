@@ -1,0 +1,4 @@
+[codespell]
+skip = go.sum,package-lock.json,Cargo.lock,node_modules,out,target
+# notIn is a key in the VS Code language configuration.
+ignore-words-list = notIn

@@ -1,0 +1,78 @@
+name: Static Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+
+    - name: Set up mise
+      uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+      with:
+        version: 2025.6.8
+        experimental: true
+        install_args: go shellcheck pipx:codespell
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - id: go-cache-paths
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - name: Go Build Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+    - name: Go Mod Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: codespell
+      if: ${{ !cancelled() }}
+      run: codespell
+
+    # On Go 1.26, go fix -diff exits 0 even when it prints a diff, so fail on any output.
+    - name: go fix
+      if: ${{ !cancelled() }}
+      run: |
+        diff=$(go fix -diff ./...)
+        if [[ -n "$diff" ]]; then
+          echo "$diff"
+          echo "::error::go fix has changes to apply. Run 'go fix ./...' and commit the result."
+          exit 1
+        fi
+
+    - name: go mod tidy
+      if: ${{ !cancelled() }}
+      run: |
+        if ! go mod tidy -diff; then
+          echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the result."
+          exit 1
+        fi
+
+    - name: shellcheck
+      if: ${{ !cancelled() }}
+      run: git ls-files -z '*.sh' | xargs -0 -r shellcheck -x

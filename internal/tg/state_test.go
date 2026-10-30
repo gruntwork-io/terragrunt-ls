@@ -200,8 +200,11 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			require.Len(t, state.Configs, 1)
 
+			// State keys documents by file name, which has backslashes on Windows.
+			filename := filepath.FromSlash("/foo/terragrunt.hcl")
+
 			if len(tt.expected) != 0 {
-				assert.Equal(t, tt.expected, state.Configs["/foo/terragrunt.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expected, state.Configs[filename].Cfg.Locals)
 			}
 
 			diags = state.UpdateDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.updated)
@@ -210,7 +213,7 @@ func TestState_UpdateDocument(t *testing.T) {
 			assert.Len(t, state.Configs, 1)
 
 			if len(tt.expectedUpdated) != 0 {
-				assert.Equal(t, tt.expectedUpdated, state.Configs["/foo/terragrunt.hcl"].Cfg.Locals)
+				assert.Equal(t, tt.expectedUpdated, state.Configs[filename].Cfg.Locals)
 			}
 		})
 	}
