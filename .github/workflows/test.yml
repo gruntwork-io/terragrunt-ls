@@ -39,8 +39,6 @@ jobs:
       with:
         version: 2025.6.8
         experimental: true
-        # The tests need only Go. The other tools in mise.toml are for the editor clients and CI checks.
-        install_args: go
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

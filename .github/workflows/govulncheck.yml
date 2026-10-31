@@ -33,7 +33,6 @@ jobs:
       with:
         version: 2025.6.8
         experimental: true
-        install_args: go go:golang.org/x/vuln/cmd/govulncheck
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

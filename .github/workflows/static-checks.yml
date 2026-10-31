@@ -29,7 +29,6 @@ jobs:
       with:
         version: 2025.6.8
         experimental: true
-        install_args: go shellcheck pipx:codespell
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

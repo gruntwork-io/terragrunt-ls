@@ -28,7 +28,6 @@ jobs:
       with:
         version: 2025.6.8
         experimental: true
-        install_args: go
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
