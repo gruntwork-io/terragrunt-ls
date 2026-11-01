@@ -36,7 +36,7 @@ go test ./...
 
 This will run all the tests for the project.
 
-The `Test` workflow runs `go test ./...` on Linux, macOS and Windows. The `Race Test` workflow runs `go test -race ./...` on Linux.
+The `Test` workflow runs `go test ./...` on Linux, macOS and Windows. The `Race Test` workflow runs `go test -race ./...` on Linux. Every other workflow, including every code check, runs on Linux only.
 
 ### Fuzzing
 

@@ -17,9 +17,10 @@ if [[ -z "$base" ]]; then
 fi
 
 # Print the IDs of the reachable vulnerabilities in the module at $1. A finding
-# is reachable when its trace starts in a function.
+# is reachable when its trace starts in a function. -C keeps the current
+# directory, so a mise shim still finds govulncheck in this checkout's mise.toml.
 reachable() {
-	(cd "$1" && govulncheck -format json ./...) |
+	govulncheck -C "$1" -format json ./... |
 		jq -r 'select(.finding.trace[0].function != null) | .finding.osv' |
 		sort -u
 }
