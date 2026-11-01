@@ -83,17 +83,6 @@ git ls-files -z '*.sh' | xargs -0 -r shellcheck -x
 
 `go fix -diff` and `go mod tidy -diff` print the changes they would make. Run them without `-diff` to apply the changes. On Go 1.26, `go fix -diff` exits 0 even when it prints a diff, so read its output.
 
-## Vulnerabilities
-
-The `Govulncheck` workflow runs `govulncheck` on every pull request and every Monday. A pull request fails only when it adds a vulnerability that the code can reach. The weekly run fails while any reachable vulnerability is left.
-
-To check the whole module, or only what your branch adds since `origin/main`:
-
-```bash
-govulncheck ./...
-./.github/scripts/govulncheck.sh origin/main
-```
-
 ## Logging
 
 The terragrunt-ls language server includes basic logging capabilities to help with development and debugging. The logging system is built on Go's structured logging (`slog`) package and provides multiple log levels and output formats.
