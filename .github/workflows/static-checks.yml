@@ -49,7 +49,6 @@ jobs:
       if: ${{ !cancelled() }}
       run: codespell
 
-    # On Go 1.26, go fix -diff exits 0 even when it prints a diff, so fail on any output.
     - name: go fix
       if: ${{ !cancelled() }}
       run: |

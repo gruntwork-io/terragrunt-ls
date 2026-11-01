@@ -81,7 +81,7 @@ go mod tidy -diff
 git ls-files -z '*.sh' | xargs -0 -r shellcheck -x
 ```
 
-`go fix -diff` and `go mod tidy -diff` print the changes they would make. Run them without `-diff` to apply the changes. On Go 1.26, `go fix -diff` exits 0 even when it prints a diff, so read its output.
+`go fix -diff` and `go mod tidy -diff` print the changes they would make. Run them without `-diff` to apply the changes.
 
 ## Logging
 
