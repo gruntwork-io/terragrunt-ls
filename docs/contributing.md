@@ -10,7 +10,7 @@ To get started with development, you will want to install [mise](https://mise.jd
 mise install
 ```
 
-This will install all the necessary dependencies for the project.
+This will install all the necessary dependencies for the project. mise installs codespell with `pipx` or `uv`, so install one of them first. On Windows, `mise install` skips golangci-lint, lua, shellcheck and codespell, so run the code checks on Linux or macOS.
 
 ### Dependency updates
 
@@ -72,16 +72,16 @@ This will run the linter on the project.
 
 ## Static checks
 
-The `Static Checks` workflow runs these commands on every pull request. `mise install` installs the tools.
+The `Static Checks` workflow runs these mise tasks on every pull request:
 
 ```bash
-codespell
-go fix -diff ./...
-go mod tidy -diff
-git ls-files -z '*.sh' | xargs -0 -r shellcheck -x
+mise run check:codespell
+mise run check:go-fix
+mise run check:go-mod-tidy
+mise run check:shellcheck
 ```
 
-`go fix -diff` and `go mod tidy -diff` print the changes they would make. Run them without `-diff` to apply the changes.
+`check:go-fix` and `check:go-mod-tidy` print the changes they want. Run `go fix ./...` or `go mod tidy` to apply them.
 
 ## Logging
 

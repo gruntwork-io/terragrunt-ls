@@ -7,3 +7,22 @@ rust = "1.85.1"
 "go:github.com/goph/licensei/cmd/licensei" = "v0.9.0"
 shellcheck = "0.11.0"
 "pipx:codespell" = { version = "2.4.1", os = ["linux", "macos"] }
+
+[tasks."check:codespell"]
+run = "codespell"
+
+[tasks."check:go-fix"]
+run = '''
+diff=$(go fix -diff ./...)
+if [ -n "$diff" ]; then
+  echo "$diff"
+  echo "go fix has changes to apply. Run 'go fix ./...' and commit the result." >&2
+  exit 1
+fi
+'''
+
+[tasks."check:go-mod-tidy"]
+run = "go mod tidy -diff"
+
+[tasks."check:shellcheck"]
+run = "git ls-files -z '*.sh' | xargs -0 -r shellcheck -x"
