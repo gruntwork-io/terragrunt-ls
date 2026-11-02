@@ -8,15 +8,50 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 3
     cooldown:
       default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 3
     cooldown:
       default-days: 7
+    groups:
+      # A Terragrunt bump changes how the server parses files, so it gets its own pull request.
+      go-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "github.com/gruntwork-io/terragrunt"
+
+  - package-ecosystem: "npm"
+    directory: "/vscode-extension"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "cargo"
+    directory: "/zed-extension"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
