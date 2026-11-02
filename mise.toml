@@ -1,8 +1,6 @@
 [tools]
 go = "1.26.2"
-# mise 2025.6.8 for Windows has no built-in aqua registry, so it cannot install golangci-lint.
 golangci-lint = { version = "2.11.4", os = ["linux", "macos"] }
-# mise installs lua with an asdf plugin, which does not run on Windows.
 lua = { version = "5.4.7", os = ["linux", "macos"] }
 node = "23.10.0"
 rust = "1.85.1"
