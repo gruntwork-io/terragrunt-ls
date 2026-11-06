@@ -79,20 +79,20 @@
 		"lint": "eslint"
 	},
 	"dependencies": {
-		"glob": "12.0.0",
-		"vscode-languageclient": "^9.0.1"
+		"glob": "14.0.3",
+		"vscode-languageclient": "^11.0.0"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.13.0",
-		"@stylistic/eslint-plugin": "^2.9.0",
+		"@eslint/js": "^10.0.1",
+		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/mocha": "^10.0.6",
-		"@types/node": "^20",
-		"@types/vscode": "^1.75.1",
-		"@vscode/test-electron": "^2.3.9",
-		"eslint": "^9.13.0",
+		"@types/node": "^26",
+		"@types/vscode": "^1.144.0",
+		"@vscode/test-electron": "^3.1.0",
+		"eslint": "^10.14.0",
 		"mocha": "^12.0.3",
-		"nodemon": "^3.1.9",
-		"typescript": "^5.8.2",
-		"typescript-eslint": "^8.26.0"
+		"nodemon": "^3.1.14",
+		"typescript": "^7.0.2",
+		"typescript-eslint": "^8.72.1"
 	}
 }
