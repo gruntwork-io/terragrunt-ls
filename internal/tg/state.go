@@ -32,7 +32,7 @@ func NewState() State {
 	return State{Configs: map[string]store.Store{}}
 }
 
-func (s *State) OpenDocument(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) OpenDocument(ctx context.Context, l logger.Logger, docURI uri.URI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Opening document",
 		"uri", docURI,
@@ -42,7 +42,7 @@ func (s *State) OpenDocument(ctx context.Context, l logger.Logger, docURI protoc
 	return s.updateState(ctx, l, docURI, text)
 }
 
-func (s *State) UpdateDocument(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
+func (s *State) UpdateDocument(ctx context.Context, l logger.Logger, docURI uri.URI, text string) []protocol.Diagnostic {
 	l.Debug(
 		"Updating document",
 		"uri", docURI,
@@ -52,8 +52,8 @@ func (s *State) UpdateDocument(ctx context.Context, l logger.Logger, docURI prot
 	return s.updateState(ctx, l, docURI, text)
 }
 
-func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protocol.DocumentURI, text string) []protocol.Diagnostic {
-	filename := docURI.Filename()
+func (s *State) updateState(ctx context.Context, l logger.Logger, docURI uri.URI, text string) []protocol.Diagnostic {
+	filename := docURI.FsPath()
 	fileType := DetectFileType(filename)
 
 	// Ignore errors from AST indexing since we'll get the same errors from the Terragrunt parser just below
@@ -115,8 +115,8 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI protoco
 	return diags
 }
 
-func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.HoverResponse {
-	st, ok := s.Configs[docURI.Filename()]
+func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.HoverResponse {
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return newEmptyHoverResponse(id)
 	}
@@ -178,7 +178,7 @@ func (s *State) Hover(l logger.Logger, id int, docURI protocol.DocumentURI, posi
 			},
 			Result: lsp.HoverResult{
 				Contents: protocol.MarkupContent{
-					Kind:  protocol.Markdown,
+					Kind:  protocol.MarkupKindMarkdown,
 					Value: text.WrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
 				},
 			},
@@ -197,8 +197,8 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	}
 }
 
-func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
-	st, ok := s.Configs[docURI.Filename()]
+func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.DefinitionResponse {
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
@@ -256,7 +256,12 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 					"include", include,
 				)
 
-				defURI := uri.File(include.Path)
+				path := include.Path
+				if !filepath.IsAbs(path) {
+					path = filepath.Join(filepath.Dir(docURI.FsPath()), path)
+				}
+
+				defURI := uri.File(path)
 
 				l.Debug(
 					"URI of target",
@@ -310,10 +315,10 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 
 				defURI := uri.File(path)
 				if !filepath.IsAbs(path) {
-					defURI = uri.File(filepath.Join(filepath.Dir(docURI.Filename()), path, "terragrunt.hcl"))
+					defURI = uri.File(filepath.Join(filepath.Dir(docURI.FsPath()), path, "terragrunt.hcl"))
 				}
 
-				_, err := os.Stat(defURI.Filename())
+				_, err := os.Stat(defURI.FsPath())
 				if err != nil {
 					l.Warn(
 						"Dependency does not exist",
@@ -357,13 +362,13 @@ func (s *State) Definition(l logger.Logger, id int, docURI protocol.DocumentURI,
 
 // findLocalDefinition locates the `<name> = ...` declaration in the current
 // file's locals block. Returns the location of the bare identifier.
-func (s *State) findLocalDefinition(l logger.Logger, st store.Store, docURI protocol.DocumentURI, position protocol.Position, name string) (protocol.Location, bool) {
+func (s *State) findLocalDefinition(l logger.Logger, st store.Store, docURI uri.URI, position protocol.Position, name string) (protocol.Location, bool) {
 	target := rename.GetRenameTarget(l, st, position)
 	if target.Context != rename.RenameContextLocal || target.Name != name {
 		return protocol.Location{}, false
 	}
 
-	for _, occ := range rename.FindAllOccurrences(target, docURI.Filename(), st) {
+	for _, occ := range rename.FindAllOccurrences(target, docURI.FsPath(), st) {
 		if !occ.IsDefinition {
 			continue
 		}
@@ -377,7 +382,7 @@ func (s *State) findLocalDefinition(l logger.Logger, st store.Store, docURI prot
 	return protocol.Location{}, false
 }
 
-func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position protocol.Position) lsp.DefinitionResponse {
+func newEmptyDefinitionResponse(id int, docURI uri.URI, position protocol.Position) lsp.DefinitionResponse {
 	return lsp.DefinitionResponse{
 		Response: lsp.Response{
 			RPC: lsp.RPCVersion,
@@ -393,8 +398,8 @@ func newEmptyDefinitionResponse(id int, docURI protocol.DocumentURI, position pr
 	}
 }
 
-func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.CompletionResponse {
-	st, ok := s.Configs[docURI.Filename()]
+func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.CompletionResponse {
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return lsp.CompletionResponse{
 			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
@@ -415,8 +420,8 @@ func (s *State) TextDocumentCompletion(l logger.Logger, id int, docURI protocol.
 	return response
 }
 
-func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.DocumentURI) lsp.FormatResponse {
-	st, ok := s.Configs[docURI.Filename()]
+func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI uri.URI) lsp.FormatResponse {
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return lsp.FormatResponse{
 			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
@@ -451,13 +456,13 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI protocol.
 	}
 }
 
-func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position) lsp.PrepareRenameResponse {
+func (s *State) PrepareRename(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.PrepareRenameResponse {
 	empty := lsp.PrepareRenameResponse{
 		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
 		Result:   nil,
 	}
 
-	st, ok := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok || !canRename(st) {
 		return empty
 	}
@@ -476,13 +481,13 @@ func (s *State) PrepareRename(l logger.Logger, id int, docURI protocol.DocumentU
 	}
 }
 
-func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, newName string) lsp.RenameResponse {
+func (s *State) TextDocumentRename(l logger.Logger, id int, docURI uri.URI, position protocol.Position, newName string) lsp.RenameResponse {
 	empty := lsp.RenameResponse{
 		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
 		Result:   nil,
 	}
 
-	st, ok := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok || !canRename(st) {
 		return empty
 	}
@@ -501,12 +506,12 @@ func (s *State) TextDocumentRename(l logger.Logger, id int, docURI protocol.Docu
 		return empty
 	}
 
-	occurrences := rename.FindAllOccurrences(target, docURI.Filename(), st)
+	occurrences := rename.FindAllOccurrences(target, docURI.FsPath(), st)
 	if len(occurrences) == 0 {
 		return empty
 	}
 
-	changes := map[protocol.DocumentURI][]protocol.TextEdit{}
+	changes := map[uri.URI][]protocol.TextEdit{}
 
 	for _, occ := range occurrences {
 		fileURI := uri.File(occ.File)
@@ -535,18 +540,18 @@ func canRename(st store.Store) bool {
 	return st.FileType == store.FileTypeUnit || st.FileType == store.FileTypeUnknown
 }
 
-func (s *State) TextDocumentReferences(l logger.Logger, id int, docURI protocol.DocumentURI, position protocol.Position, includeDeclaration bool) lsp.ReferencesResponse {
+func (s *State) TextDocumentReferences(l logger.Logger, id int, docURI uri.URI, position protocol.Position, includeDeclaration bool) lsp.ReferencesResponse {
 	empty := lsp.ReferencesResponse{
 		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
 		Result:   nil,
 	}
 
-	st, ok := s.Configs[docURI.Filename()]
+	st, ok := s.Configs[docURI.FsPath()]
 	if !ok || !canRename(st) {
 		return empty
 	}
 
-	locations := references.GetReferences(l, st, position, docURI.Filename(), includeDeclaration)
+	locations := references.GetReferences(l, st, position, docURI.FsPath(), includeDeclaration)
 	if len(locations) == 0 {
 		return empty
 	}

@@ -8,12 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"go.lsp.dev/protocol"
 )
 
 const contentLengthPrefix = "Content-Length: "
 
+// EncodeMessage returns msg as a framed LSP message.
+//
+// Panics when msg cannot be marshaled.
 func EncodeMessage(msg any) string {
-	content, err := json.Marshal(msg)
+	// encoding/json renders protocol.Optional as an empty object.
+	content, err := protocol.Marshal(msg)
 	if err != nil {
 		panic(err)
 	}

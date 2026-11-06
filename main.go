@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"terragrunt-ls/internal/config"
@@ -54,7 +53,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 	switch method {
 	case protocol.MethodInitialize:
 		var request lsp.InitializeRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error("Failed to parse initialize request", "err", err)
 		}
 
@@ -69,7 +68,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentDidOpen:
 		var notification lsp.DidOpenTextDocumentNotification
-		if err := json.Unmarshal(contents, &notification); err != nil {
+		if err := protocol.Unmarshal(contents, &notification); err != nil {
 			l.Error(
 				"Failed to parse didOpen request",
 				"error",
@@ -104,7 +103,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentDidChange:
 		var notification lsp.DidChangeTextDocumentNotification
-		if err := json.Unmarshal(contents, &notification); err != nil {
+		if err := protocol.Unmarshal(contents, &notification); err != nil {
 			l.Error(
 				"Failed to parse didChange request",
 				"error",
@@ -119,13 +118,22 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 		)
 
 		for _, change := range notification.Params.ContentChanges {
+			text, ok := lsp.ContentChangeText(change)
+			if !ok {
+				l.Error(
+					"Ignoring null content change",
+					"URI", notification.Params.TextDocument.URI,
+				)
+
+				continue
+			}
+
 			l.Debug(
 				"Change",
-				"Range", change.Range,
-				"Text", change.Text,
+				"Text", text,
 			)
 
-			diagnostics := state.UpdateDocument(ctx, l, notification.Params.TextDocument.URI, change.Text)
+			diagnostics := state.UpdateDocument(ctx, l, notification.Params.TextDocument.URI, text)
 			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 				Notification: lsp.Notification{
 					RPC:    lsp.RPCVersion,
@@ -145,7 +153,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentHover:
 		var request lsp.HoverRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Debug(
 				"Failed to parse hover request",
 				"error",
@@ -165,7 +173,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentDefinition:
 		var request lsp.DefinitionRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse definition request",
 				"error",
@@ -185,7 +193,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentCompletion:
 		var request lsp.CompletionRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse completion request",
 				"error",
@@ -210,7 +218,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentFormatting:
 		var request lsp.FormatRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse format request",
 				"error",
@@ -229,7 +237,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentReferences:
 		var request lsp.ReferencesRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse references request",
 				"error",
@@ -250,7 +258,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentPrepareRename:
 		var request lsp.PrepareRenameRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse prepare rename request",
 				"error",
@@ -270,7 +278,7 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 
 	case protocol.MethodTextDocumentRename:
 		var request lsp.RenameRequest
-		if err := json.Unmarshal(contents, &request); err != nil {
+		if err := protocol.Unmarshal(contents, &request); err != nil {
 			l.Error(
 				"Failed to parse rename request",
 				"error",

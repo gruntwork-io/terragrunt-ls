@@ -29,8 +29,8 @@ func TestGetCompletions(t *testing.T) {
 			completions: []protocol.CompletionItem{
 				{
 					Label: "dependency",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -47,8 +47,8 @@ func TestGetCompletions(t *testing.T) {
 				},
 				{
 					Label: "dependencies",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -75,8 +75,8 @@ func TestGetCompletions(t *testing.T) {
 			completions: []protocol.CompletionItem{
 				{
 					Label: "dependency",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -103,8 +103,8 @@ func TestGetCompletions(t *testing.T) {
 			completions: []protocol.CompletionItem{
 				{
 					Label: "include",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# include\nThe include block is used to specify the inclusion of partial Terragrunt configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -121,8 +121,8 @@ func TestGetCompletions(t *testing.T) {
 				},
 				{
 					Label: "inputs",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# inputs\nThe inputs attribute is a map that is used to specify the input variables and their values to pass in to OpenTofu/Terraform.",
 					},
 					Kind:             protocol.CompletionItemKindField,
@@ -149,8 +149,8 @@ func TestGetCompletions(t *testing.T) {
 			completions: []protocol.CompletionItem{
 				{
 					Label: "include",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# include\nThe include block is used to specify the inclusion of partial Terragrunt configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -177,8 +177,8 @@ func TestGetCompletions(t *testing.T) {
 			completions: []protocol.CompletionItem{
 				{
 					Label: "generate",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# generate\nThe generate block can be used to arbitrarily generate a file in the terragrunt working directory.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -211,8 +211,8 @@ EOF
 			completions: []protocol.CompletionItem{
 				{
 					Label: "unit",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# unit\nThe unit block references a Terragrunt unit to include in this stack.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -240,8 +240,8 @@ EOF
 			completions: []protocol.CompletionItem{
 				{
 					Label: "stack",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# stack\nThe stack block references another Terragrunt stack to nest within this stack.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
@@ -269,8 +269,8 @@ EOF
 			completions: []protocol.CompletionItem{
 				{
 					Label: "locals",
-					Documentation: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+					Documentation: &protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "# locals\nThe locals block defines aliases for expressions reusable within the stack file.",
 					},
 					Kind:             protocol.CompletionItemKindClass,

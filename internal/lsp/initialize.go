@@ -3,13 +3,13 @@ package lsp
 import "go.lsp.dev/protocol"
 
 type InitializeRequest struct {
-	Request
 	Params protocol.InitializeParams `json:"params"`
+	Request
 }
 
 type InitializeResponse struct {
-	Result protocol.InitializeResult `json:"result"`
 	Response
+	Result protocol.InitializeResult `json:"result"`
 }
 
 type ServerInfo struct {
@@ -25,19 +25,19 @@ func NewInitializeResponse(id int) InitializeResponse {
 		},
 		Result: protocol.InitializeResult{
 			Capabilities: protocol.ServerCapabilities{
-				TextDocumentSync:           1,
-				HoverProvider:              true,
-				DefinitionProvider:         true,
-				ReferencesProvider:         true,
+				TextDocumentSync:           protocol.TextDocumentSyncKindFull,
+				HoverProvider:              protocol.Boolean(true),
+				DefinitionProvider:         protocol.Boolean(true),
+				ReferencesProvider:         protocol.Boolean(true),
 				CompletionProvider:         &protocol.CompletionOptions{},
-				DocumentFormattingProvider: true,
+				DocumentFormattingProvider: protocol.Boolean(true),
 				RenameProvider: &protocol.RenameOptions{
-					PrepareProvider: true,
+					PrepareProvider: new(true),
 				},
 			},
-			ServerInfo: &protocol.ServerInfo{
+			ServerInfo: protocol.ServerInfo{
 				Name:    name,
-				Version: version,
+				Version: protocol.NewOptional(version),
 			},
 		},
 	}

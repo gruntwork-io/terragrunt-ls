@@ -233,8 +233,8 @@ func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 		diags = append(diags, protocol.Diagnostic{
 			Range:    diagRange,
 			Severity: protocol.DiagnosticSeverity(diag.Severity),
-			Source:   "HCL",
-			Message:  diag.Summary + ": " + diag.Detail,
+			Source:   protocol.NewOptional("HCL"),
+			Message:  protocol.String(diag.Summary + ": " + diag.Detail),
 		})
 	}
 
