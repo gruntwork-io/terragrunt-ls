@@ -45,8 +45,8 @@ func newUnitCompletions(position protocol.Position) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
 		{
 			Label: "dependency",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# dependency
 The dependency block is used to configure unit dependencies.
 Each dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.`,
@@ -65,8 +65,8 @@ Each dependency block exposes outputs of the dependency unit as variables you ca
 		},
 		{
 			Label: "inputs",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# inputs
 The inputs attribute is a map that is used to specify the input variables and their values to pass in to OpenTofu/Terraform.`,
 			},
@@ -84,8 +84,8 @@ The inputs attribute is a map that is used to specify the input variables and th
 		},
 		{
 			Label: "locals",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# locals
 The locals block is used to define aliases for Terragrunt expressions that can be referenced elsewhere in configuration.`,
 			},
@@ -103,8 +103,8 @@ The locals block is used to define aliases for Terragrunt expressions that can b
 		},
 		{
 			Label: "feature",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# feature
 The feature block is used to configure feature flags in HCL for a specific Terragrunt unit.`,
 			},
@@ -122,8 +122,8 @@ The feature block is used to configure feature flags in HCL for a specific Terra
 		},
 		{
 			Label: "terraform",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# terraform
 The terraform block is used to configure how Terragrunt will interact with OpenTofu/Terraform.`,
 			},
@@ -141,8 +141,8 @@ The terraform block is used to configure how Terragrunt will interact with OpenT
 		},
 		{
 			Label: "remote_state",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# remote_state
 The remote_state block is used to configure how Terragrunt will set up remote state configuration.`,
 			},
@@ -165,8 +165,8 @@ The remote_state block is used to configure how Terragrunt will set up remote st
 		},
 		{
 			Label: "include",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# include
 The include block is used to specify the inclusion of partial Terragrunt configuration.`,
 			},
@@ -184,8 +184,8 @@ The include block is used to specify the inclusion of partial Terragrunt configu
 		},
 		{
 			Label: "dependencies",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# dependencies
 The dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.`,
 			},
@@ -203,8 +203,8 @@ The dependencies block is used to enumerate all the Terragrunt units that need t
 		},
 		{
 			Label: "generate",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# generate
 The generate block can be used to arbitrarily generate a file in the terragrunt working directory.`,
 			},
@@ -228,8 +228,8 @@ EOF
 		},
 		{
 			Label: "engine",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# engine
 The engine block is used to configure Terragrunt engine configuration.`,
 			},
@@ -248,8 +248,8 @@ The engine block is used to configure Terragrunt engine configuration.`,
 		},
 		{
 			Label: "exclude",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# exclude
 The exclude block provides configuration options to dynamically determine when and how a unit is excluded from the run queue.`,
 			},
@@ -268,8 +268,8 @@ The exclude block provides configuration options to dynamically determine when a
 		},
 		{
 			Label: "download_dir",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# download_dir
 The download_dir string option can be used to override the default download directory (which is .terragrunt-cache by default).`,
 			},
@@ -285,8 +285,8 @@ The download_dir string option can be used to override the default download dire
 		},
 		{
 			Label: "prevent_destroy",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# prevent_destroy
 The prevent_destroy boolean attribute prevents the unit from being destroyed.`,
 			},
@@ -302,8 +302,8 @@ The prevent_destroy boolean attribute prevents the unit from being destroyed.`,
 		},
 		{
 			Label: "iam_role",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_role
 The iam_role attribute is used to specify an IAM role that Terragrunt should assume prior to running OpenTofu/Terraform.`,
 			},
@@ -319,8 +319,8 @@ The iam_role attribute is used to specify an IAM role that Terragrunt should ass
 		},
 		{
 			Label: "iam_assume_role_duration",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_assume_role_duration
 The iam_assume_role_duration attribute is used to specify the STS session duration, in seconds.`,
 			},
@@ -336,8 +336,8 @@ The iam_assume_role_duration attribute is used to specify the STS session durati
 		},
 		{
 			Label: "iam_assume_role_session_name",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_assume_role_session_name
 The iam_assume_role_session_name attribute is used to specify the STS session name.`,
 			},
@@ -353,8 +353,8 @@ The iam_assume_role_session_name attribute is used to specify the STS session na
 		},
 		{
 			Label: "iam_web_identity_token",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_web_identity_token
 The iam_web_identity_token attribute is used along with iam_role to assume a role using the AssumeRoleWithWebIdentity API.`,
 			},
@@ -370,8 +370,8 @@ The iam_web_identity_token attribute is used along with iam_role to assume a rol
 		},
 		{
 			Label: "terraform_binary",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# terraform_binary
 The terraform_binary attribute is used to override the binary Terragrunt uses during runs (which is tofu by default).`,
 			},
@@ -387,8 +387,8 @@ The terraform_binary attribute is used to override the binary Terragrunt uses du
 		},
 		{
 			Label: "terraform_version_constraint",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# terraform_version_constraint
 The terraform_version_constraint attribute is used to override the default minimum supported version of OpenTofu/Terraform.`,
 			},
@@ -404,8 +404,8 @@ The terraform_version_constraint attribute is used to override the default minim
 		},
 		{
 			Label: "terragrunt_version_constraint",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# terragrunt_version_constraint
 The terragrunt_version_constraint attribute is used to specify which versions of the Terragrunt CLI can be used.`,
 			},
@@ -427,8 +427,8 @@ func newStackCompletions(position protocol.Position) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
 		{
 			Label: "unit",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# unit
 The unit block references a Terragrunt unit to include in this stack.`,
 			},
@@ -447,8 +447,8 @@ The unit block references a Terragrunt unit to include in this stack.`,
 		},
 		{
 			Label: "stack",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# stack
 The stack block references another Terragrunt stack to nest within this stack.`,
 			},
@@ -467,8 +467,8 @@ The stack block references another Terragrunt stack to nest within this stack.`,
 		},
 		{
 			Label: "locals",
-			Documentation: protocol.MarkupContent{
-				Kind: protocol.Markdown,
+			Documentation: &protocol.MarkupContent{
+				Kind: protocol.MarkupKindMarkdown,
 				Value: `# locals
 The locals block defines aliases for expressions reusable within the stack file.`,
 			},

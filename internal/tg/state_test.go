@@ -33,7 +33,8 @@ func TestState_OpenDocument(t *testing.T) {
 	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
 	require.NoError(t, err)
 
-	rootPath := filepath.Join(tmpDir, "root.hcl")
+	// Paths derived from a document URI have a lowercase drive letter on Windows.
+	rootPath := uri.File(filepath.Join(tmpDir, "root.hcl")).FsPath()
 
 	// rootURI := uri.File(rootPath)
 
@@ -43,9 +44,8 @@ func TestState_OpenDocument(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the URI for the unit file
-	unitPath := filepath.Join(unitDir, "terragrunt.hcl")
-
-	unitURI := uri.File(unitPath)
+	unitURI := uri.File(filepath.Join(unitDir, "terragrunt.hcl"))
+	unitPath := unitURI.FsPath()
 
 	tc := []struct {
 		expectedLocals         map[string]any
@@ -123,7 +123,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			assert.Len(t, state.Configs, 1)
 
-			cfg := state.Configs[unitPath].Cfg
+			cfg := state.Configs[unitURI.FsPath()].Cfg
 			require.NotNil(t, cfg)
 			assert.Equal(t, tt.expectedLocals, cfg.Locals)
 			assert.Equal(t, tt.expectedIncludes, cfg.ProcessedIncludes)
@@ -245,7 +245,7 @@ func TestState_Hover(t *testing.T) {
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "```hcl\nfoo = \"bar\"\n```",
 					},
 				},
@@ -269,7 +269,7 @@ func TestState_Hover(t *testing.T) {
 				},
 				Result: lsp.HoverResult{
 					Contents: protocol.MarkupContent{
-						Kind:  protocol.Markdown,
+						Kind:  protocol.MarkupKindMarkdown,
 						Value: "```hcl\nbaz = \"bar-baz\"\n```",
 					},
 				},
@@ -393,6 +393,35 @@ func TestState_Definition(t *testing.T) {
 			},
 		},
 		{
+			name: "go to relative include",
+			document: `include "root" {
+	path = "../root.hcl"
+}`,
+			position: protocol.Position{
+				Line:      1,
+				Character: 8,
+			},
+			expected: lsp.DefinitionResponse{
+				Response: lsp.Response{
+					RPC: "2.0",
+					ID:  new(1),
+				},
+				Result: protocol.Location{
+					URI: rootURI,
+					Range: protocol.Range{
+						Start: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+						End: protocol.Position{
+							Line:      0,
+							Character: 0,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "go to dependency",
 			document: `dependency "vpc" {
     config_path = "../vpc"
@@ -469,8 +498,8 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 				Result: []protocol.CompletionItem{
 					{
 						Label: "dependency",
-						Documentation: protocol.MarkupContent{
-							Kind:  protocol.Markdown,
+						Documentation: &protocol.MarkupContent{
+							Kind:  protocol.MarkupKindMarkdown,
 							Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 						},
 						Kind:             protocol.CompletionItemKindClass,
@@ -487,8 +516,8 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 					},
 					{
 						Label: "dependencies",
-						Documentation: protocol.MarkupContent{
-							Kind:  protocol.Markdown,
+						Documentation: &protocol.MarkupContent{
+							Kind:  protocol.MarkupKindMarkdown,
 							Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
 						},
 						Kind:             protocol.CompletionItemKindClass,
@@ -584,7 +613,7 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 
 	require.Len(t, state.Configs, 1)
 
-	st := state.Configs[stackPath]
+	st := state.Configs[stackURI.FsPath()]
 	assert.NotNil(t, st.StackCfg)
 	assert.Nil(t, st.Cfg)
 	assert.Len(t, st.StackCfg.Units, 1)
@@ -606,7 +635,7 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 
 	require.Len(t, state.Configs, 1)
 
-	st := state.Configs[valuesPath]
+	st := state.Configs[valuesURI.FsPath()]
 	assert.Nil(t, st.Cfg)
 	assert.Nil(t, st.StackCfg)
 }

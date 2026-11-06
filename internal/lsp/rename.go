@@ -3,8 +3,8 @@ package lsp
 import "go.lsp.dev/protocol"
 
 type PrepareRenameRequest struct {
-	Request
 	Params protocol.PrepareRenameParams `json:"params"`
+	Request
 }
 
 // PrepareRenameResult mirrors the LSP `{ range, placeholder }` response shape.

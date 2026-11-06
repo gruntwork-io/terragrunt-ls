@@ -39,7 +39,7 @@ inputs = {
 	t.Run("includes declaration when requested", func(t *testing.T) {
 		t.Parallel()
 
-		locs := references.GetReferences(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 14}, tgPath, true)
+		locs := references.GetReferences(l, s.Configs[uri.File(tgPath).FsPath()], protocol.Position{Line: 5, Character: 14}, tgPath, true)
 		require.Len(t, locs, 2, "definition + reference")
 
 		for _, loc := range locs {
@@ -50,7 +50,7 @@ inputs = {
 	t.Run("excludes declaration when requested", func(t *testing.T) {
 		t.Parallel()
 
-		locs := references.GetReferences(l, s.Configs[tgPath], protocol.Position{Line: 5, Character: 14}, tgPath, false)
+		locs := references.GetReferences(l, s.Configs[uri.File(tgPath).FsPath()], protocol.Position{Line: 5, Character: 14}, tgPath, false)
 		require.Len(t, locs, 1, "only the reference, not the definition")
 
 		assert.Equal(t, uri.File(tgPath), locs[0].URI)
@@ -59,7 +59,7 @@ inputs = {
 	t.Run("returns nil for non-renameable position", func(t *testing.T) {
 		t.Parallel()
 
-		locs := references.GetReferences(l, s.Configs[tgPath], protocol.Position{Line: 0, Character: 0}, tgPath, true)
+		locs := references.GetReferences(l, s.Configs[uri.File(tgPath).FsPath()], protocol.Position{Line: 0, Character: 0}, tgPath, true)
 		assert.Nil(t, locs)
 	})
 }

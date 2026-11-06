@@ -121,7 +121,7 @@ inputs = {
 			docURI := uri.File("/test/terragrunt.hcl")
 			s.OpenDocument(t.Context(), l, docURI, tt.document)
 
-			target := rename.GetRenameTarget(l, s.Configs[docURI.Filename()], tt.position)
+			target := rename.GetRenameTarget(l, s.Configs[docURI.FsPath()], tt.position)
 
 			assert.Equal(t, tt.expectedContext, target.Context)
 			if tt.expectedContext != rename.RenameContextNull {
@@ -157,7 +157,7 @@ dependency "b" {
 	docURI := uri.File(hclPath)
 	s.OpenDocument(t.Context(), l, docURI, content)
 
-	st := s.Configs[hclPath]
+	st := s.Configs[docURI.FsPath()]
 
 	target := rename.GetRenameTarget(l, st, protocol.Position{Line: 1, Character: 3})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
@@ -198,7 +198,7 @@ func TestFindAllOccurrences_NoDefinition(t *testing.T) {
 	docURI := uri.File(hclPath)
 	s.OpenDocument(t.Context(), l, docURI, content)
 
-	st := s.Configs[hclPath]
+	st := s.Configs[docURI.FsPath()]
 
 	target := rename.GetRenameTarget(l, st, protocol.Position{Line: 1, Character: 14})
 	require.Equal(t, rename.RenameContextLocal, target.Context)
