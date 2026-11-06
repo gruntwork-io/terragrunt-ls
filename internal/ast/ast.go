@@ -13,11 +13,14 @@ import (
 // where nodes are indexed by their line numbers.
 func ParseHCLFile(fileName string, contents []byte) (file *IndexedAST, err error) {
 	hclFile, diags := hclsyntax.ParseConfig(contents, fileName, hcl.Pos{Byte: 0, Line: 1, Column: 1})
-	if diags != nil && diags.HasErrors() {
-		return indexAST(hclFile), diags
+	indexed, indexDiags := indexAST(hclFile)
+
+	diags = diags.Extend(indexDiags)
+	if diags.HasErrors() {
+		return indexed, diags
 	}
 
-	return indexAST(hclFile), nil
+	return indexed, nil
 }
 
 // IndexedNode wraps a hclsyntax.Node with a reference to its parent in the AST
@@ -252,15 +255,15 @@ func FindFirstParentMatch(inode *IndexedNode, matcher func(*IndexedNode) bool) *
 
 var _ hclsyntax.Walker = &nodeIndexBuilder{}
 
-func indexAST(ast *hcl.File) *IndexedAST {
+func indexAST(ast *hcl.File) (*IndexedAST, hcl.Diagnostics) {
 	body := ast.Body.(*hclsyntax.Body)
 	builder := newNodeIndexBuilder()
-	_ = hclsyntax.Walk(body, builder)
+	diags := hclsyntax.Walk(body, builder)
 
 	return &IndexedAST{
 		Index:    builder.index,
 		Locals:   builder.locals,
 		Includes: builder.includes,
 		HCLFile:  ast,
-	}
+	}, diags
 }

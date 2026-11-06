@@ -12,7 +12,8 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// FuzzGetCompletions tests that every completion starts with the cursor word and that values and unknown files get none.
+// FuzzGetCompletions tests that every completion starts with the cursor word and that values and unknown files get
+// none.
 func FuzzGetCompletions(f *testing.F) {
 	fileTypes := []store.FileType{
 		store.FileTypeUnknown,
@@ -30,7 +31,7 @@ func FuzzGetCompletions(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, document string, line, character uint32, fileType uint8) {
 		position := protocol.Position{Line: line, Character: character}
-		st := store.Store{Document: document, FileType: fileTypes[int(fileType)%len(fileTypes)]}
+		st := &store.Store{Document: document, FileType: fileTypes[int(fileType)%len(fileTypes)]}
 
 		items := completion.GetCompletions(testutils.NewTestLogger(t), st, position)
 
@@ -45,8 +46,9 @@ func FuzzGetCompletions(f *testing.F) {
 			require.NotEmpty(t, items, "an empty cursor word matches the whole catalog")
 		}
 
-		for _, item := range items {
-			require.True(t, strings.HasPrefix(item.Label, word), "label %q does not start with %q", item.Label, word)
+		for i := range items {
+			label := items[i].Label
+			require.True(t, strings.HasPrefix(label, word), "label %q does not start with %q", label, word)
 		}
 	})
 }

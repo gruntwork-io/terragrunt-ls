@@ -30,8 +30,9 @@ func TestGetCompletions(t *testing.T) {
 				{
 					Label: "dependency",
 					Documentation: &protocol.MarkupContent{
-						Kind:  protocol.MarkupKindMarkdown,
-						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+						Kind: protocol.MarkupKindMarkdown,
+						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block " +
+							"exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
 					InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -48,8 +49,9 @@ func TestGetCompletions(t *testing.T) {
 				{
 					Label: "dependencies",
 					Documentation: &protocol.MarkupContent{
-						Kind:  protocol.MarkupKindMarkdown,
-						Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
+						Kind: protocol.MarkupKindMarkdown,
+						Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be " +
+							"applied before this unit.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
 					InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -76,8 +78,9 @@ func TestGetCompletions(t *testing.T) {
 				{
 					Label: "dependency",
 					Documentation: &protocol.MarkupContent{
-						Kind:  protocol.MarkupKindMarkdown,
-						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+						Kind: protocol.MarkupKindMarkdown,
+						Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block " +
+							"exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
 					InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -122,8 +125,9 @@ func TestGetCompletions(t *testing.T) {
 				{
 					Label: "inputs",
 					Documentation: &protocol.MarkupContent{
-						Kind:  protocol.MarkupKindMarkdown,
-						Value: "# inputs\nThe inputs attribute is a map that is used to specify the input variables and their values to pass in to OpenTofu/Terraform.",
+						Kind: protocol.MarkupKindMarkdown,
+						Value: "# inputs\nThe inputs attribute is a map that is used to specify the input variables and their values " +
+							"to pass in to OpenTofu/Terraform.",
 					},
 					Kind:             protocol.CompletionItemKindField,
 					InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -178,8 +182,9 @@ func TestGetCompletions(t *testing.T) {
 				{
 					Label: "generate",
 					Documentation: &protocol.MarkupContent{
-						Kind:  protocol.MarkupKindMarkdown,
-						Value: "# generate\nThe generate block can be used to arbitrarily generate a file in the terragrunt working directory.",
+						Kind: protocol.MarkupKindMarkdown,
+						Value: "# generate\nThe generate block can be used to arbitrarily generate a file in the terragrunt working " +
+							"directory.",
 					},
 					Kind:             protocol.CompletionItemKindClass,
 					InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -304,7 +309,7 @@ EOF
 
 			l := testutils.NewTestLogger(t)
 
-			completions := completion.GetCompletions(l, tt.store, tt.position)
+			completions := completion.GetCompletions(l, &tt.store, tt.position)
 
 			assert.ElementsMatch(t, tt.completions, completions)
 		})

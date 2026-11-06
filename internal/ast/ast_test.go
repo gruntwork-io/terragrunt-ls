@@ -109,6 +109,7 @@ func TestIndexedAST_FindNodeAt_BasicCases(t *testing.T) {
 	// Test with empty file
 	t.Run("empty file", func(t *testing.T) {
 		t.Parallel()
+
 		indexed, err := ast.ParseHCLFile("test.hcl", []byte(``))
 		require.NoError(t, err)
 		require.NotNil(t, indexed)
@@ -119,6 +120,7 @@ func TestIndexedAST_FindNodeAt_BasicCases(t *testing.T) {
 	// Test with position within a node span
 	t.Run("position within node span", func(t *testing.T) {
 		t.Parallel()
+
 		content := `locals {
 		foo = "bar"
 	}`

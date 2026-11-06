@@ -173,6 +173,7 @@ func TestParseTerragruntBuffer(t *testing.T) {
 				t.Helper()
 
 				path := filepath.Join(tmpDir, "terragrunt.hcl")
+
 				return path
 			},
 			content: `
@@ -201,6 +202,7 @@ terraform {
 				// Create unit directory and return path to its terragrunt.hcl
 				unitDir := filepath.Join(tmpDir, "unit")
 				require.NoError(t, os.MkdirAll(unitDir, 0755))
+
 				return filepath.Join(unitDir, "terragrunt.hcl")
 			},
 			content: `

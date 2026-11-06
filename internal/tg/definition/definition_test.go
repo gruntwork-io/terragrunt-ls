@@ -60,7 +60,11 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 			s.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
 
 			// State keys documents by file name, which has backslashes on Windows.
-			target, context := definition.GetDefinitionTargetWithContext(l, s.Configs[filepath.FromSlash("/test.hcl")], tt.position)
+			target, context := definition.GetDefinitionTargetWithContext(
+				l,
+				s.Configs[filepath.FromSlash("/test.hcl")],
+				tt.position,
+			)
 
 			assert.Equal(t, tt.expectedTarget, target)
 			assert.Equal(t, tt.expectedContext, context)

@@ -10,7 +10,7 @@ To get started with development, you will want to install [mise](https://mise.jd
 mise install
 ```
 
-This will install all the necessary dependencies for the project. mise installs codespell with `pipx` or `uv`, so install one of them first. On Windows, `mise install` skips golangci-lint, lua, shellcheck and codespell, so run the code checks on Linux or macOS.
+This will install all the necessary dependencies for the project. mise installs codespell with `pipx` or `uv`, so install one of them first. On Windows, `mise install` skips golangci-lint, lua, shellcheck, shfmt, markdownlint-cli2 and codespell, so run the code checks on Linux or macOS.
 
 ### Dependency updates
 
@@ -68,7 +68,11 @@ To lint the project, you can run the following command:
 golangci-lint run ./...
 ```
 
-This will run the linter on the project.
+This will run the linter on the project. It also reports code that `goimports` or `golines` would reformat. To apply that formatting:
+
+```bash
+golangci-lint fmt ./...
+```
 
 ## Static checks
 
@@ -78,10 +82,12 @@ The `Static Checks` workflow runs these mise tasks on every pull request:
 mise run check:codespell
 mise run check:go-fix
 mise run check:go-mod-tidy
+mise run check:markdownlint
 mise run check:shellcheck
+mise run check:shfmt
 ```
 
-`check:go-fix` and `check:go-mod-tidy` print the changes they want. Run `go fix ./...` or `go mod tidy` to apply them.
+`check:go-fix`, `check:go-mod-tidy` and `check:shfmt` print the changes they want. Run `go fix ./...`, `go mod tidy` or `shfmt -w <file>` to apply them.
 
 ## Logging
 

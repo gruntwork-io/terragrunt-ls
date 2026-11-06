@@ -499,8 +499,9 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 					{
 						Label: "dependency",
 						Documentation: &protocol.MarkupContent{
-							Kind:  protocol.MarkupKindMarkdown,
-							Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+							Kind: protocol.MarkupKindMarkdown,
+							Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block " +
+								"exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
 						},
 						Kind:             protocol.CompletionItemKindClass,
 						InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -517,8 +518,9 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 					{
 						Label: "dependencies",
 						Documentation: &protocol.MarkupContent{
-							Kind:  protocol.MarkupKindMarkdown,
-							Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.",
+							Kind: protocol.MarkupKindMarkdown,
+							Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be " +
+								"applied before this unit.",
 						},
 						Kind:             protocol.CompletionItemKindClass,
 						InsertTextFormat: protocol.InsertTextFormatSnippet,

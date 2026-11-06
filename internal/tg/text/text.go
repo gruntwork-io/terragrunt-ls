@@ -8,7 +8,8 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// GetCursorWord returns the word under the cursor, or an empty string when the position is past the end of the document.
+// GetCursorWord returns the word under the cursor, or an empty string when the position is past the end of the
+// document.
 func GetCursorWord(document string, position protocol.Position) string {
 	scanner := bufio.NewScanner(strings.NewReader(document))
 	for i := 0; i <= int(position.Line); i++ {

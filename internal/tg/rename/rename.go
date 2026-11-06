@@ -54,7 +54,7 @@ func IsValidIdentifier(s string) bool {
 // GetRenameTarget identifies the renameable symbol at the given position.
 // Returns a target with Context == RenameContextNull when nothing renameable
 // is at the position.
-func GetRenameTarget(l logger.Logger, st store.Store, position protocol.Position) RenameTarget {
+func GetRenameTarget(l logger.Logger, st *store.Store, position protocol.Position) RenameTarget {
 	null := RenameTarget{Context: RenameContextNull}
 
 	if st.AST == nil {
@@ -132,14 +132,14 @@ func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Posit
 	return RenameTarget{
 		Name:       attrStep.Name,
 		Context:    RenameContextLocal,
-		IdentRange: ast.FromHCLRange(ast.TraverseAttrIdentRange(attrStep)),
+		IdentRange: ast.FromHCLRange(ast.TraverseAttrIdentRange(&attrStep)),
 	}
 }
 
 // FindAllOccurrences returns every occurrence of target within the given file's
 // AST: the declaration site (when present) plus all references. The returned
 // slice is sorted by (line, column) for determinism.
-func FindAllOccurrences(target RenameTarget, file string, st store.Store) []Occurrence {
+func FindAllOccurrences(target RenameTarget, file string, st *store.Store) []Occurrence {
 	if target.Context == RenameContextNull || st.AST == nil || st.AST.HCLFile == nil {
 		return nil
 	}
