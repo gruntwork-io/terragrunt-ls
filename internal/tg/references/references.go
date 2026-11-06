@@ -14,7 +14,13 @@ import (
 // GetReferences returns LSP locations for every reference (and optionally the
 // declaration) of the renameable symbol at position. Returns nil if the cursor
 // is not on a renameable identifier.
-func GetReferences(l logger.Logger, st store.Store, position protocol.Position, file string, includeDeclaration bool) []protocol.Location {
+func GetReferences(
+	l logger.Logger,
+	st *store.Store,
+	position protocol.Position,
+	file string,
+	includeDeclaration bool,
+) []protocol.Location {
 	target := rename.GetRenameTarget(l, st, position)
 	if target.Context == rename.RenameContextNull {
 		return nil

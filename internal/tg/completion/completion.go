@@ -10,7 +10,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) []protocol.CompletionItem {
+func GetCompletions(l logger.Logger, s *store.Store, position protocol.Position) []protocol.CompletionItem {
 	word := text.GetCursorWord(s.Document, position)
 
 	var candidates []protocol.CompletionItem
@@ -28,9 +28,9 @@ func GetCompletions(l logger.Logger, s store.Store, position protocol.Position) 
 
 	completions := []protocol.CompletionItem{}
 
-	for _, completion := range candidates {
-		if strings.HasPrefix(completion.Label, word) {
-			completions = append(completions, completion)
+	for i := range candidates {
+		if strings.HasPrefix(candidates[i].Label, word) {
+			completions = append(completions, candidates[i])
 		}
 	}
 
@@ -49,7 +49,8 @@ func newUnitCompletions(position protocol.Position) []protocol.CompletionItem {
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# dependency
 The dependency block is used to configure unit dependencies.
-Each dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.`,
+Each dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit ` +
+					`configuration.`,
 			},
 			Kind:             protocol.CompletionItemKindClass,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -68,7 +69,8 @@ Each dependency block exposes outputs of the dependency unit as variables you ca
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# inputs
-The inputs attribute is a map that is used to specify the input variables and their values to pass in to OpenTofu/Terraform.`,
+The inputs attribute is a map that is used to specify the input variables and their values to pass in to ` +
+					`OpenTofu/Terraform.`,
 			},
 			Kind:             protocol.CompletionItemKindField,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -87,7 +89,8 @@ The inputs attribute is a map that is used to specify the input variables and th
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# locals
-The locals block is used to define aliases for Terragrunt expressions that can be referenced elsewhere in configuration.`,
+The locals block is used to define aliases for Terragrunt expressions that can be referenced elsewhere in ` +
+					`configuration.`,
 			},
 			Kind:             protocol.CompletionItemKindClass,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -251,7 +254,8 @@ The engine block is used to configure Terragrunt engine configuration.`,
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# exclude
-The exclude block provides configuration options to dynamically determine when and how a unit is excluded from the run queue.`,
+The exclude block provides configuration options to dynamically determine when and how a unit is excluded from the ` +
+					`run queue.`,
 			},
 			Kind:             protocol.CompletionItemKindClass,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -271,7 +275,8 @@ The exclude block provides configuration options to dynamically determine when a
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# download_dir
-The download_dir string option can be used to override the default download directory (which is .terragrunt-cache by default).`,
+The download_dir string option can be used to override the default download directory (which is .terragrunt-cache ` +
+					`by default).`,
 			},
 			Kind:             protocol.CompletionItemKindField,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -305,7 +310,8 @@ The prevent_destroy boolean attribute prevents the unit from being destroyed.`,
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_role
-The iam_role attribute is used to specify an IAM role that Terragrunt should assume prior to running OpenTofu/Terraform.`,
+The iam_role attribute is used to specify an IAM role that Terragrunt should assume prior to running ` +
+					`OpenTofu/Terraform.`,
 			},
 			Kind:             protocol.CompletionItemKindField,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -356,7 +362,8 @@ The iam_assume_role_session_name attribute is used to specify the STS session na
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# iam_web_identity_token
-The iam_web_identity_token attribute is used along with iam_role to assume a role using the AssumeRoleWithWebIdentity API.`,
+The iam_web_identity_token attribute is used along with iam_role to assume a role using the ` +
+					`AssumeRoleWithWebIdentity API.`,
 			},
 			Kind:             protocol.CompletionItemKindField,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -390,7 +397,8 @@ The terraform_binary attribute is used to override the binary Terragrunt uses du
 			Documentation: &protocol.MarkupContent{
 				Kind: protocol.MarkupKindMarkdown,
 				Value: `# terraform_version_constraint
-The terraform_version_constraint attribute is used to override the default minimum supported version of OpenTofu/Terraform.`,
+The terraform_version_constraint attribute is used to override the default minimum supported version of ` +
+					`OpenTofu/Terraform.`,
 			},
 			Kind:             protocol.CompletionItemKindField,
 			InsertTextFormat: protocol.InsertTextFormatSnippet,

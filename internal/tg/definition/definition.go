@@ -32,7 +32,7 @@ const (
 	DefinitionContextNull = "null"
 )
 
-func GetDefinitionTargetWithContext(l logger.Logger, store store.Store, position protocol.Position) (string, string) {
+func GetDefinitionTargetWithContext(l logger.Logger, store *store.Store, position protocol.Position) (string, string) {
 	if store.AST == nil {
 		l.Debug("No AST found")
 		return "", DefinitionContextNull

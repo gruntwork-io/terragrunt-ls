@@ -23,7 +23,7 @@ jobs:
     - name: Set up mise
       uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
       with:
-        version: 2025.6.8
+        version: 2026.11.3
         experimental: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,6 +57,14 @@ jobs:
       if: ${{ !cancelled() }}
       run: mise run check:go-mod-tidy
 
+    - name: markdownlint
+      if: ${{ !cancelled() }}
+      run: mise run check:markdownlint
+
     - name: shellcheck
       if: ${{ !cancelled() }}
       run: mise run check:shellcheck
+
+    - name: shfmt
+      if: ${{ !cancelled() }}
+      run: mise run check:shfmt

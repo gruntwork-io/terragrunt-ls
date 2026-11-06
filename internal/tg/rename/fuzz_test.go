@@ -14,12 +14,21 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// FuzzFindAllOccurrences tests that a rename target is always one of its own occurrences and that occurrences come back sorted.
+// FuzzFindAllOccurrences tests that a rename target is always one of its own occurrences and that occurrences come
+// back sorted.
 func FuzzFindAllOccurrences(f *testing.F) {
 	const file = "/work/terragrunt.hcl"
 
-	f.Add("locals {\n  env  = \"dev\"\n  name = \"${local.env}-app\"\n}\n\ninputs = {\n  env = local.env\n}\n", uint32(1), uint32(3))
-	f.Add("locals {\n  env  = \"dev\"\n  name = \"${local.env}-app\"\n}\n\ninputs = {\n  env = local.env\n}\n", uint32(6), uint32(14))
+	f.Add(
+		"locals {\n  env  = \"dev\"\n  name = \"${local.env}-app\"\n}\n\ninputs = {\n  env = local.env\n}\n",
+		uint32(1),
+		uint32(3),
+	)
+	f.Add(
+		"locals {\n  env  = \"dev\"\n  name = \"${local.env}-app\"\n}\n\ninputs = {\n  env = local.env\n}\n",
+		uint32(6),
+		uint32(14),
+	)
 	f.Add("locals {\n  a = local.b\n  b = local.a\n}\n", uint32(1), uint32(13))
 	f.Add("locals {\n  a = 1\n}\n\nlocals {\n  a = 2\n}\n", uint32(1), uint32(2))
 
@@ -27,7 +36,7 @@ func FuzzFindAllOccurrences(f *testing.F) {
 		indexed, err := ast.ParseHCLFile(file, []byte(document))
 		require.NotNil(t, indexed, "parse error: %v", err)
 
-		st := store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
+		st := &store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
 		position := protocol.Position{Line: line, Character: character}
 
 		target := rename.GetRenameTarget(testutils.NewTestLogger(t), st, position)

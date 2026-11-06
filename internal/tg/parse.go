@@ -30,7 +30,11 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 
 // newParsingContext builds a terragrunt ParsingContext for the given file and
 // returns a pointer to the HCL diagnostics slice that the parser will populate.
-func newParsingContext(ctx context.Context, tgLogger tgLog.Logger, filename string) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
+func newParsingContext(
+	ctx context.Context,
+	tgLogger tgLog.Logger,
+	filename string,
+) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
 	parseOptions := []hclparse.Option{
@@ -52,7 +56,11 @@ func newParsingContext(ctx context.Context, tgLogger tgLog.Logger, filename stri
 	return ctx, pctx, parseDiags
 }
 
-func ParseTerragruntBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.TerragruntConfig, []protocol.Diagnostic) {
+func ParseTerragruntBuffer(
+	ctx context.Context,
+	l logger.Logger,
+	filename, text string,
+) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 
@@ -258,7 +266,11 @@ func DetectFileType(filename string) store.FileType {
 }
 
 // ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
-func ParseStackBuffer(ctx context.Context, l logger.Logger, filename, text string) (*config.StackConfig, []protocol.Diagnostic) {
+func ParseStackBuffer(
+	ctx context.Context,
+	l logger.Logger,
+	filename, text string,
+) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
 

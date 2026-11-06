@@ -47,7 +47,14 @@ func main() {
 	}
 }
 
-func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state tg.State, method string, contents []byte) {
+func handleMessage(
+	ctx context.Context,
+	l logger.Logger,
+	writer io.Writer,
+	state tg.State,
+	method string,
+	contents []byte,
+) {
 	l.Debug("Received msg", "method", method, "contents", string(contents))
 
 	switch method {
@@ -252,7 +259,13 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 			"IncludeDeclaration", request.Params.Context.IncludeDeclaration,
 		)
 
-		response := state.TextDocumentReferences(l, request.ID, request.Params.TextDocument.URI, request.Params.Position, request.Params.Context.IncludeDeclaration)
+		response := state.TextDocumentReferences(
+			l,
+			request.ID,
+			request.Params.TextDocument.URI,
+			request.Params.Position,
+			request.Params.Context.IncludeDeclaration,
+		)
 
 		writeResponse(l, writer, response)
 
@@ -293,7 +306,13 @@ func handleMessage(ctx context.Context, l logger.Logger, writer io.Writer, state
 			"NewName", request.Params.NewName,
 		)
 
-		response := state.TextDocumentRename(l, request.ID, request.Params.TextDocument.URI, request.Params.Position, request.Params.NewName)
+		response := state.TextDocumentRename(
+			l,
+			request.ID,
+			request.Params.TextDocument.URI,
+			request.Params.Position,
+			request.Params.NewName,
+		)
 
 		writeResponse(l, writer, response)
 	}

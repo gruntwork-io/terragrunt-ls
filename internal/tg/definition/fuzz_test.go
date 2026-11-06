@@ -11,7 +11,8 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// FuzzGetDefinitionTargetWithContext tests that definition always returns a known context, and no name when there is nothing to jump to.
+// FuzzGetDefinitionTargetWithContext tests that definition always returns a known context, and no name when there
+// is nothing to jump to.
 func FuzzGetDefinitionTargetWithContext(f *testing.F) {
 	f.Add("include \"root\" {\n  path = find_in_parent_folders(\"root.hcl\")\n}\n", uint32(1), uint32(10))
 	f.Add("dependency \"vpc\" {\n  config_path = \"../vpc\"\n}\n", uint32(1), uint32(20))
@@ -21,7 +22,7 @@ func FuzzGetDefinitionTargetWithContext(f *testing.F) {
 		indexed, err := ast.ParseHCLFile("/work/terragrunt.hcl", []byte(document))
 		require.NotNil(t, indexed, "parse error: %v", err)
 
-		st := store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
+		st := &store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
 		position := protocol.Position{Line: line, Character: character}
 
 		name, definitionContext := definition.GetDefinitionTargetWithContext(testutils.NewTestLogger(t), st, position)

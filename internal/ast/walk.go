@@ -21,7 +21,7 @@ func WalkReferences(body *hclsyntax.Body, root, name string, visitor ReferenceVi
 		return
 	}
 
-	_ = hclsyntax.VisitAll(body, func(node hclsyntax.Node) hcl.Diagnostics {
+	diags := hclsyntax.VisitAll(body, func(node hclsyntax.Node) hcl.Diagnostics {
 		expr, ok := node.(*hclsyntax.ScopeTraversalExpr)
 		if !ok {
 			return nil
@@ -41,15 +41,19 @@ func WalkReferences(body *hclsyntax.Body, root, name string, visitor ReferenceVi
 			return nil
 		}
 
-		visitor(expr, TraverseAttrIdentRange(attrStep))
+		visitor(expr, TraverseAttrIdentRange(&attrStep))
 
 		return nil
 	})
+
+	if diags.HasErrors() {
+		panic(diags)
+	}
 }
 
 // TraverseAttrIdentRange returns the range of the attribute identifier alone,
 // excluding the leading dot included in TraverseAttr.SrcRange.
-func TraverseAttrIdentRange(step hcl.TraverseAttr) hcl.Range {
+func TraverseAttrIdentRange(step *hcl.TraverseAttr) hcl.Range {
 	r := step.SrcRange
 	r.Start.Column++
 	r.Start.Byte++

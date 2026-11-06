@@ -76,11 +76,13 @@ inputs = {
 			require.True(t, ok)
 
 			var got []hcl.Range
+
 			ast.WalkReferences(body, tt.root, tt.ident, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
 				got = append(got, r)
 			})
 
 			require.Len(t, got, len(tt.expected))
+
 			for i := range tt.expected {
 				assert.Equal(t, tt.expected[i].Start.Line, got[i].Start.Line, "start line %d", i)
 				assert.Equal(t, tt.expected[i].Start.Column, got[i].Start.Column, "start col %d", i)

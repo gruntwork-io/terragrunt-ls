@@ -13,7 +13,8 @@ import (
 	"go.lsp.dev/uri"
 )
 
-// FuzzGetReferences tests that references are exactly the rename occurrences, minus the declaration when it is excluded.
+// FuzzGetReferences tests that references are exactly the rename occurrences, minus the declaration when it is
+// excluded.
 func FuzzGetReferences(f *testing.F) {
 	const file = "/work/terragrunt.hcl"
 
@@ -24,7 +25,7 @@ func FuzzGetReferences(f *testing.F) {
 		indexed, err := ast.ParseHCLFile(file, []byte(document))
 		require.NotNil(t, indexed, "parse error: %v", err)
 
-		st := store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
+		st := &store.Store{AST: indexed, Document: document, FileType: store.FileTypeUnit}
 		position := protocol.Position{Line: line, Character: character}
 		l := testutils.NewTestLogger(t)
 
@@ -33,6 +34,7 @@ func FuzzGetReferences(f *testing.F) {
 		target := rename.GetRenameTarget(l, st, position)
 
 		expected := []protocol.Location{}
+
 		for _, occurrence := range rename.FindAllOccurrences(target, file, st) {
 			if occurrence.IsDefinition && !includeDeclaration {
 				continue

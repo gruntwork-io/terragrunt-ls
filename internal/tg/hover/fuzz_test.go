@@ -20,7 +20,7 @@ func FuzzGetHoverTargetWithContext(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, document string, line, character uint32) {
 		position := protocol.Position{Line: line, Character: character}
-		st := store.Store{Document: document, FileType: store.FileTypeUnit}
+		st := &store.Store{Document: document, FileType: store.FileTypeUnit}
 
 		target, hoverContext := hover.GetHoverTargetWithContext(testutils.NewTestLogger(t), st, position)
 

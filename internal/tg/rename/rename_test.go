@@ -124,6 +124,7 @@ inputs = {
 			target := rename.GetRenameTarget(l, s.Configs[docURI.FsPath()], tt.position)
 
 			assert.Equal(t, tt.expectedContext, target.Context)
+
 			if tt.expectedContext != rename.RenameContextNull {
 				assert.Equal(t, tt.expectedName, target.Name)
 			}

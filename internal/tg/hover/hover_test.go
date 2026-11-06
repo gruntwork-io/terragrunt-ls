@@ -41,7 +41,7 @@ func TestGetHoverTargetWithContext(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			target, context := hover.GetHoverTargetWithContext(l, tt.store, tt.position)
+			target, context := hover.GetHoverTargetWithContext(l, &tt.store, tt.position)
 
 			assert.Equal(t, tt.expectedTarget, target)
 			assert.Equal(t, tt.expectedContext, context)

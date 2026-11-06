@@ -17,29 +17,20 @@ func TestEncode(t *testing.T) {
 	t.Parallel()
 
 	expected := "Content-Length: 16\r\n\r\n{\"Testing\":true}"
-	actual := rpc.EncodeMessage(EncodingExample{Testing: true})
-	if expected != actual {
-		t.Fatalf("Expected: %s, Actual: %s", expected, actual)
-	}
+
+	assert.Equal(t, expected, rpc.EncodeMessage(EncodingExample{Testing: true}))
 }
 
 func TestDecode(t *testing.T) {
 	t.Parallel()
 
 	incomingMessage := "Content-Length: 15\r\n\r\n{\"Method\":\"hi\"}"
+
 	method, content, err := rpc.DecodeMessage([]byte(incomingMessage))
-	contentLength := len(content)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if contentLength != 15 {
-		t.Fatalf("Expected: 16, Got: %d", contentLength)
-	}
-
-	if method != "hi" {
-		t.Fatalf("Expected: 'hi', Got: %s", method)
-	}
+	assert.Len(t, content, 15)
+	assert.Equal(t, "hi", method)
 }
 
 // TestSplit tests that Split returns one whole message at a time and rejects a malformed header.
@@ -164,8 +155,9 @@ func TestDecodeMessage(t *testing.T) {
 		expectedContent string
 	}{
 		{
-			name:            "Content-Type header",
-			msg:             "Content-Length: 15\r\nContent-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n{\"method\":\"hi\"}",
+			name: "Content-Type header",
+			msg: "Content-Length: 15\r\nContent-Type: application/vscode-jsonrpc; " +
+				"charset=utf-8\r\n\r\n{\"method\":\"hi\"}",
 			expectedMethod:  "hi",
 			expectedContent: "{\"method\":\"hi\"}",
 		},
