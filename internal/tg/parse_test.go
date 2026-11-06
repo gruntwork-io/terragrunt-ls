@@ -235,6 +235,33 @@ inputs = {
 `,
 			wantDiag: false,
 		},
+		{
+			name: "bare include block",
+			setup: func(t *testing.T, tmpDir string) string {
+				t.Helper()
+
+				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "root.hcl"), []byte(`
+locals {
+  region = "us-east-1"
+}
+`), 0644))
+
+				unitDir := filepath.Join(tmpDir, "unit")
+				require.NoError(t, os.MkdirAll(unitDir, 0755))
+
+				return filepath.Join(unitDir, "terragrunt.hcl")
+			},
+			content: `
+include {
+  path = find_in_parent_folders("root.hcl")
+}
+
+inputs = {
+  name = "example"
+}
+`,
+			wantDiag: false,
+		},
 	}
 
 	for _, tt := range tests {
