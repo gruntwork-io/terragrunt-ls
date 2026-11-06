@@ -43,8 +43,6 @@ type IndexedAST struct {
 	Index NodeIndex
 	// Locals contains the local attributes in the file, indexed by attribute key
 	Locals Scope
-	// Includes contains the include blocks in the file, indexed by include block name
-	Includes Scope
 }
 
 // FindNodeAt returns the node at the given position in the file. If no node is found, returns nil.
@@ -111,17 +109,15 @@ func (s Scope) Add(node *IndexedNode) {
 type NodeIndex map[int][]*IndexedNode
 
 type nodeIndexBuilder struct {
-	index    NodeIndex
-	locals   Scope
-	includes Scope
-	stack    []*IndexedNode
+	index  NodeIndex
+	locals Scope
+	stack  []*IndexedNode
 }
 
 func newNodeIndexBuilder() *nodeIndexBuilder {
 	return &nodeIndexBuilder{
-		index:    make(map[int][]*IndexedNode),
-		locals:   make(Scope),
-		includes: make(Scope),
+		index:  make(map[int][]*IndexedNode),
+		locals: make(Scope),
 	}
 }
 
@@ -141,8 +137,6 @@ func (w *nodeIndexBuilder) Enter(node hclsyntax.Node) hcl.Diagnostics {
 
 	if IsLocalAttribute(inode) {
 		w.locals.Add(inode)
-	} else if IsIncludeBlock(inode) {
-		w.includes.Add(inode)
 	}
 
 	return nil
@@ -176,68 +170,10 @@ func IsLocalsBlock(inode *IndexedNode) bool {
 	return ok && block.Type == "locals"
 }
 
-// IsIncludeBlock returns TRUE if the node is an HCL block of type "include".
-func IsIncludeBlock(inode *IndexedNode) bool {
-	block, ok := inode.Node.(*hclsyntax.Block)
-	return ok && block.Type == "include" && len(block.Labels) > 0
-}
-
-// IsDependencyBlock returns TRUE if the node is an HCL block of type "dependency".
-func IsDependencyBlock(inode *IndexedNode) bool {
-	block, ok := inode.Node.(*hclsyntax.Block)
-	return ok && block.Type == "dependency" && len(block.Labels) > 0
-}
-
 // IsAttribute returns TRUE if the node is an hclsyntax.Attribute.
 func IsAttribute(inode *IndexedNode) bool {
 	_, ok := inode.Node.(*hclsyntax.Attribute)
 	return ok
-}
-
-// GetNodeIncludeLabel returns the label of the given node, if it is an include block.
-// If the node is not an include block, returns an empty string and false.
-func GetNodeIncludeLabel(inode *IndexedNode) (string, bool) {
-	attr := FindFirstParentMatch(inode, IsAttribute)
-	if attr == nil {
-		return "", false
-	}
-
-	local := FindFirstParentMatch(attr, IsIncludeBlock)
-	if local == nil {
-		return "", false
-	}
-
-	name := ""
-	if labels := local.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
-}
-
-// GetNodeDependencyLabel returns whether the node is part of a dependency block's config_path field.
-// If it is, returns the name of the dependency block and TRUE, otherwise returns "" and FALSE.
-func GetNodeDependencyLabel(inode *IndexedNode) (string, bool) {
-	attr := FindFirstParentMatch(inode, IsAttribute)
-	if attr == nil {
-		return "", false
-	}
-
-	if attr.Node.(*hclsyntax.Attribute).Name != "config_path" {
-		return "", false
-	}
-
-	dep := FindFirstParentMatch(attr, IsDependencyBlock)
-	if dep == nil {
-		return "", false
-	}
-
-	name := ""
-	if labels := dep.Node.(*hclsyntax.Block).Labels; len(labels) > 0 {
-		name = labels[0]
-	}
-
-	return name, true
 }
 
 func FindFirstParentMatch(inode *IndexedNode, matcher func(*IndexedNode) bool) *IndexedNode {
@@ -258,9 +194,8 @@ func indexAST(ast *hcl.File) *IndexedAST {
 	_ = hclsyntax.Walk(body, builder)
 
 	return &IndexedAST{
-		Index:    builder.index,
-		Locals:   builder.locals,
-		Includes: builder.includes,
-		HCLFile:  ast,
+		Index:   builder.index,
+		Locals:  builder.locals,
+		HCLFile: ast,
 	}
 }
