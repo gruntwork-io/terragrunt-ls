@@ -29,7 +29,7 @@ export function activate(context: ExtensionContext) {
 				"--watch", "./**/*.go",
 				"--signal", "SIGTERM",
 				"--exec", "go", "run", "./main.go"
-			] : [],
+			] : allowArgs(),
 			transport: TransportKind.stdio,
 			options: isDevMode ? {
 				cwd: context.asAbsolutePath(".."),
@@ -74,6 +74,35 @@ export function activate(context: ExtensionContext) {
 
 	// Start the client. This will also launch the server
 	client.start();
+
+	// The server reads its flags once, when it starts.
+	context.subscriptions.push(workspace.onDidChangeConfiguration(async (event) => {
+		if (!event.affectsConfiguration('terragrunt-ls.allow') && !event.affectsConfiguration('terragrunt-ls.allowCmds')) {
+			return;
+		}
+
+		const choice = await vscode.window.showInformationMessage(
+			'Reload the window to apply the new Terragrunt language server permissions.',
+			'Reload Window'
+		);
+		if (choice === 'Reload Window') {
+			await vscode.commands.executeCommand('workbench.action.reloadWindow');
+		}
+	}));
+}
+
+// allowArgs returns the server flags for the terragrunt-ls.allow and
+// terragrunt-ls.allowCmds settings. Both settings have machine scope, so a
+// repository's .vscode/settings.json cannot set them.
+function allowArgs(): string[] {
+	const config = workspace.getConfiguration('terragrunt-ls');
+	const allow = config.get<string[]>('allow', []);
+	const allowCmds = config.get<string[]>('allowCmds', []);
+
+	return [
+		...allow.map((capability) => `--allow=${capability}`),
+		...allowCmds.flatMap((pattern) => ['--allow-cmd', pattern]),
+	];
 }
 
 export function deactivate(): Thenable<void> | undefined {

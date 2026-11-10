@@ -61,6 +61,19 @@ To install the Visual Studio Code extension, you can manually compile the extens
 
 Installation from the Visual Studio Extensions Marketplace coming soon!
 
+### Allowing capabilities in Visual Studio Code
+
+By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the capabilities and command patterns to your user settings:
+
+```json
+{
+  "terragrunt-ls.allow": ["exec"],
+  "terragrunt-ls.allowCmds": ["jq **"]
+}
+```
+
+A workspace's `.vscode/settings.json` can't set either one, so a repository can't grant itself anything.
+
 ## Neovim
 
 For Neovim, you can install the neovim plugin by adding the following to your editor:
@@ -98,11 +111,39 @@ return {
 
 Installation from Mason coming soon!
 
+### Allowing capabilities in Neovim
+
+By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the flags to `cmd`:
+
+```lua
+terragrunt_ls.setup {
+  cmd = { 'terragrunt-ls', '--allow=exec', '--allow-cmd', 'jq **' },
+}
+```
+
 ## Zed
 
 For now, clone this repo and point to the `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
 
 Installing from extension page coming soon!
+
+### Allowing capabilities in Zed
+
+By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the flags to the language server's binary arguments in your user settings:
+
+```json
+{
+  "lsp": {
+    "terragrunt": {
+      "binary": {
+        "arguments": ["--allow=exec", "--allow-cmd", "jq **"]
+      }
+    }
+  }
+}
+```
+
+Zed also reads `lsp` settings from a project's `.zed/settings.json` once you trust that project.
 
 ## Allowing capabilities
 
@@ -122,3 +163,5 @@ terragrunt-ls --allow=exec --allow-cmd 'jq **'
 ```
 
 `terragrunt-ls` refuses to start when a flag names an unknown capability, when a pattern can't be read, or when `--allow-cmd` is given without `--allow=exec`.
+
+Each editor section above shows where to set these flags: [Visual Studio Code](#allowing-capabilities-in-visual-studio-code), [Neovim](#allowing-capabilities-in-neovim), and [Zed](#allowing-capabilities-in-zed).
