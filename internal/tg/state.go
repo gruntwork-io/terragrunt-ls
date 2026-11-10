@@ -185,10 +185,8 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 	rootBody.SetAttributeValue(word, localVal)
 
 	return lsp.HoverResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
+		RPC: lsp.RPCVersion,
+		ID:  &id,
 		Result: &lsp.HoverResult{
 			Contents: protocol.MarkupContent{
 				Kind:  protocol.MarkupKindMarkdown,
@@ -200,10 +198,8 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 
 func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	return lsp.HoverResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
+		RPC: lsp.RPCVersion,
+		ID:  &id,
 	}
 }
 
@@ -239,8 +235,8 @@ func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position pro
 	case definition.DefinitionContextLocal:
 		if loc, ok := s.findLocalDefinition(l, st, docURI, position, target); ok {
 			return lsp.DefinitionResponse{
-				Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-				Result:   loc,
+				RPC: lsp.RPCVersion, ID: &id,
+				Result: loc,
 			}
 		}
 
@@ -279,10 +275,8 @@ func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position pro
 				)
 
 				return lsp.DefinitionResponse{
-					Response: lsp.Response{
-						RPC: lsp.RPCVersion,
-						ID:  &id,
-					},
+					RPC: lsp.RPCVersion,
+					ID:  &id,
 					Result: protocol.Location{
 						URI: defURI,
 						Range: protocol.Range{
@@ -345,10 +339,8 @@ func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position pro
 				)
 
 				return lsp.DefinitionResponse{
-					Response: lsp.Response{
-						RPC: lsp.RPCVersion,
-						ID:  &id,
-					},
+					RPC: lsp.RPCVersion,
+					ID:  &id,
 					Result: protocol.Location{
 						URI: defURI,
 						Range: protocol.Range{
@@ -400,10 +392,8 @@ func (s *State) findLocalDefinition(
 
 func newEmptyDefinitionResponse(id int, docURI uri.URI, position protocol.Position) lsp.DefinitionResponse {
 	return lsp.DefinitionResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
+		RPC: lsp.RPCVersion,
+		ID:  &id,
 		Result: protocol.Location{
 			URI: docURI,
 			Range: protocol.Range{
@@ -423,18 +413,16 @@ func (s *State) TextDocumentCompletion(
 	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return lsp.CompletionResponse{
-			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-			Result:   []protocol.CompletionItem{},
+			RPC: lsp.RPCVersion, ID: &id,
+			Result: []protocol.CompletionItem{},
 		}
 	}
 
 	items := completion.GetCompletions(l, st, position)
 
 	response := lsp.CompletionResponse{
-		Response: lsp.Response{
-			RPC: "2.0",
-			ID:  &id,
-		},
+		RPC:    "2.0",
+		ID:     &id,
 		Result: items,
 	}
 
@@ -445,8 +433,8 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI uri.URI) 
 	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return lsp.FormatResponse{
-			Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-			Result:   []protocol.TextEdit{},
+			RPC: lsp.RPCVersion, ID: &id,
+			Result: []protocol.TextEdit{},
 		}
 	}
 
@@ -458,10 +446,8 @@ func (s *State) TextDocumentFormatting(l logger.Logger, id int, docURI uri.URI) 
 	formatted := hclwrite.Format([]byte(st.Document))
 
 	return lsp.FormatResponse{
-		Response: lsp.Response{
-			RPC: lsp.RPCVersion,
-			ID:  &id,
-		},
+		RPC: lsp.RPCVersion,
+		ID:  &id,
 		Result: []protocol.TextEdit{
 			{
 				Range: protocol.Range{
@@ -484,8 +470,8 @@ func (s *State) PrepareRename(
 	position protocol.Position,
 ) lsp.PrepareRenameResponse {
 	empty := lsp.PrepareRenameResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-		Result:   nil,
+		RPC: lsp.RPCVersion, ID: &id,
+		Result: nil,
 	}
 
 	st, ok := s.Configs[docURI.FsPath()]
@@ -499,7 +485,7 @@ func (s *State) PrepareRename(
 	}
 
 	return lsp.PrepareRenameResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		RPC: lsp.RPCVersion, ID: &id,
 		Result: &lsp.PrepareRenameResult{
 			Range:       target.IdentRange,
 			Placeholder: target.Name,
@@ -515,8 +501,8 @@ func (s *State) TextDocumentRename(
 	newName string,
 ) lsp.RenameResponse {
 	empty := lsp.RenameResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-		Result:   nil,
+		RPC: lsp.RPCVersion, ID: &id,
+		Result: nil,
 	}
 
 	st, ok := s.Configs[docURI.FsPath()]
@@ -554,7 +540,7 @@ func (s *State) TextDocumentRename(
 	}
 
 	return lsp.RenameResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
+		RPC: lsp.RPCVersion, ID: &id,
 		Result: &protocol.WorkspaceEdit{
 			Changes: changes,
 		},
@@ -580,8 +566,8 @@ func (s *State) TextDocumentReferences(
 	includeDeclaration bool,
 ) lsp.ReferencesResponse {
 	empty := lsp.ReferencesResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-		Result:   nil,
+		RPC: lsp.RPCVersion, ID: &id,
+		Result: nil,
 	}
 
 	st, ok := s.Configs[docURI.FsPath()]
@@ -595,8 +581,8 @@ func (s *State) TextDocumentReferences(
 	}
 
 	return lsp.ReferencesResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: &id},
-		Result:   locations,
+		RPC: lsp.RPCVersion, ID: &id,
+		Result: locations,
 	}
 }
 

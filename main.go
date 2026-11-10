@@ -93,10 +93,8 @@ func handleMessage(
 
 		diagnostics := state.OpenDocument(ctx, l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
 		writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
-			Notification: lsp.Notification{
-				RPC:    lsp.RPCVersion,
-				Method: protocol.MethodTextDocumentPublishDiagnostics,
-			},
+			RPC:    lsp.RPCVersion,
+			Method: protocol.MethodTextDocumentPublishDiagnostics,
 			Params: protocol.PublishDiagnosticsParams{
 				URI:         notification.Params.TextDocument.URI,
 				Diagnostics: diagnostics,
@@ -142,10 +140,8 @@ func handleMessage(
 
 			diagnostics := state.UpdateDocument(ctx, l, notification.Params.TextDocument.URI, text)
 			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
-				Notification: lsp.Notification{
-					RPC:    lsp.RPCVersion,
-					Method: protocol.MethodTextDocumentPublishDiagnostics,
-				},
+				RPC:    lsp.RPCVersion,
+				Method: protocol.MethodTextDocumentPublishDiagnostics,
 				Params: protocol.PublishDiagnosticsParams{
 					URI:         notification.Params.TextDocument.URI,
 					Diagnostics: diagnostics,
