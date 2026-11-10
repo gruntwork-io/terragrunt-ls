@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,7 +121,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, unitURI, tt.document)
 			require.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -196,7 +198,14 @@ func TestState_UpdateDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.document,
+			)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -208,7 +217,14 @@ func TestState_UpdateDocument(t *testing.T) {
 				assert.Equal(t, tt.expected, state.Configs[filename].Cfg.Locals)
 			}
 
-			diags = state.UpdateDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.updated)
+			diags = state.UpdateDocument(
+				t.Context(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.updated,
+			)
 			assert.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -286,7 +302,14 @@ func TestState_Hover(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.document,
+			)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -549,7 +572,7 @@ func TestState_Definition(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, unitURI, tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -635,7 +658,14 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				"file:///terragrunt.hcl",
+				tt.document,
+			)
 			if tt.expectDiagnostics {
 				require.NotEmpty(t, diags)
 			} else {
@@ -659,7 +689,7 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
-	diags := state.OpenDocument(t.Context(), l, stackURI, "uni")
+	diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, stackURI, "uni")
 	require.NotEmpty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
@@ -678,7 +708,7 @@ func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, valuesURI, "loc")
+	diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, valuesURI, "loc")
 	assert.Empty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, valuesURI, protocol.Position{Line: 0, Character: 3})
@@ -696,7 +726,7 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -721,7 +751,7 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
+	diags := state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, valuesURI, `some_var = "hello"`)
 	assert.Empty(t, diags)
 
 	require.Len(t, state.Configs, 1)
@@ -741,7 +771,7 @@ func TestState_Hover_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -760,7 +790,7 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
+	_ = state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, valuesURI, `some_var = "hello"`)
 
 	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
 	assert.Nil(t, hover.Result)
@@ -776,7 +806,7 @@ func TestState_Definition_StackFile(t *testing.T) {
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -832,7 +862,14 @@ bar=   "baz"
 			l := testutils.NewTestLogger(t)
 
 			// First open the document to populate the state
-			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				"file:///terragrunt.hcl",
+				tt.document,
+			)
 			require.Empty(t, diags)
 
 			// Request formatting

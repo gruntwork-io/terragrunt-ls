@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"terragrunt-ls/internal/logger"
 	"testing"
+
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 )
 
 var _ logger.Logger = &testLogger{}
@@ -104,4 +106,9 @@ func (l *testLogger) Warn(msg string, args ...any) {
 // Error logs an error message
 func (l *testLogger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
+}
+
+// NewVenv returns a venv on the real system whose writers discard output.
+func NewVenv() *venv.Venv {
+	return venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
 }

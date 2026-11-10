@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
+	"flag"
+	"fmt"
 	"io"
 	"os"
 	"terragrunt-ls/internal/config"
@@ -11,11 +14,24 @@ import (
 	"terragrunt-ls/internal/rpc"
 	"terragrunt-ls/internal/tg"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"go.lsp.dev/protocol"
 )
 
+// exitCodeUsage is the exit code for flags terragrunt-ls cannot use. The flag
+// package exits with the same code.
+const exitCodeUsage = 2
+
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load(os.Args[1:])
+	if errors.Is(err, flag.ErrHelp) {
+		return
+	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(exitCodeUsage)
+	}
 
 	l := logger.NewLogger(cfg.LogFile, cfg.LogLevel)
 	defer func() {
@@ -32,6 +48,8 @@ func main() {
 	ctx := context.Background()
 	state := tg.NewState()
 	writer := os.Stdout
+	// The writers discard output, because stdout is for protocol messages.
+	v := venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
 
 	for scanner.Scan() {
 		msg := scanner.Bytes()
@@ -43,13 +61,15 @@ func main() {
 			continue
 		}
 
-		handleMessage(ctx, l, writer, state, method, contents)
+		handleMessage(ctx, l, v, cfg.Policy, writer, state, method, contents)
 	}
 }
 
 func handleMessage(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	writer io.Writer,
 	state tg.State,
 	method string,
@@ -91,7 +111,14 @@ func handleMessage(
 			"Text", notification.Params.TextDocument.Text,
 		)
 
-		diagnostics := state.OpenDocument(ctx, l, notification.Params.TextDocument.URI, notification.Params.TextDocument.Text)
+		diagnostics := state.OpenDocument(
+			ctx,
+			l,
+			v,
+			p,
+			notification.Params.TextDocument.URI,
+			notification.Params.TextDocument.Text,
+		)
 		writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 			RPC:    lsp.RPCVersion,
 			Method: protocol.MethodTextDocumentPublishDiagnostics,
@@ -138,7 +165,7 @@ func handleMessage(
 				"Text", text,
 			)
 
-			diagnostics := state.UpdateDocument(ctx, l, notification.Params.TextDocument.URI, text)
+			diagnostics := state.UpdateDocument(ctx, l, v, p, notification.Params.TextDocument.URI, text)
 			writeResponse(l, writer, lsp.PublishDiagnosticsNotification{
 				RPC:    lsp.RPCVersion,
 				Method: protocol.MethodTextDocumentPublishDiagnostics,

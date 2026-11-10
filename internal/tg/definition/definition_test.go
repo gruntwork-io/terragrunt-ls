@@ -8,6 +8,8 @@ import (
 	"terragrunt-ls/internal/tg/definition"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"go.lsp.dev/protocol"
 )
@@ -57,7 +59,7 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			s := tg.NewState()
 
-			s.OpenDocument(context.Background(), l, "file:///test.hcl", tt.document)
+			s.OpenDocument(context.Background(), l, testutils.NewVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
 
 			// State keys documents by file name, which has backslashes on Windows.
 			target, context := definition.GetDefinitionTargetWithContext(

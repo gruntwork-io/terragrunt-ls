@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -34,7 +36,7 @@ inputs = {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
+	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, uri.File(tgPath), content)
 
 	t.Run("includes declaration when requested", func(t *testing.T) {
 		t.Parallel()

@@ -2,7 +2,6 @@ package tg
 
 import (
 	"context"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -29,10 +28,14 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 	)
 }
 
-// newVenv returns the venv a parse runs in. Its writers discard output, because
-// the server writes protocol messages to stdout.
-func newVenv() *venv.Venv {
-	return venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
+// restrict returns v restricted to p for one parse, and the recorder of what
+// that venv refuses. It clones v's environment first, because a venv granted
+// the env capability otherwise shares its environment map with v.
+func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
+	rec := newDenialRecorder()
+	p.Observe = rec.observe
+
+	return venv.Restrict(v.WithEnvCloned(), p), rec
 }
 
 // newParsingContext builds a terragrunt ParsingContext for the given file and
@@ -59,13 +62,18 @@ func newParsingContext(
 	return config.WithCaches(ctx), pctx, parseDiags
 }
 
+// ParseTerragruntBuffer parses text as the unit configuration at filename, in v
+// restricted to p. The diagnostics include one for each distinct command or
+// decrypt the restriction refused. It overwrites p.Observe to record them.
 func ParseTerragruntBuffer(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	filename, text string,
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	v := newVenv()
+	v, denials := restrict(v, p)
 	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
 	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
@@ -78,7 +86,7 @@ func ParseTerragruntBuffer(
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
-	return cfg, diags
+	return cfg, append(diags, denials.diagnostics()...)
 }
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
@@ -269,14 +277,18 @@ func DetectFileType(filename string) store.FileType {
 	}
 }
 
-// ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
+// ParseStackBuffer parses a terragrunt.stack.hcl file in v restricted to p, and
+// returns the stack config and diagnostics. The diagnostics include the
+// refusals [ParseTerragruntBuffer] describes.
 func ParseStackBuffer(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	filename, text string,
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	v := newVenv()
+	v, denials := restrict(v, p)
 	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
 	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
@@ -289,5 +301,5 @@ func ParseStackBuffer(
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
-	return cfg, diags
+	return cfg, append(diags, denials.diagnostics()...)
 }

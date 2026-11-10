@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -33,7 +35,7 @@ inputs = {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
 
 	// Cursor on `foo` in `local.foo`.
 	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 5, Character: 14})
@@ -60,7 +62,7 @@ func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
 
 	// Cursor on `nonexistent` — no `locals` block defines it.
 	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 1, Character: 18})

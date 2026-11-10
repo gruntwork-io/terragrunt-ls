@@ -17,6 +17,7 @@ import (
 	"terragrunt-ls/internal/tg/text"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
@@ -32,19 +33,28 @@ func NewState() State {
 	return State{Configs: map[string]*store.Store{}}
 }
 
-func (s *State) OpenDocument(ctx context.Context, l logger.Logger, docURI uri.URI, text string) []protocol.Diagnostic {
+func (s *State) OpenDocument(
+	ctx context.Context,
+	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
+	docURI uri.URI,
+	text string,
+) []protocol.Diagnostic {
 	l.Debug(
 		"Opening document",
 		"uri", docURI,
 		"text", text,
 	)
 
-	return s.updateState(ctx, l, docURI, text)
+	return s.updateState(ctx, l, v, p, docURI, text)
 }
 
 func (s *State) UpdateDocument(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	docURI uri.URI,
 	text string,
 ) []protocol.Diagnostic {
@@ -54,10 +64,17 @@ func (s *State) UpdateDocument(
 		"text", text,
 	)
 
-	return s.updateState(ctx, l, docURI, text)
+	return s.updateState(ctx, l, v, p, docURI, text)
 }
 
-func (s *State) updateState(ctx context.Context, l logger.Logger, docURI uri.URI, text string) []protocol.Diagnostic {
+func (s *State) updateState(
+	ctx context.Context,
+	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
+	docURI uri.URI,
+	text string,
+) []protocol.Diagnostic {
 	filename := docURI.FsPath()
 	fileType := DetectFileType(filename)
 
@@ -82,7 +99,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI uri.URI
 
 	switch fileType {
 	case store.FileTypeUnit:
-		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, filename, text)
+		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, v, p, filename, text)
 
 		l.Debug(
 			"Config",
@@ -103,7 +120,7 @@ func (s *State) updateState(ctx context.Context, l logger.Logger, docURI uri.URI
 		diags = unitDiags
 
 	case store.FileTypeStack:
-		stackCfg, stackDiags := ParseStackBuffer(ctx, l, filename, text)
+		stackCfg, stackDiags := ParseStackBuffer(ctx, l, v, p, filename, text)
 
 		l.Debug(
 			"Stack Config",

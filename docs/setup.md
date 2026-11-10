@@ -103,3 +103,22 @@ Installation from Mason coming soon!
 For now, clone this repo and point to the `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
 
 Installing from extension page coming soon!
+
+## Allowing capabilities
+
+By default, `terragrunt-ls` parses a configuration without running commands, making network requests, decrypting SOPS files, or reading environment variables. A `run_cmd()` returns empty output, `get_env()` returns its default, and `sops_decrypt_file()` fails. Each refused command or decrypt appears as an information diagnostic that names the flag that would allow it.
+
+Grant more with these flags:
+
+- `--allow` grants a capability: `exec`, `http`, `sops`, or `env`. Repeat it or separate values with commas.
+- `--allow-cmd` lets parsing run a program a configuration names, given as a pattern such as `'jq **'`. The first word is the program and each later word matches one argument, where `**` matches any number of arguments. It requires `--allow=exec`.
+
+```bash
+# get_env() reads the editor's environment
+terragrunt-ls --allow=env
+
+# run_cmd() may run jq with any arguments
+terragrunt-ls --allow=exec --allow-cmd 'jq **'
+```
+
+`terragrunt-ls` refuses to start when a flag names an unknown capability, when a pattern can't be read, or when `--allow-cmd` is given without `--allow=exec`.

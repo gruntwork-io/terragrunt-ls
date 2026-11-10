@@ -7,6 +7,8 @@ import (
 	"terragrunt-ls/internal/tg/rename"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -119,7 +121,7 @@ inputs = {
 			s := tg.NewState()
 
 			docURI := uri.File("/test/terragrunt.hcl")
-			s.OpenDocument(t.Context(), l, docURI, tt.document)
+			s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, tt.document)
 
 			target := rename.GetRenameTarget(l, s.Configs[docURI.FsPath()], tt.position)
 
@@ -156,7 +158,7 @@ dependency "b" {
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
 	docURI := uri.File(hclPath)
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
 
 	st := s.Configs[docURI.FsPath()]
 
@@ -197,7 +199,7 @@ func TestFindAllOccurrences_NoDefinition(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
 	docURI := uri.File(hclPath)
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
 
 	st := s.Configs[docURI.FsPath()]
 

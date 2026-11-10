@@ -9,6 +9,8 @@ import (
 	"terragrunt-ls/internal/tg/store"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,7 +142,7 @@ stack "service" {
 			filename := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseStackBuffer(t.Context(), l, filename, tt.content)
+			cfg, diags := tg.ParseStackBuffer(t.Context(), l, testutils.NewVenv(), venv.Policy{}, filename, tt.content)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")
@@ -277,7 +279,14 @@ inputs = {
 			filename := tt.setup(t, tmpDir)
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseTerragruntBuffer(context.Background(), l, filename, tt.content)
+			cfg, diags := tg.ParseTerragruntBuffer(
+				context.Background(),
+				l,
+				testutils.NewVenv(),
+				venv.Policy{},
+				filename,
+				tt.content,
+			)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")
