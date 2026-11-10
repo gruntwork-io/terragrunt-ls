@@ -13,10 +13,10 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// TestParseTerragruntBufferReportsARefusedRunCmd pins that a run_cmd() the
-// policy refuses returns empty output, and that the parse reports it with the
-// flags that would let it run.
-func TestParseTerragruntBufferReportsARefusedRunCmd(t *testing.T) {
+// TestParseTerragruntBufferReportsADeniedRunCmd pins that a run_cmd() denied by
+// the policy returns empty output, and that the parse reports a diagnostic
+// naming the flags that allow the command.
+func TestParseTerragruntBufferReportsADeniedRunCmd(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -27,14 +27,14 @@ func TestParseTerragruntBufferReportsARefusedRunCmd(t *testing.T) {
 		{
 			name:   "without exec",
 			policy: venv.Policy{},
-			message: `"jq -n 1" returned empty output, because terragrunt-ls was started without --allow=exec. ` +
-				`Start terragrunt-ls with --allow=exec and --allow-cmd 'jq **' to run the command.`,
+			message: `terragrunt-ls did not run "jq -n 1" and used empty output instead. ` +
+				`To run it, start terragrunt-ls with --allow=exec and --allow-cmd 'jq **'.`,
 		},
 		{
-			name:   "with exec, unallowed",
+			name:   "with exec and no matching allow-cmd",
 			policy: venv.Policy{Granted: venv.Capabilities{venv.CapabilityExec: {}}},
-			message: `"jq -n 1" returned empty output, because no --allow-cmd pattern matches it. ` +
-				`Start terragrunt-ls with --allow-cmd 'jq **' to run the command.`,
+			message: `terragrunt-ls did not run "jq -n 1" because no --allow-cmd pattern matches it, ` +
+				`and used empty output instead. To run it, start terragrunt-ls with --allow-cmd 'jq **'.`,
 		},
 	}
 
@@ -63,15 +63,17 @@ func TestParseTerragruntBufferReportsARefusedRunCmd(t *testing.T) {
 	}
 }
 
-// TestParseTerragruntBufferRunsAnAllowedRunCmd pins that a run_cmd() an
-// --allow-cmd pattern matches runs, and that the parse reports nothing for it.
+// TestParseTerragruntBufferRunsAnAllowedRunCmd pins that a run_cmd() runs when
+// an --allow-cmd pattern matches it, and that the parse reports no diagnostic
+// for it.
 func TestParseTerragruntBufferRunsAnAllowedRunCmd(t *testing.T) {
 	t.Parallel()
 
 	allowCmds, err := venv.ParseAllowCmds([]string{"go env GOOS"})
 	require.NoError(t, err)
 
-	// The env capability keeps PATH, which finding go needs.
+	// Looking up go needs PATH, and the venv has PATH only with the env
+	// capability.
 	policy := venv.Policy{
 		Granted:   venv.Capabilities{venv.CapabilityExec: {}, venv.CapabilityEnv: {}},
 		AllowCmds: allowCmds,
@@ -91,10 +93,10 @@ func TestParseTerragruntBufferRunsAnAllowedRunCmd(t *testing.T) {
 	assert.Empty(t, diags)
 }
 
-// TestParseTerragruntBufferBoundsRefusalDiagnostics pins that a configuration
-// causing more distinct refusals than the parse reports gets the first 25 and
-// one diagnostic saying the rest were left out.
-func TestParseTerragruntBufferBoundsRefusalDiagnostics(t *testing.T) {
+// TestParseTerragruntBufferCapsDenialDiagnostics pins that a parse with 30
+// distinct denials reports the first 25, followed by one diagnostic saying that
+// the rest are not shown.
+func TestParseTerragruntBufferCapsDenialDiagnostics(t *testing.T) {
 	t.Parallel()
 
 	filename := filepath.Join(t.TempDir(), "terragrunt.hcl")
@@ -110,7 +112,7 @@ func TestParseTerragruntBufferBoundsRefusalDiagnostics(t *testing.T) {
 	require.Len(t, diags, 26)
 	assert.Equal(
 		t,
-		protocol.String("Parsing refused more than 25 commands or decrypts. Only the first 25 are shown."),
+		protocol.String("terragrunt-ls denied more than 25 commands or SOPS decryptions. Only the first 25 are shown."),
 		diags[25].Message,
 	)
 }

@@ -11,16 +11,17 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// maxDenialDiags bounds the diagnostics one parse reports for refusals. The
-// configuration decides how many distinct refusals a parse causes, for example
-// with a run_cmd() inside a for expression.
+// maxDenialDiags is the largest number of denials that one parse reports. A
+// configuration can produce any number of them.
 const maxDenialDiags = 25
 
-// plainProgram matches a program name that can go in a single-quoted
-// --allow-cmd suggestion as written.
+// plainProgram matches a program name that is safe to print inside single
+// quotes in a suggested --allow-cmd flag. A name with a space or a quote in it
+// would need shell escaping.
 var plainProgram = regexp.MustCompile(`^[A-Za-z0-9._/+-]+$`)
 
-// denialRecorder collects the distinct refusals of one parse.
+// denialRecorder collects the denials from one parse. It drops repeats, and it
+// drops every denial after the first maxDenialDiags.
 type denialRecorder struct {
 	seen      map[venv.Denial]struct{}
 	denials   []venv.Denial
@@ -32,8 +33,8 @@ func newDenialRecorder() *denialRecorder {
 	return &denialRecorder{seen: map[venv.Denial]struct{}{}}
 }
 
-// observe records d unless it was seen before. It is a [venv.Policy] Observe,
-// so the parse may call it from several goroutines at once.
+// observe records d. Terragrunt calls it through [venv.Policy.Observe], and may
+// do so from several goroutines at once.
 func (r *denialRecorder) observe(d venv.Denial) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -52,8 +53,9 @@ func (r *denialRecorder) observe(d venv.Denial) {
 	r.denials = append(r.denials, d)
 }
 
-// diagnostics returns an Information diagnostic for each recorded refusal. They
-// have no range, because a refusal does not say which call caused it.
+// diagnostics returns one Information diagnostic for each recorded denial, and
+// one more if any denials were dropped. The diagnostics have no range because a
+// [venv.Denial] does not say where in the file the call is.
 func (r *denialRecorder) diagnostics() []protocol.Diagnostic {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -65,7 +67,7 @@ func (r *denialRecorder) diagnostics() []protocol.Diagnostic {
 
 	if r.truncated {
 		diags = append(diags, denialDiagnostic(fmt.Sprintf(
-			"Parsing refused more than %d commands or decrypts. Only the first %d are shown.",
+			"terragrunt-ls denied more than %d commands or SOPS decryptions. Only the first %d are shown.",
 			maxDenialDiags,
 			maxDenialDiags,
 		)))
@@ -82,36 +84,37 @@ func denialDiagnostic(msg string) protocol.Diagnostic {
 	}
 }
 
-// denialMessage describes what d refused and names the flag that would allow it.
+// denialMessage returns the diagnostic text for d. The text names the command
+// or file that was denied and the flags that allow it.
 //
-// Panics when d.Kind is not a [venv.DenialKind] Terragrunt defines.
+// Panics when d.Kind is not one of the [venv.DenialKind] constants.
 func denialMessage(d venv.Denial) string {
 	switch d.Kind {
 	case venv.StubbedCommand:
 		return fmt.Sprintf(
-			"%q returned empty output, because terragrunt-ls was started without --%s=%s. "+
-				"Start terragrunt-ls with --%s=%s and %s to run the command.",
+			"terragrunt-ls did not run %q and used empty output instead. "+
+				"To run it, start terragrunt-ls with --%s=%s and %s.",
 			d.Cmdline,
-			lsconfig.AllowFlagName, venv.CapabilityExec,
 			lsconfig.AllowFlagName, venv.CapabilityExec,
 			allowCmdSuggestion(d.Program),
 		)
 	case venv.RefusedCommand:
 		return fmt.Sprintf(
-			"%q returned empty output, because no --%s pattern matches it. Start terragrunt-ls with %s to run the command.",
+			"terragrunt-ls did not run %q because no --%s pattern matches it, and used empty output instead. "+
+				"To run it, start terragrunt-ls with %s.",
 			d.Cmdline,
 			lsconfig.AllowCmdFlagName,
 			allowCmdSuggestion(d.Program),
 		)
 	case venv.DeniedIaC, venv.DeniedTrustedCommand:
 		return fmt.Sprintf(
-			"%q did not run, because terragrunt-ls was started without --%s=%s.",
+			"terragrunt-ls did not run %q. To run it, start terragrunt-ls with --%s=%s.",
 			d.Cmdline,
 			lsconfig.AllowFlagName, venv.CapabilityExec,
 		)
 	case venv.DeniedSops:
 		return fmt.Sprintf(
-			"%q was not decrypted, because terragrunt-ls was started without --%s=%s.",
+			"terragrunt-ls did not decrypt %q. To decrypt it, start terragrunt-ls with --%s=%s.",
 			d.Path,
 			lsconfig.AllowFlagName, venv.CapabilitySops,
 		)
@@ -120,8 +123,9 @@ func denialMessage(d venv.Denial) string {
 	panic(fmt.Sprintf("tg: unknown venv.DenialKind %d", d.Kind))
 }
 
-// allowCmdSuggestion returns an --allow-cmd flag that lets program run with any
-// arguments, or a description of one when program cannot be quoted as written.
+// allowCmdSuggestion returns the --allow-cmd flag that allows program with any
+// arguments. When program does not match plainProgram, it describes the flag
+// in words.
 func allowCmdSuggestion(program string) string {
 	if !plainProgram.MatchString(program) {
 		return fmt.Sprintf("an --%s pattern that matches it", lsconfig.AllowCmdFlagName)

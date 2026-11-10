@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLoadGrantsNothingByDefault pins that Load without flags returns a policy
-// that grants no capability and allows no program.
+// TestLoadGrantsNothingByDefault pins that Load returns an empty policy when it
+// gets no flags.
 func TestLoadGrantsNothingByDefault(t *testing.T) {
 	t.Parallel()
 
@@ -21,10 +21,10 @@ func TestLoadGrantsNothingByDefault(t *testing.T) {
 	assert.Empty(t, cfg.Policy.AllowCmds)
 }
 
-// TestLoadGrantsWhatTheAllowFlagsName pins that --allow takes repeated and
-// comma-separated capabilities, and that the policy has the --allow-cmd
-// patterns.
-func TestLoadGrantsWhatTheAllowFlagsName(t *testing.T) {
+// TestLoadParsesAllowFlags pins that Load reads --allow both when the flag is
+// repeated and when its value is comma-separated, and that it adds an
+// --allow-cmd pattern to the policy.
+func TestLoadParsesAllowFlags(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load([]string{"--allow=exec, env", "--allow", "sops", "--allow-cmd", "jq **"})
@@ -39,9 +39,9 @@ func TestLoadGrantsWhatTheAllowFlagsName(t *testing.T) {
 	assert.True(t, cfg.Policy.AllowCmds[0].Matches("jq", []string{"-r", ".name"}))
 }
 
-// TestLoadRejectsFlagsItCannotHonor pins that Load fails on an --allow or
-// --allow-cmd value that would grant less than the operator asked for.
-func TestLoadRejectsFlagsItCannotHonor(t *testing.T) {
+// TestLoadRejectsInvalidAllowFlags pins the error that Load returns for each
+// kind of invalid --allow or --allow-cmd value.
+func TestLoadRejectsInvalidAllowFlags(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

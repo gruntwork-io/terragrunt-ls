@@ -18,8 +18,8 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-// exitCodeUsage is the exit code for flags terragrunt-ls cannot use. The flag
-// package exits with the same code.
+// exitCodeUsage is the exit code for invalid flags. The flag package uses the
+// same code under [flag.ExitOnError].
 const exitCodeUsage = 2
 
 func main() {
@@ -48,7 +48,8 @@ func main() {
 	ctx := context.Background()
 	state := tg.NewState()
 	writer := os.Stdout
-	// The writers discard output, because stdout is for protocol messages.
+	// The client reads LSP messages from stdout, so output that Terragrunt
+	// writes while parsing is discarded.
 	v := venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
 
 	for scanner.Scan() {

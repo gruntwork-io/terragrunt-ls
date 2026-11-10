@@ -108,7 +108,8 @@ func (l *testLogger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
 }
 
-// NewVenv returns a venv on the real system whose writers discard output.
+// NewVenv returns a venv that uses the real OS and discards everything written
+// to its writers.
 func NewVenv() *venv.Venv {
 	return venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
 }

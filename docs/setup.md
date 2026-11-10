@@ -63,7 +63,7 @@ Installation from the Visual Studio Extensions Marketplace coming soon!
 
 ### Allowing capabilities in Visual Studio Code
 
-By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the capabilities and command patterns to your user settings:
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), set `terragrunt-ls.allow` and `terragrunt-ls.allowCmds` in your user settings:
 
 ```json
 {
@@ -72,7 +72,7 @@ By default, the language server runs no commands while it parses. [Allowing capa
 }
 ```
 
-A workspace's `.vscode/settings.json` can't set either one, so a repository can't grant itself anything.
+Visual Studio Code ignores both settings in a workspace's `.vscode/settings.json`, so a repository that you open cannot grant capabilities to itself.
 
 ## Neovim
 
@@ -113,7 +113,7 @@ Installation from Mason coming soon!
 
 ### Allowing capabilities in Neovim
 
-By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the flags to `cmd`:
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), add the flags to `cmd`:
 
 ```lua
 terragrunt_ls.setup {
@@ -129,7 +129,7 @@ Installing from extension page coming soon!
 
 ### Allowing capabilities in Zed
 
-By default, the language server runs no commands while it parses. [Allowing capabilities](#allowing-capabilities) describes what you can grant. Add the flags to the language server's binary arguments in your user settings:
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), add the flags to the language server's binary arguments in your user settings:
 
 ```json
 {
@@ -143,25 +143,31 @@ By default, the language server runs no commands while it parses. [Allowing capa
 }
 ```
 
-Zed also reads `lsp` settings from a project's `.zed/settings.json` once you trust that project.
+Zed also reads `lsp` settings from a project's `.zed/settings.json` once you trust that project, so a trusted project can set these flags.
 
 ## Allowing capabilities
 
-By default, `terragrunt-ls` parses a configuration without running commands, making network requests, decrypting SOPS files, or reading environment variables. A `run_cmd()` returns empty output, `get_env()` returns its default, and `sops_decrypt_file()` fails. Each refused command or decrypt appears as an information diagnostic that names the flag that would allow it.
+`terragrunt-ls` parses your configuration as you edit it. By default, the parse does not run commands, make network requests, decrypt SOPS files, or read environment variables:
 
-Grant more with these flags:
+- `run_cmd()` returns empty output.
+- `get_env()` sees an empty environment.
+- `sops_decrypt_file()` fails.
 
-- `--allow` grants a capability: `exec`, `http`, `sops`, or `env`. Repeat it or separate values with commas.
-- `--allow-cmd` lets parsing run a program a configuration names, given as a pattern such as `'jq **'`. The first word is the program and each later word matches one argument, where `**` matches any number of arguments. It requires `--allow=exec`.
+When `terragrunt-ls` denies a command or a SOPS decryption, it reports an information diagnostic that names the flag you need.
+
+Two flags change the default:
+
+- `--allow` grants one of the capabilities `exec`, `http`, `sops`, or `env`. To grant several, repeat the flag or separate the values with commas.
+- `--allow-cmd` takes a pattern, such as `'jq **'`, for a command that `run_cmd()` is allowed to run. The first word is the program. Each word after it matches one argument, and `**` matches any number of arguments. `--allow-cmd` requires `--allow=exec`.
 
 ```bash
-# get_env() reads the editor's environment
+# Let get_env() read the environment variables of terragrunt-ls
 terragrunt-ls --allow=env
 
-# run_cmd() may run jq with any arguments
+# Let run_cmd() run jq with any arguments
 terragrunt-ls --allow=exec --allow-cmd 'jq **'
 ```
 
-`terragrunt-ls` refuses to start when a flag names an unknown capability, when a pattern can't be read, or when `--allow-cmd` is given without `--allow=exec`.
+`terragrunt-ls` exits with an error if `--allow` names an unknown capability, if an `--allow-cmd` pattern is invalid, or if `--allow-cmd` is used without `--allow=exec`.
 
-Each editor section above shows where to set these flags: [Visual Studio Code](#allowing-capabilities-in-visual-studio-code), [Neovim](#allowing-capabilities-in-neovim), and [Zed](#allowing-capabilities-in-zed).
+To set these flags in your editor, see the section for [Visual Studio Code](#allowing-capabilities-in-visual-studio-code), [Neovim](#allowing-capabilities-in-neovim), or [Zed](#allowing-capabilities-in-zed).

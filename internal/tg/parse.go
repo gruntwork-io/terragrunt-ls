@@ -28,13 +28,14 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 	)
 }
 
-// restrict returns v restricted to p for one parse, and the recorder of what
-// that venv refuses. It clones v's environment first, because a venv granted
-// the env capability otherwise shares its environment map with v.
+// restrict returns a copy of v that is limited to p, and a recorder that
+// collects the denials from that copy.
 func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
 	rec := newDenialRecorder()
 	p.Observe = rec.observe
 
+	// When p grants env, venv.Restrict shares v's environment map with the
+	// copy. v is reused for every parse, so each parse gets its own clone.
 	return venv.Restrict(v.WithEnvCloned(), p), rec
 }
 
@@ -62,9 +63,12 @@ func newParsingContext(
 	return config.WithCaches(ctx), pctx, parseDiags
 }
 
-// ParseTerragruntBuffer parses text as the unit configuration at filename, in v
-// restricted to p. The diagnostics include one for each distinct command or
-// decrypt the restriction refused. It overwrites p.Observe to record them.
+// ParseTerragruntBuffer parses text as the unit configuration at filename. The
+// parse runs in a copy of v that is limited to p.
+//
+// The returned diagnostics include an Information diagnostic for each distinct
+// command or SOPS decryption that p denied. The parse replaces p.Observe to
+// collect the denials, so an Observe set by the caller is never called.
 func ParseTerragruntBuffer(
 	ctx context.Context,
 	l logger.Logger,
@@ -277,9 +281,9 @@ func DetectFileType(filename string) store.FileType {
 	}
 }
 
-// ParseStackBuffer parses a terragrunt.stack.hcl file in v restricted to p, and
-// returns the stack config and diagnostics. The diagnostics include the
-// refusals [ParseTerragruntBuffer] describes.
+// ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack
+// config and diagnostics. It limits v to p and reports denials in the same way
+// as [ParseTerragruntBuffer].
 func ParseStackBuffer(
 	ctx context.Context,
 	l logger.Logger,

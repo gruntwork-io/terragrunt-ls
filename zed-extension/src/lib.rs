@@ -15,7 +15,7 @@ impl zed::Extension for TerragruntLsExtension {
             .which("terragrunt-ls")
             .ok_or_else(|| "The LSP for Terragrunt 'terragrunt-ls' is not installed".to_string())?;
 
-        // The server's flags, such as --allow, come from `lsp.terragrunt.binary.arguments`.
+        // Users set server flags such as --allow in `lsp.terragrunt.binary.arguments`.
         let args = zed::settings::LspSettings::for_worktree(language_server_id.as_ref(), worktree)?
             .binary
             .and_then(|binary| binary.arguments)

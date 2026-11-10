@@ -15,7 +15,8 @@ import (
 type Config struct {
 	// LogFile is the path to the log file, empty string means stderr
 	LogFile string
-	// Policy is what parsing a configuration may do beyond reading files.
+	// Policy is the set of capabilities and command patterns that the --allow
+	// and --allow-cmd flags granted. The zero value grants nothing.
 	Policy venv.Policy
 	// LogLevel is the log level to use
 	LogLevel slog.Level
@@ -29,30 +30,31 @@ const (
 )
 
 const (
-	// AllowFlagName is the name of the flag that grants a capability parsing
-	// otherwise refuses.
+	// AllowFlagName is the flag that grants a capability: exec, http, sops, or
+	// env.
 	AllowFlagName = "allow"
-	// AllowCmdFlagName is the name of the flag that lets parsing run a program
-	// a configuration names, matched on its program and arguments.
+	// AllowCmdFlagName is the flag that takes a pattern for a command that
+	// run_cmd() is allowed to run.
 	AllowCmdFlagName = "allow-cmd"
 )
 
-// Load reads configuration from environment variables and from args, the
-// command-line arguments without the program name.
+// Load reads configuration from environment variables and from args, which are
+// the command-line arguments without the program name.
 //
-// Returns [flag.ErrHelp] when args ask for help, [venv.ErrUnknownCapability]
-// for an --allow value that names no capability, [venv.ErrInvalidAllowCmd] for
-// an --allow-cmd pattern it cannot read, and [venv.ErrAllowCmdRequiresExec] for
-// --allow-cmd without --allow=exec.
+// Returns [flag.ErrHelp] when args contain -h or -help. Returns
+// [venv.ErrUnknownCapability] when an --allow value is not a capability name,
+// [venv.ErrInvalidAllowCmd] when an --allow-cmd pattern does not parse, and
+// [venv.ErrAllowCmdRequiresExec] when --allow-cmd is set without --allow=exec.
 func Load(args []string) (*Config, error) {
 	var allow, allowCmds stringsFlag
 
 	fs := flag.NewFlagSet("terragrunt-ls", flag.ContinueOnError)
 	fs.Var(&allow, AllowFlagName,
-		"Grant a capability parsing otherwise refuses: exec, http, sops, or env. Repeatable, or comma-separated.")
+		"Capability to grant while parsing: exec, http, sops, or env. "+
+			"Repeat the flag or separate values with commas.")
 	fs.Var(&allowCmds, AllowCmdFlagName,
-		"Let parsing run a program a configuration names, such as one run_cmd calls, given as a pattern like 'jq **'. "+
-			"Repeatable. Requires --allow=exec.")
+		"Pattern, such as 'jq **', for a command that run_cmd() is allowed to run. "+
+			"Repeat the flag for more patterns. Requires --allow=exec.")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -82,7 +84,6 @@ func Load(args []string) (*Config, error) {
 	return cfg, nil
 }
 
-// parsePolicy builds the policy the --allow and --allow-cmd values grant.
 func parsePolicy(allow, allowCmds []string) (venv.Policy, error) {
 	names := make([]string, 0, len(allow))
 	for _, value := range allow {
@@ -107,8 +108,8 @@ func parsePolicy(allow, allowCmds []string) (venv.Policy, error) {
 	return policy, nil
 }
 
-// stringsFlag is a [flag.Value] that keeps every value it is given, so its
-// flag can repeat.
+// stringsFlag is a [flag.Value] for a flag that can be repeated. It keeps the
+// value of each occurrence.
 type stringsFlag []string
 
 func (f *stringsFlag) String() string {

@@ -75,7 +75,8 @@ export function activate(context: ExtensionContext) {
 	// Start the client. This will also launch the server
 	client.start();
 
-	// The server reads its flags once, when it starts.
+	// The server reads its flags only at startup, so a change to these settings
+	// needs a reload.
 	context.subscriptions.push(workspace.onDidChangeConfiguration(async (event) => {
 		if (!event.affectsConfiguration('terragrunt-ls.allow') && !event.affectsConfiguration('terragrunt-ls.allowCmds')) {
 			return;
@@ -91,9 +92,9 @@ export function activate(context: ExtensionContext) {
 	}));
 }
 
-// allowArgs returns the server flags for the terragrunt-ls.allow and
-// terragrunt-ls.allowCmds settings. Both settings have machine scope, so a
-// repository's .vscode/settings.json cannot set them.
+// allowArgs converts the terragrunt-ls.allow and terragrunt-ls.allowCmds
+// settings into server flags. package.json gives both settings machine scope,
+// which stops a repository's .vscode/settings.json from setting them.
 function allowArgs(): string[] {
 	const config = workspace.getConfiguration('terragrunt-ls');
 	const allow = config.get<string[]>('allow', []);

@@ -72,7 +72,7 @@
 					},
 					"uniqueItems": true,
 					"default": [],
-					"markdownDescription": "Capabilities the server may use while parsing. By default it runs no commands, makes no network requests, decrypts no SOPS files, and reads no environment variables. Each value is passed to the server as `--allow`. A workspace cannot set this."
+					"markdownDescription": "Capabilities that the language server is allowed to use while it parses a configuration. With none set, the server does not run commands, make network requests, decrypt SOPS files, or read environment variables. Each value is passed to the server as `--allow`. Workspace settings cannot set this."
 				},
 				"terragrunt-ls.allowCmds": {
 					"scope": "machine",
@@ -81,7 +81,7 @@
 						"type": "string"
 					},
 					"default": [],
-					"markdownDescription": "Programs a configuration may run while the server parses it, such as one `run_cmd()` calls, given as patterns like `jq **`. Each value is passed to the server as `--allow-cmd`. Requires `exec` in `#terragrunt-ls.allow#`. A workspace cannot set this."
+					"markdownDescription": "Patterns, such as `jq **`, for commands that `run_cmd()` is allowed to run while the language server parses a configuration. Each value is passed to the server as `--allow-cmd`. Requires `exec` in `#terragrunt-ls.allow#`. Workspace settings cannot set this."
 				},
 				"terragrunt-ls.trace.server": {
 					"scope": "window",
