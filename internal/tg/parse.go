@@ -10,10 +10,10 @@ import (
 	"terragrunt-ls/internal/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
-	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
 	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/gruntwork-io/terragrunt/pkg/options"
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
@@ -29,36 +29,34 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 	)
 }
 
+// newVenv returns the venv a parse runs in. Its writers discard output, because
+// the server writes protocol messages to stdout.
+func newVenv() *venv.Venv {
+	return venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
+}
+
 // newParsingContext builds a terragrunt ParsingContext for the given file and
 // returns a pointer to the HCL diagnostics slice that the parser will populate.
 func newParsingContext(
 	ctx context.Context,
-	tgLogger tgLog.Logger,
+	v *venv.Venv,
 	filename string,
 ) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
-	parseOptions := []hclparse.Option{
-		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-			*parseDiags = append(*parseDiags, hclDiags...)
-			return hclDiags, nil
-		}),
-	}
-
-	ctx, pctx := config.NewParsingContext(
-		ctx,
-		tgLogger,
-		config.WithStrictControls(options.NewTerragruntOptions().StrictControls),
+	pctx := config.NewParsingContext(
+		config.WithStrictControls(options.NewTerragruntOptions(v.Exec).StrictControls),
 	)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
 	pctx.SkipOutput = true
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
-	pctx.Writers.Writer = io.Discard
-	pctx.Writers.ErrWriter = io.Discard
-	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
+	pctx.Parser.DiagnosticsHandler = func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
+		*parseDiags = append(*parseDiags, hclDiags...)
+		return hclDiags, nil
+	}
 
-	return ctx, pctx, parseDiags
+	return config.WithCaches(ctx), pctx, parseDiags
 }
 
 func ParseTerragruntBuffer(
@@ -67,9 +65,10 @@ func ParseTerragruntBuffer(
 	filename, text string,
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
+	v := newVenv()
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
-	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -277,9 +276,10 @@ func ParseStackBuffer(
 	filename, text string,
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
+	v := newVenv()
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
