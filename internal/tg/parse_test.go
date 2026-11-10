@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"terragrunt-ls/internal/testutils"
@@ -280,7 +279,7 @@ inputs = {
 
 			l := testutils.NewTestLogger(t)
 			cfg, diags := tg.ParseTerragruntBuffer(
-				context.Background(),
+				t.Context(),
 				l,
 				testutils.NewVenv(),
 				venv.Policy{},

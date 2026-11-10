@@ -1,7 +1,6 @@
 package definition_test
 
 import (
-	"context"
 	"path/filepath"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
@@ -59,7 +58,7 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			s := tg.NewState()
 
-			s.OpenDocument(context.Background(), l, testutils.NewVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
+			s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
 
 			// State keys documents by file name, which has backslashes on Windows.
 			target, context := definition.GetDefinitionTargetWithContext(
