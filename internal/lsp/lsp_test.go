@@ -103,6 +103,49 @@ func TestCompletionResponseEncoding(t *testing.T) {
 	assert.JSONEq(t, expected, encodedBody(t, msg))
 }
 
+func TestHoverResponseEncoding(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		result   *lsp.HoverResult
+		name     string
+		expected string
+	}{
+		{
+			name: "markdown",
+			result: &lsp.HoverResult{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.MarkupKindMarkdown,
+					Value: "# locals",
+				},
+			},
+			expected: `{
+				"id": 7,
+				"jsonrpc": "2.0",
+				"result": {"contents": {"kind": "markdown", "value": "# locals"}}
+			}`,
+		},
+		{
+			name:     "nothing to show",
+			result:   nil,
+			expected: `{"id": 7, "jsonrpc": "2.0", "result": null}`,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			msg := lsp.HoverResponse{
+				Response: lsp.Response{RPC: lsp.RPCVersion, ID: new(7)},
+				Result:   tt.result,
+			}
+
+			assert.JSONEq(t, tt.expected, encodedBody(t, msg))
+		})
+	}
+}
+
 func TestInitializeRequestDecoding(t *testing.T) {
 	t.Parallel()
 

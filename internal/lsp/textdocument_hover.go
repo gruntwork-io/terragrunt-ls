@@ -7,9 +7,12 @@ type HoverRequest struct {
 	Request
 }
 
+// HoverResponse is the response to a textDocument/hover request.
+//
+// A nil Result is sent as a JSON null, which tells the client there is nothing to show.
 type HoverResponse struct {
+	Result *HoverResult `json:"result"`
 	Response
-	Result HoverResult `json:"result"`
 }
 
 type HoverResult struct {
