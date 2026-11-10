@@ -12,6 +12,7 @@ import (
 
 	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/uri"
 )
 
 var _ logger.Logger = &testLogger{}
@@ -122,11 +123,15 @@ func (l *testLogger) Error(msg string, args ...any) {
 
 // WorkDir returns the working directory of v, which is an absolute path on
 // every platform.
+//
+// The path is spelled as a document URI spells it. On Windows that means a
+// lowercase drive letter, and the in-memory filesystem is case-sensitive, so a
+// file seeded under any other spelling is not found through a URI.
 func WorkDir(t *testing.T, v *venv.Venv) string {
 	t.Helper()
 
 	dir, err := v.Platform.Getwd()
 	require.NoError(t, err)
 
-	return dir
+	return uri.File(dir).FsPath()
 }
