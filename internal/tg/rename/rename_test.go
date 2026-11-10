@@ -121,7 +121,7 @@ inputs = {
 			s := tg.NewState()
 
 			docURI := uri.File("/test/terragrunt.hcl")
-			s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, tt.document)
+			s.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, docURI, tt.document)
 
 			target := rename.GetRenameTarget(l, s.Configs[docURI.FsPath()], tt.position)
 
@@ -137,7 +137,9 @@ inputs = {
 func TestFindAllOccurrences_Local(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	hclPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
 	content := `locals {
@@ -152,13 +154,13 @@ dependency "b" {
   config_path = local.foo
 }
 `
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
 	docURI := uri.File(hclPath)
-	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
+	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	st := s.Configs[docURI.FsPath()]
 
@@ -185,7 +187,9 @@ dependency "b" {
 func TestFindAllOccurrences_NoDefinition(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	hclPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
 	// References to a local that has no declaration in this file.
@@ -193,13 +197,13 @@ func TestFindAllOccurrences_NoDefinition(t *testing.T) {
   v = local.shared
 }
 `
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
 	docURI := uri.File(hclPath)
-	s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
+	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	st := s.Configs[docURI.FsPath()]
 

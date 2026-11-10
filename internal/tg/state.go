@@ -2,7 +2,6 @@ package tg
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/ast"
@@ -220,7 +219,13 @@ func newEmptyHoverResponse(id int) lsp.HoverResponse {
 	}
 }
 
-func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.DefinitionResponse {
+func (s *State) Definition(
+	l logger.Logger,
+	v *venv.Venv,
+	id int,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.DefinitionResponse {
 	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return newEmptyDefinitionResponse(id, docURI, position)
@@ -339,7 +344,7 @@ func (s *State) Definition(l logger.Logger, id int, docURI uri.URI, position pro
 					defURI = uri.File(filepath.Join(filepath.Dir(docURI.FsPath()), path, "terragrunt.hcl"))
 				}
 
-				_, err := os.Stat(defURI.FsPath())
+				_, err := v.FS.Stat(defURI.FsPath())
 				if err != nil {
 					l.Warn(
 						"Dependency does not exist",

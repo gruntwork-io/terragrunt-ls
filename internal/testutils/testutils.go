@@ -2,6 +2,7 @@
 package testutils
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terragrunt/pkg/venv"
+	"github.com/stretchr/testify/require"
 )
 
 var _ logger.Logger = &testLogger{}
@@ -53,20 +55,30 @@ func (tw testWriter) Close() error {
 	return nil
 }
 
-func CreateFile(dir, name, content string) (string, error) {
-	const ownerRWGlobalR = 0644
+// CreateFile writes content to the file name in dir on the filesystem of v. It
+// creates dir when dir does not exist.
+func CreateFile(v *venv.Venv, dir, name, content string) (string, error) {
+	const (
+		ownerRWXGlobalRX = 0755
+		ownerRWGlobalR   = 0644
+	)
 
-	return CreateFileWithMode(dir, name, content, ownerRWGlobalR)
-}
-
-func CreateFileWithMode(dir, name, content string, mode os.FileMode) (string, error) {
-	path := filepath.Join(dir, name)
-
-	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+	if err := v.FS.MkdirAll(dir, ownerRWXGlobalRX); err != nil {
 		return "", err
 	}
 
-	return path, nil
+	path := filepath.Join(dir, name)
+
+	f, err := v.FS.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, ownerRWGlobalR)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := f.WriteString(content); err != nil {
+		return "", errors.Join(err, f.Close())
+	}
+
+	return path, f.Close()
 }
 
 // Close closes the logger
@@ -108,8 +120,13 @@ func (l *testLogger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
 }
 
-// NewVenv returns a venv that uses the real OS and discards everything written
-// to its writers.
-func NewVenv() *venv.Venv {
-	return venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
+// WorkDir returns the working directory of v, which is an absolute path on
+// every platform.
+func WorkDir(t *testing.T, v *venv.Venv) string {
+	t.Helper()
+
+	dir, err := v.Platform.Getwd()
+	require.NoError(t, err)
+
+	return dir
 }

@@ -1,6 +1,7 @@
 package tg_test
 
 import (
+	"io"
 	"path/filepath"
 	"runtime"
 	"terragrunt-ls/internal/testutils"
@@ -42,14 +43,15 @@ func TestParseTerragruntBufferReportsADeniedRunCmd(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			filename := filepath.Join(t.TempDir(), "terragrunt.hcl")
+			v := venv.MemVenv()
+			filename := filepath.Join(testutils.WorkDir(t, v), "terragrunt.hcl")
 			content := `locals {
   out = run_cmd("--terragrunt-quiet", "jq", "-n", "1")
 }
 `
 
 			cfg, diags := tg.ParseTerragruntBuffer(
-				t.Context(), testutils.NewTestLogger(t), testutils.NewVenv(), tt.policy, filename, content,
+				t.Context(), testutils.NewTestLogger(t), v, tt.policy, filename, content,
 			)
 
 			require.NotNil(t, cfg)
@@ -84,8 +86,12 @@ func TestParseTerragruntBufferRunsAnAllowedRunCmd(t *testing.T) {
 }
 `
 
+	// pkg/venv does not export the types that a MemVenv command handler needs,
+	// so this test runs the real go binary.
+	v := venv.OSVenv().WithWriter(io.Discard).WithErrWriter(io.Discard)
+
 	cfg, diags := tg.ParseTerragruntBuffer(
-		t.Context(), testutils.NewTestLogger(t), testutils.NewVenv(), policy, filename, content,
+		t.Context(), testutils.NewTestLogger(t), v, policy, filename, content,
 	)
 
 	require.NotNil(t, cfg)
@@ -99,14 +105,15 @@ func TestParseTerragruntBufferRunsAnAllowedRunCmd(t *testing.T) {
 func TestParseTerragruntBufferCapsDenialDiagnostics(t *testing.T) {
 	t.Parallel()
 
-	filename := filepath.Join(t.TempDir(), "terragrunt.hcl")
+	v := venv.MemVenv()
+	filename := filepath.Join(testutils.WorkDir(t, v), "terragrunt.hcl")
 	content := `locals {
   outs = [for i in range(30) : run_cmd("--terragrunt-quiet", "jq", "-n", tostring(i))]
 }
 `
 
 	_, diags := tg.ParseTerragruntBuffer(
-		t.Context(), testutils.NewTestLogger(t), testutils.NewVenv(), venv.Policy{}, filename, content,
+		t.Context(), testutils.NewTestLogger(t), v, venv.Policy{}, filename, content,
 	)
 
 	require.Len(t, diags, 26)

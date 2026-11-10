@@ -218,7 +218,7 @@ func handleMessage(
 			"Position", request.Params.Position,
 		)
 
-		response := state.Definition(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+		response := state.Definition(l, v, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
 		writeResponse(l, writer, response)
 

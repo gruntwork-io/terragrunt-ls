@@ -60,13 +60,15 @@ inputs = { v = local.foo }`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tmpDir := t.TempDir()
+			v := venv.MemVenv()
+
+			tmpDir := testutils.WorkDir(t, v)
 			tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 			docURI := uri.File(tgPath)
 
 			l := testutils.NewTestLogger(t)
 			s := tg.NewState()
-			s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, tt.document)
+			s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, tt.document)
 
 			resp := s.PrepareRename(l, 1, docURI, tt.position)
 
@@ -89,13 +91,15 @@ func TestState_TextDocumentRename(t *testing.T) {
 	t.Run("rejects invalid identifier", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
+		v := venv.MemVenv()
+
+		tmpDir := testutils.WorkDir(t, v)
 		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 		docURI := uri.File(tgPath)
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "1invalid")
 		assert.Nil(t, resp.Result)
@@ -104,7 +108,9 @@ func TestState_TextDocumentRename(t *testing.T) {
 	t.Run("renames local declaration and references in same file", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
+		v := venv.MemVenv()
+
+		tmpDir := testutils.WorkDir(t, v)
 		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 		docURI := uri.File(tgPath)
 
@@ -116,12 +122,12 @@ inputs = {
   v = local.shared
 }
 `
-		_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+		_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 		require.NoError(t, err)
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, content)
+		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 5, Character: 14}, "renamed")
 		require.NotNil(t, resp.Result)
@@ -138,13 +144,15 @@ inputs = {
 	t.Run("returns nil for non-renameable position", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
+		v := venv.MemVenv()
+
+		tmpDir := testutils.WorkDir(t, v)
 		tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 		docURI := uri.File(tgPath)
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 0}, "valid")
 		assert.Nil(t, resp.Result)
@@ -153,13 +161,15 @@ inputs = {
 	t.Run("works on auxiliary HCL files (FileTypeUnknown)", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
+		v := venv.MemVenv()
+
+		tmpDir := testutils.WorkDir(t, v)
 		commonPath := filepath.Join(tmpDir, "common.hcl")
 		docURI := uri.File(commonPath)
 
 		l := testutils.NewTestLogger(t)
 		s := tg.NewState()
-		s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, docURI, `locals { foo = "bar" }`)
+		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "renamed")
 		require.NotNil(t, resp.Result)

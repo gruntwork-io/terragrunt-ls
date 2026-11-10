@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"os"
 	"path/filepath"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
@@ -137,11 +136,13 @@ stack "service" {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tmpDir := t.TempDir()
+			v := venv.MemVenv()
+
+			tmpDir := testutils.WorkDir(t, v)
 			filename := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 
 			l := testutils.NewTestLogger(t)
-			cfg, diags := tg.ParseStackBuffer(t.Context(), l, testutils.NewVenv(), venv.Policy{}, filename, tt.content)
+			cfg, diags := tg.ParseStackBuffer(t.Context(), l, v, venv.Policy{}, filename, tt.content)
 
 			if tt.wantDiag {
 				assert.NotEmpty(t, diags, "expected diagnostics but got none")
@@ -162,7 +163,7 @@ func TestParseTerragruntBuffer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		setup    func(t *testing.T, tmpDir string) string
+		setup    func(t *testing.T, v *venv.Venv, tmpDir string) string
 		wantCfg  *config.TerragruntConfig
 		name     string
 		content  string
@@ -170,7 +171,7 @@ func TestParseTerragruntBuffer(t *testing.T) {
 	}{
 		{
 			name: "basic terragrunt config",
-			setup: func(t *testing.T, tmpDir string) string {
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
 				t.Helper()
 
 				path := filepath.Join(tmpDir, "terragrunt.hcl")
@@ -186,23 +187,23 @@ terraform {
 		},
 		{
 			name: "dependency with missing outputs should not show diagnostic",
-			setup: func(t *testing.T, tmpDir string) string {
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
 				t.Helper()
 
 				// Create base module directory and its terragrunt.hcl
 				baseDir := filepath.Join(tmpDir, "base")
-				require.NoError(t, os.MkdirAll(baseDir, 0755))
+				require.NoError(t, v.FS.MkdirAll(baseDir, 0755))
 
-				baseTg := filepath.Join(baseDir, "terragrunt.hcl")
-				require.NoError(t, os.WriteFile(baseTg, []byte(`
+				_, err := testutils.CreateFile(v, baseDir, "terragrunt.hcl", `
 terraform {
   source = "./module"
 }
-`), 0644))
+`)
+				require.NoError(t, err)
 
 				// Create unit directory and return path to its terragrunt.hcl
 				unitDir := filepath.Join(tmpDir, "unit")
-				require.NoError(t, os.MkdirAll(unitDir, 0755))
+				require.NoError(t, v.FS.MkdirAll(unitDir, 0755))
 
 				return filepath.Join(unitDir, "terragrunt.hcl")
 			},
@@ -227,7 +228,7 @@ inputs = {
 		},
 		{
 			name: "values attribute access should not show diagnostic",
-			setup: func(t *testing.T, tmpDir string) string {
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
 				t.Helper()
 
 				return filepath.Join(tmpDir, "terragrunt.hcl")
@@ -240,17 +241,18 @@ inputs = {
 		},
 		{
 			name: "bare include block",
-			setup: func(t *testing.T, tmpDir string) string {
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
 				t.Helper()
 
-				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "root.hcl"), []byte(`
+				_, err := testutils.CreateFile(v, tmpDir, "root.hcl", `
 locals {
   region = "us-east-1"
 }
-`), 0644))
+`)
+				require.NoError(t, err)
 
 				unitDir := filepath.Join(tmpDir, "unit")
-				require.NoError(t, os.MkdirAll(unitDir, 0755))
+				require.NoError(t, v.FS.MkdirAll(unitDir, 0755))
 
 				return filepath.Join(unitDir, "terragrunt.hcl")
 			},
@@ -271,17 +273,17 @@ inputs = {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create temporary directory for test
-			tmpDir := t.TempDir()
+			v := venv.MemVenv()
+			tmpDir := testutils.WorkDir(t, v)
 
 			// Run setup and get file to parse
-			filename := tt.setup(t, tmpDir)
+			filename := tt.setup(t, v, tmpDir)
 
 			l := testutils.NewTestLogger(t)
 			cfg, diags := tg.ParseTerragruntBuffer(
 				t.Context(),
 				l,
-				testutils.NewVenv(),
+				v,
 				venv.Policy{},
 				filename,
 				tt.content,

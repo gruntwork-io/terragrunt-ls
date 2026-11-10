@@ -58,7 +58,7 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			s := tg.NewState()
 
-			s.OpenDocument(t.Context(), l, testutils.NewVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
+			s.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
 
 			// State keys documents by file name, which has backslashes on Windows.
 			target, context := definition.GetDefinitionTargetWithContext(
