@@ -38,6 +38,8 @@ const (
 	AllowCmdFlagName = "allow-cmd"
 )
 
+const stdioFlagName = "stdio"
+
 // Load reads configuration from environment variables and from args, which are
 // the command-line arguments without the program name.
 //
@@ -55,6 +57,10 @@ func Load(args []string) (*Config, error) {
 	fs.Var(&allowCmds, AllowCmdFlagName,
 		"Pattern, such as 'jq **', for a command that run_cmd() is allowed to run. "+
 			"Repeat the flag for more patterns. Requires --allow=exec.")
+
+	// LSP clients such as vscode-languageclient pass --stdio to select the
+	// transport. The flag's value is unused because stdio is the only transport.
+	fs.Bool(stdioFlagName, true, "Communicate over stdin and stdout. This is the only transport.")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err

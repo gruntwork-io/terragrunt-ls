@@ -39,6 +39,18 @@ func TestLoadParsesAllowFlags(t *testing.T) {
 	assert.True(t, cfg.Policy.AllowCmds[0].Matches("jq", []string{"-r", ".name"}))
 }
 
+// TestLoadAcceptsTheStdioFlag pins that Load accepts --stdio, which
+// vscode-languageclient adds to the arguments of a server that uses the stdio
+// transport.
+func TestLoadAcceptsTheStdioFlag(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load([]string{"--allow=exec", "--stdio"})
+	require.NoError(t, err)
+
+	assert.Equal(t, venv.Capabilities{venv.CapabilityExec: {}}, cfg.Policy.Granted)
+}
+
 // TestLoadRejectsInvalidAllowFlags pins the error that Load returns for each
 // kind of invalid --allow or --allow-cmd value.
 func TestLoadRejectsInvalidAllowFlags(t *testing.T) {

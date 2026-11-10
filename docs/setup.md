@@ -147,27 +147,53 @@ Zed also reads `lsp` settings from a project's `.zed/settings.json` once you tru
 
 ## Allowing capabilities
 
-`terragrunt-ls` parses your configuration as you edit it. By default, the parse does not run commands, make network requests, decrypt SOPS files, or read environment variables:
+`terragrunt-ls` parses your configuration as you edit it. By default, the parse does not run commands, make network requests, decrypt SOPS files, or read environment variables. When `terragrunt-ls` denies a command or a SOPS decryption, it reports an information diagnostic that names the flag you need.
 
-- `run_cmd()` returns empty output.
-- `get_env()` sees an empty environment.
-- `sops_decrypt_file()` fails.
-
-When `terragrunt-ls` denies a command or a SOPS decryption, it reports an information diagnostic that names the flag you need.
-
-Two flags change the default:
-
-- `--allow` grants one of the capabilities `exec`, `http`, `sops`, or `env`. To grant several, repeat the flag or separate the values with commas.
-- `--allow-cmd` takes a pattern, such as `'jq **'`, for a command that `run_cmd()` is allowed to run. The first word is the program. Each word after it matches one argument, and `**` matches any number of arguments. `--allow-cmd` requires `--allow=exec`.
+The `--allow` flag grants a capability: `exec`, `http`, `sops`, or `env`. To grant several, repeat the flag or separate the values with commas:
 
 ```bash
-# Let get_env() read the environment variables of terragrunt-ls
-terragrunt-ls --allow=env
-
-# Let run_cmd() run jq with any arguments
-terragrunt-ls --allow=exec --allow-cmd 'jq **'
+terragrunt-ls --allow=exec,env --allow-cmd 'jq **'
 ```
 
 `terragrunt-ls` exits with an error if `--allow` names an unknown capability, if an `--allow-cmd` pattern is invalid, or if `--allow-cmd` is used without `--allow=exec`.
 
 To set these flags in your editor, see the section for [Visual Studio Code](#allowing-capabilities-in-visual-studio-code), [Neovim](#allowing-capabilities-in-neovim), or [Zed](#allowing-capabilities-in-zed).
+
+Granting a capability does not confine the filesystem. A function such as `file()` reads any file that `terragrunt-ls` can read, with or without these flags.
+
+### The `exec` capability
+
+`exec` lets the parse start processes.
+
+Without it, no process starts. `run_cmd()` returns empty output, and a command that Terragrunt runs on its own, such as `tofu` to read the outputs of a dependency, fails. A dependency that sets `mock_outputs` uses them.
+
+With it, Terragrunt can run its own commands. A command that your configuration names, such as the one `run_cmd()` calls, also needs an `--allow-cmd` pattern that matches it:
+
+```bash
+# Let run_cmd() run jq with any arguments
+terragrunt-ls --allow=exec --allow-cmd 'jq **'
+
+# Let run_cmd() run only this one command line
+terragrunt-ls --allow=exec --allow-cmd 'git rev-parse --show-toplevel'
+```
+
+The first word of a pattern is the program. Each word after it matches one argument, and `**` matches any number of arguments. Repeat `--allow-cmd` for more patterns. A `run_cmd()` that no pattern matches returns empty output.
+
+A process that `exec` lets start is not restricted. It can read files, use the network, and see the environment that it is given.
+
+### The `http` capability
+
+`http` lets the parse make the network requests that Terragrunt makes itself. Without it, those requests fail.
+
+### The `sops` capability
+
+`sops` lets `sops_decrypt_file()` decrypt files. Without it, the function fails.
+
+### The `env` capability
+
+`env` lets the parse read the environment variables of `terragrunt-ls`, which are usually the ones your editor started it with. Without it, the parse sees an empty environment, so `get_env()` returns its default value or fails when it has none.
+
+```bash
+# Let get_env() read the environment variables of terragrunt-ls
+terragrunt-ls --allow=env
+```

@@ -74,10 +74,8 @@ func TestParseTerragruntBufferRunsAnAllowedRunCmd(t *testing.T) {
 	allowCmds, err := venv.ParseAllowCmds([]string{"go env GOOS"})
 	require.NoError(t, err)
 
-	// Looking up go needs PATH, and the venv has PATH only with the env
-	// capability.
 	policy := venv.Policy{
-		Granted:   venv.Capabilities{venv.CapabilityExec: {}, venv.CapabilityEnv: {}},
+		Granted:   venv.Capabilities{venv.CapabilityExec: {}},
 		AllowCmds: allowCmds,
 	}
 	filename := filepath.Join(t.TempDir(), "terragrunt.hcl")
