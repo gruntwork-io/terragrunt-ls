@@ -361,8 +361,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0 h1:Bd7KaOxzULLxtZ/K5s1aLbWhR0+
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0/go.mod h1:nN7ts3dFXKtCZWc//yfkpcQNKJABg16/uDVAZpLDalo=
 github.com/gruntwork-io/boilerplate v0.17.0 h1:ld33t+X6j5wd1ddYKEM3sX0HCiuSPY92a3uAu9EVcQs=
 github.com/gruntwork-io/boilerplate v0.17.0/go.mod h1:U/+aiGF/c8GDA/s/y50hBevlo8Bc/0zUCSWfhuWI5w0=
-github.com/gruntwork-io/terragrunt v1.2.2-0.20261109211427-67bf287fb0b2 h1:/v39BVbUGkfGxGzi/wFW91FBQtx9w2gUH9gCMY4HBes=
-github.com/gruntwork-io/terragrunt v1.2.2-0.20261109211427-67bf287fb0b2/go.mod h1:vItDkk48blivbvSmnBc7feqS3YZFMetbSUk6Q3lA3ic=
+github.com/gruntwork-io/terragrunt v1.2.2-0.20261110143818-37499b6aeeb9 h1:OJxRIkpYQ4uXk5UiwAwx8Zag/R3PtSzUIEWXfpj1PMY=
+github.com/gruntwork-io/terragrunt v1.2.2-0.20261110143818-37499b6aeeb9/go.mod h1:vItDkk48blivbvSmnBc7feqS3YZFMetbSUk6Q3lA3ic=
 github.com/gruntwork-io/terragrunt-engine-go v0.2.0 h1:LEZelI6sZ4B3L9lEL2Nu1wzw7ZscXSu6KtfJKPlPAZU=
 github.com/gruntwork-io/terragrunt-engine-go v0.2.0/go.mod h1:27Gf11JzI/kYS8iq5rNDR7TooMQ5B/N1ce9BZf6HUHA=
 github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.74 h1:mymLUKThnV9wFvogOK8NnsMP9/vlhnjXY98gr2QIGW8=

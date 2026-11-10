@@ -3,7 +3,7 @@ module terragrunt-ls
 go 1.27.3
 
 require (
-	github.com/gruntwork-io/terragrunt v1.2.2-0.20261109211427-67bf287fb0b2
+	github.com/gruntwork-io/terragrunt v1.2.2-0.20261110143818-37499b6aeeb9
 	github.com/hashicorp/hcl/v2 v2.25.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
