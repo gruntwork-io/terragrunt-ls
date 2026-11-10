@@ -399,7 +399,7 @@ func TestState_Hover_Encoding(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			state.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, "file:///foo/terragrunt.hcl", tt.document)
 
 			hover := state.Hover(l, 1, tt.docURI, tt.position)
 
