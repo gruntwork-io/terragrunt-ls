@@ -13,6 +13,7 @@ import (
 	"go.lsp.dev/uri"
 
 	"terragrunt-ls/internal/lsp"
+	"terragrunt-ls/internal/rpc"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 )
@@ -243,7 +244,7 @@ func TestState_Hover(t *testing.T) {
 					RPC: "2.0",
 					ID:  new(1),
 				},
-				Result: lsp.HoverResult{
+				Result: &lsp.HoverResult{
 					Contents: protocol.MarkupContent{
 						Kind:  protocol.MarkupKindMarkdown,
 						Value: "```hcl\nfoo = \"bar\"\n```",
@@ -267,7 +268,7 @@ func TestState_Hover(t *testing.T) {
 					RPC: "2.0",
 					ID:  new(1),
 				},
-				Result: lsp.HoverResult{
+				Result: &lsp.HoverResult{
 					Contents: protocol.MarkupContent{
 						Kind:  protocol.MarkupKindMarkdown,
 						Value: "```hcl\nbaz = \"bar-baz\"\n```",
@@ -292,6 +293,94 @@ func TestState_Hover(t *testing.T) {
 
 			hover := state.Hover(l, 1, "file:///foo/terragrunt.hcl", tt.position)
 			assert.Equal(t, tt.expected, hover)
+		})
+	}
+}
+
+// TestState_Hover_Encoding pins that a hover with nothing to show is sent as a null result.
+func TestState_Hover_Encoding(t *testing.T) {
+	t.Parallel()
+
+	const document = `locals {
+	foo = "bar"
+	bar = local.foo
+}
+
+`
+
+	tc := []struct {
+		name     string
+		document string
+		docURI   uri.URI
+		expected string
+		position protocol.Position
+	}{
+		{
+			name:     "block keyword",
+			document: document,
+			docURI:   "file:///foo/terragrunt.hcl",
+			position: protocol.Position{Line: 0, Character: 2},
+			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
+		},
+		{
+			name:     "attribute name",
+			document: document,
+			docURI:   "file:///foo/terragrunt.hcl",
+			position: protocol.Position{Line: 1, Character: 2},
+			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
+		},
+		{
+			name:     "blank line",
+			document: document,
+			docURI:   "file:///foo/terragrunt.hcl",
+			position: protocol.Position{Line: 4, Character: 0},
+			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
+		},
+		{
+			name: "undefined local",
+			document: `locals {
+	foo = local.missing
+}`,
+			docURI:   "file:///foo/terragrunt.hcl",
+			position: protocol.Position{Line: 1, Character: 15},
+			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
+		},
+		{
+			name:     "unopened document",
+			document: document,
+			docURI:   "file:///other/terragrunt.hcl",
+			position: protocol.Position{Line: 0, Character: 0},
+			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
+		},
+		{
+			name:     "defined local",
+			document: document,
+			docURI:   "file:///foo/terragrunt.hcl",
+			position: protocol.Position{Line: 2, Character: 15},
+			expected: `{
+				"id": 1,
+				"jsonrpc": "2.0",
+				"result": {"contents": {"kind": "markdown", "value": "` + "```hcl\\nfoo = \\\"bar\\\"\\n```" + `"}}
+			}`,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			state := tg.NewState()
+
+			l := testutils.NewTestLogger(t)
+
+			state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+
+			hover := state.Hover(l, 1, tt.docURI, tt.position)
+
+			_, body, err := rpc.DecodeMessage([]byte(rpc.EncodeMessage(hover)))
+			require.NoError(t, err)
+
+			assert.JSONEq(t, tt.expected, string(body))
 		})
 	}
 }
@@ -658,7 +747,7 @@ func TestState_Hover_StackFile(t *testing.T) {
 }`)
 
 	hover := state.Hover(l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
-	assert.Empty(t, hover.Result.Contents.Value)
+	assert.Nil(t, hover.Result)
 }
 
 func TestState_Hover_ValuesFile(t *testing.T) {
@@ -674,7 +763,7 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 	_ = state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
 
 	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
-	assert.Empty(t, hover.Result.Contents.Value)
+	assert.Nil(t, hover.Result)
 }
 
 func TestState_Definition_StackFile(t *testing.T) {

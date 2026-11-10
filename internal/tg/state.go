@@ -189,7 +189,7 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 			RPC: lsp.RPCVersion,
 			ID:  &id,
 		},
-		Result: lsp.HoverResult{
+		Result: &lsp.HoverResult{
 			Contents: protocol.MarkupContent{
 				Kind:  protocol.MarkupKindMarkdown,
 				Value: text.WrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
