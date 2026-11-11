@@ -37,10 +37,8 @@ func TestPublishDiagnosticsEncoding(t *testing.T) {
 	t.Parallel()
 
 	msg := lsp.PublishDiagnosticsNotification{
-		Notification: lsp.Notification{
-			RPC:    lsp.RPCVersion,
-			Method: protocol.MethodTextDocumentPublishDiagnostics,
-		},
+		RPC:    lsp.RPCVersion,
+		Method: protocol.MethodTextDocumentPublishDiagnostics,
 		Params: protocol.PublishDiagnosticsParams{
 			URI: "file:///unit/terragrunt.hcl",
 			Diagnostics: []protocol.Diagnostic{{
@@ -72,7 +70,7 @@ func TestCompletionResponseEncoding(t *testing.T) {
 	t.Parallel()
 
 	msg := lsp.CompletionResponse{
-		Response: lsp.Response{RPC: lsp.RPCVersion, ID: new(7)},
+		RPC: lsp.RPCVersion, ID: new(7),
 		Result: []protocol.CompletionItem{{
 			Label: "locals",
 			Documentation: &protocol.MarkupContent{
@@ -137,8 +135,9 @@ func TestHoverResponseEncoding(t *testing.T) {
 			t.Parallel()
 
 			msg := lsp.HoverResponse{
-				Response: lsp.Response{RPC: lsp.RPCVersion, ID: new(7)},
-				Result:   tt.result,
+				RPC:    lsp.RPCVersion,
+				ID:     new(7),
+				Result: tt.result,
 			}
 
 			assert.JSONEq(t, tt.expected, encodedBody(t, msg))

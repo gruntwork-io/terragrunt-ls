@@ -1,10 +1,11 @@
 package tg_test
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
@@ -29,9 +30,11 @@ func TestNewState(t *testing.T) {
 func TestState_OpenDocument(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
 
-	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
+	tmpDir := testutils.WorkDir(t, v)
+
+	_, err := testutils.CreateFile(v, tmpDir, "root.hcl", "")
 	require.NoError(t, err)
 
 	// Paths derived from a document URI have a lowercase drive letter on Windows.
@@ -41,7 +44,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 	unitDir := filepath.Join(tmpDir, "foo")
 
-	err = os.MkdirAll(unitDir, 0755)
+	err = v.FS.MkdirAll(unitDir, 0755)
 	require.NoError(t, err)
 
 	// Create the URI for the unit file
@@ -119,7 +122,7 @@ func TestState_OpenDocument(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, unitURI, tt.document)
 			require.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -195,8 +198,16 @@ func TestState_UpdateDocument(t *testing.T) {
 			state := tg.NewState()
 
 			l := testutils.NewTestLogger(t)
+			v := venv.MemVenv()
 
-			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				v,
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.document,
+			)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -208,7 +219,14 @@ func TestState_UpdateDocument(t *testing.T) {
 				assert.Equal(t, tt.expected, state.Configs[filename].Cfg.Locals)
 			}
 
-			diags = state.UpdateDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.updated)
+			diags = state.UpdateDocument(
+				t.Context(),
+				l,
+				v,
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.updated,
+			)
 			assert.Empty(t, diags)
 
 			assert.Len(t, state.Configs, 1)
@@ -285,8 +303,16 @@ func TestState_Hover(t *testing.T) {
 			state := tg.NewState()
 
 			l := testutils.NewTestLogger(t)
+			v := venv.MemVenv()
 
-			diags := state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				v,
+				venv.Policy{},
+				"file:///foo/terragrunt.hcl",
+				tt.document,
+			)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
@@ -373,7 +399,7 @@ func TestState_Hover_Encoding(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			state.OpenDocument(t.Context(), l, "file:///foo/terragrunt.hcl", tt.document)
+			state.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, "file:///foo/terragrunt.hcl", tt.document)
 
 			hover := state.Hover(l, 1, tt.docURI, tt.position)
 
@@ -388,27 +414,29 @@ func TestState_Hover_Encoding(t *testing.T) {
 func TestState_Definition(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
 
-	_, err := testutils.CreateFile(tmpDir, "root.hcl", "")
+	tmpDir := testutils.WorkDir(t, v)
+
+	_, err := testutils.CreateFile(v, tmpDir, "root.hcl", "")
 	require.NoError(t, err)
 
 	rootURI := uri.File(filepath.Join(tmpDir, "root.hcl"))
 
 	// Create a vpc directory
 	vpcDir := filepath.Join(tmpDir, "vpc")
-	err = os.MkdirAll(vpcDir, 0755)
+	err = v.FS.MkdirAll(vpcDir, 0755)
 	require.NoError(t, err)
 
 	// Create a terragrunt.hcl file in the vpc directory
-	_, err = testutils.CreateFile(vpcDir, "terragrunt.hcl", "")
+	_, err = testutils.CreateFile(v, vpcDir, "terragrunt.hcl", "")
 	require.NoError(t, err)
 
 	vpcURI := uri.File(filepath.Join(vpcDir, "terragrunt.hcl"))
 
 	unitDir := filepath.Join(tmpDir, "foo")
 
-	err = os.MkdirAll(unitDir, 0755)
+	err = v.FS.MkdirAll(unitDir, 0755)
 	require.NoError(t, err)
 
 	// Create the URI for the unit file
@@ -549,12 +577,12 @@ func TestState_Definition(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			diags := state.OpenDocument(t.Context(), l, unitURI, tt.document)
+			diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, unitURI, tt.document)
 			assert.Empty(t, diags)
 
 			require.Len(t, state.Configs, 1)
 
-			definition := state.Definition(l, 1, unitURI, tt.position)
+			definition := state.Definition(l, v, 1, unitURI, tt.position)
 			assert.Equal(t, tt.expected, definition)
 		})
 	}
@@ -634,8 +662,16 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
+			v := venv.MemVenv()
 
-			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				v,
+				venv.Policy{},
+				"file:///terragrunt.hcl",
+				tt.document,
+			)
 			if tt.expectDiagnostics {
 				require.NotEmpty(t, diags)
 			} else {
@@ -651,7 +687,9 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
@@ -659,7 +697,7 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
-	diags := state.OpenDocument(t.Context(), l, stackURI, "uni")
+	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, "uni")
 	require.NotEmpty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, stackURI, protocol.Position{Line: 0, Character: 3})
@@ -671,14 +709,16 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, valuesURI, "loc")
+	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, "loc")
 	assert.Empty(t, diags)
 
 	completion := state.TextDocumentCompletion(l, 1, valuesURI, protocol.Position{Line: 0, Character: 3})
@@ -689,14 +729,16 @@ func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 func TestState_OpenDocument_StackFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -714,14 +756,16 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 func TestState_OpenDocument_ValuesFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	diags := state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
+	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, `some_var = "hello"`)
 	assert.Empty(t, diags)
 
 	require.Len(t, state.Configs, 1)
@@ -734,14 +778,16 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 func TestState_Hover_StackFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
@@ -753,14 +799,16 @@ func TestState_Hover_StackFile(t *testing.T) {
 func TestState_Hover_ValuesFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, valuesURI, `some_var = "hello"`)
+	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, `some_var = "hello"`)
 
 	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
 	assert.Nil(t, hover.Result)
@@ -769,20 +817,22 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 func TestState_Definition_StackFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
 	state := tg.NewState()
 	l := testutils.NewTestLogger(t)
 
-	_ = state.OpenDocument(t.Context(), l, stackURI, `unit "vpc" {
+	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
 }`)
 
 	pos := protocol.Position{Line: 0, Character: 0}
-	def := state.Definition(l, 1, stackURI, pos)
+	def := state.Definition(l, v, 1, stackURI, pos)
 	assert.Equal(t, stackURI, def.Result.URI)
 	assert.Equal(t, pos, def.Result.Range.Start)
 }
@@ -830,9 +880,17 @@ bar=   "baz"
 
 			state := tg.NewState()
 			l := testutils.NewTestLogger(t)
+			v := venv.MemVenv()
 
 			// First open the document to populate the state
-			diags := state.OpenDocument(t.Context(), l, "file:///terragrunt.hcl", tt.document)
+			diags := state.OpenDocument(
+				t.Context(),
+				l,
+				v,
+				venv.Policy{},
+				"file:///terragrunt.hcl",
+				tt.document,
+			)
 			require.Empty(t, diags)
 
 			// Request formatting

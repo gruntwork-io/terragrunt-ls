@@ -2,7 +2,6 @@ package tg
 
 import (
 	"context"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -10,10 +9,10 @@ import (
 	"terragrunt-ls/internal/tg/store"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
-	"github.com/gruntwork-io/terragrunt/pkg/config/hclparse"
 	tgLog "github.com/gruntwork-io/terragrunt/pkg/log"
 	"github.com/gruntwork-io/terragrunt/pkg/log/format"
 	"github.com/gruntwork-io/terragrunt/pkg/options"
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
@@ -29,47 +28,59 @@ func newTGLogger(l logger.Logger) tgLog.Logger {
 	)
 }
 
+// restrict returns a copy of v that is limited to p, and a recorder that
+// collects the denials from that copy.
+func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
+	rec := newDenialRecorder()
+	p.Observe = rec.observe
+
+	// When p grants env, venv.Restrict shares v's environment map with the
+	// copy. v is reused for every parse, so each parse gets its own clone.
+	return venv.Restrict(v.WithEnvCloned(), p), rec
+}
+
 // newParsingContext builds a terragrunt ParsingContext for the given file and
 // returns a pointer to the HCL diagnostics slice that the parser will populate.
 func newParsingContext(
 	ctx context.Context,
-	tgLogger tgLog.Logger,
+	v *venv.Venv,
 	filename string,
 ) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
-	parseOptions := []hclparse.Option{
-		hclparse.WithDiagnosticsHandler(func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-			*parseDiags = append(*parseDiags, hclDiags...)
-			return hclDiags, nil
-		}),
-	}
-
-	ctx, pctx := config.NewParsingContext(
-		ctx,
-		tgLogger,
-		config.WithStrictControls(options.NewTerragruntOptions().StrictControls),
+	pctx := config.NewParsingContext(
+		config.WithStrictControls(options.NewTerragruntOptions(v.Exec).StrictControls),
 	)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
 	pctx.SkipOutput = true
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
-	pctx.Writers.Writer = io.Discard
-	pctx.Writers.ErrWriter = io.Discard
-	pctx.ParserOptions = append(pctx.ParserOptions, parseOptions...)
+	pctx.Parser.DiagnosticsHandler = func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
+		*parseDiags = append(*parseDiags, hclDiags...)
+		return hclDiags, nil
+	}
 
-	return ctx, pctx, parseDiags
+	return config.WithCaches(ctx), pctx, parseDiags
 }
 
+// ParseTerragruntBuffer parses text as the unit configuration at filename. The
+// parse runs in a copy of v that is limited to p.
+//
+// The returned diagnostics include an Information diagnostic for each distinct
+// command or SOPS decryption that p denied. The parse replaces p.Observe to
+// collect the denials, so an Observe set by the caller is never called.
 func ParseTerragruntBuffer(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	filename, text string,
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
+	v, denials := restrict(v, p)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
-	cfg, err := config.ParseConfigString(ctx, pctx, tgLogger, filename, text, nil)
+	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -79,7 +90,7 @@ func ParseTerragruntBuffer(
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
-	return cfg, diags
+	return cfg, append(diags, denials.diagnostics()...)
 }
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
@@ -270,16 +281,21 @@ func DetectFileType(filename string) store.FileType {
 	}
 }
 
-// ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack config and diagnostics.
+// ParseStackBuffer parses a terragrunt.stack.hcl file and returns the stack
+// config and diagnostics. It limits v to p and reports denials in the same way
+// as [ParseTerragruntBuffer].
 func ParseStackBuffer(
 	ctx context.Context,
 	l logger.Logger,
+	v *venv.Venv,
+	p venv.Policy,
 	filename, text string,
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
-	ctx, pctx, parseDiags := newParsingContext(ctx, tgLogger, filename)
+	v, denials := restrict(v, p)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
@@ -289,5 +305,5 @@ func ParseStackBuffer(
 
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
-	return cfg, diags
+	return cfg, append(diags, denials.diagnostics()...)
 }

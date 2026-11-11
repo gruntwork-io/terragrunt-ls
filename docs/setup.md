@@ -61,6 +61,19 @@ To install the Visual Studio Code extension, you can manually compile the extens
 
 Installation from the Visual Studio Extensions Marketplace coming soon!
 
+### Allowing capabilities in Visual Studio Code
+
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), set `terragrunt-ls.allow` and `terragrunt-ls.allowCmds` in your user settings:
+
+```json
+{
+  "terragrunt-ls.allow": ["exec"],
+  "terragrunt-ls.allowCmds": ["jq **"]
+}
+```
+
+Visual Studio Code ignores both settings in a workspace's `.vscode/settings.json`, so a repository that you open cannot grant capabilities to itself.
+
 ## Neovim
 
 For Neovim, you can install the neovim plugin by adding the following to your editor:
@@ -98,8 +111,89 @@ return {
 
 Installation from Mason coming soon!
 
+### Allowing capabilities in Neovim
+
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), add the flags to `cmd`:
+
+```lua
+terragrunt_ls.setup {
+  cmd = { 'terragrunt-ls', '--allow=exec', '--allow-cmd', 'jq **' },
+}
+```
+
 ## Zed
 
 For now, clone this repo and point to the `zed-extension` directory when [installing dev extension](https://zed.dev/docs/extensions/developing-extensions#developing-an-extension-locally)
 
 Installing from extension page coming soon!
+
+### Allowing capabilities in Zed
+
+To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), add the flags to the language server's binary arguments in your user settings:
+
+```json
+{
+  "lsp": {
+    "terragrunt": {
+      "binary": {
+        "arguments": ["--allow=exec", "--allow-cmd", "jq **"]
+      }
+    }
+  }
+}
+```
+
+Zed also reads `lsp` settings from a project's `.zed/settings.json` once you trust that project, so a trusted project can set these flags.
+
+## Allowing capabilities
+
+`terragrunt-ls` parses your configuration as you edit it. By default, the parse does not run commands, make network requests, decrypt SOPS files, or read environment variables. When `terragrunt-ls` denies a command or a SOPS decryption, it reports an information diagnostic that names the flag you need.
+
+The `--allow` flag grants a capability: `exec`, `http`, `sops`, or `env`. To grant several, repeat the flag or separate the values with commas:
+
+```bash
+terragrunt-ls --allow=exec,env --allow-cmd 'jq **'
+```
+
+`terragrunt-ls` exits with an error if `--allow` names an unknown capability, if an `--allow-cmd` pattern is invalid, or if `--allow-cmd` is used without `--allow=exec`.
+
+To set these flags in your editor, see the section for [Visual Studio Code](#allowing-capabilities-in-visual-studio-code), [Neovim](#allowing-capabilities-in-neovim), or [Zed](#allowing-capabilities-in-zed).
+
+Granting a capability does not confine the filesystem. A function such as `file()` reads any file that `terragrunt-ls` can read, with or without these flags.
+
+### The `exec` capability
+
+`exec` lets the parse start processes.
+
+Without it, no process starts. `run_cmd()` returns empty output, and a command that Terragrunt runs on its own, such as `tofu` to read the outputs of a dependency, fails. A dependency that sets `mock_outputs` uses them.
+
+With it, Terragrunt can run its own commands. A command that your configuration names, such as the one `run_cmd()` calls, also needs an `--allow-cmd` pattern that matches it:
+
+```bash
+# Let run_cmd() run jq with any arguments
+terragrunt-ls --allow=exec --allow-cmd 'jq **'
+
+# Let run_cmd() run only this one command line
+terragrunt-ls --allow=exec --allow-cmd 'git rev-parse --show-toplevel'
+```
+
+The first word of a pattern is the program. Each word after it matches one argument, and `**` matches any number of arguments. Repeat `--allow-cmd` for more patterns. A `run_cmd()` that no pattern matches returns empty output.
+
+A process that `exec` lets start is not restricted. It can read files, use the network, and see the environment that it is given.
+
+### The `http` capability
+
+`http` lets the parse make the network requests that Terragrunt makes itself. Without it, those requests fail.
+
+### The `sops` capability
+
+`sops` lets `sops_decrypt_file()` decrypt files. Without it, the function fails.
+
+### The `env` capability
+
+`env` lets the parse read the environment variables of `terragrunt-ls`, which are usually the ones your editor started it with. Without it, the parse sees an empty environment, so `get_env()` returns its default value or fails when it has none.
+
+```bash
+# Let get_env() read the environment variables of terragrunt-ls
+terragrunt-ls --allow=env
+```

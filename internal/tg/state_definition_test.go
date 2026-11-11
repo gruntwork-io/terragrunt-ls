@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -16,7 +18,9 @@ import (
 func TestState_Definition_LocalReference_SameFile(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 	docURI := uri.File(tgPath)
 
@@ -28,15 +32,15 @@ inputs = {
   v = local.foo
 }
 `
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	// Cursor on `foo` in `local.foo`.
-	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 5, Character: 14})
+	resp := s.Definition(l, v, 1, docURI, protocol.Position{Line: 5, Character: 14})
 
 	assert.Equal(t, docURI, resp.Result.URI)
 	assert.Equal(t, uint32(1), resp.Result.Range.Start.Line)
@@ -47,7 +51,9 @@ inputs = {
 func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 	docURI := uri.File(tgPath)
 
@@ -55,15 +61,15 @@ func TestState_Definition_LocalReference_NotFound(t *testing.T) {
   v = local.nonexistent
 }
 `
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, docURI, content)
+	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	// Cursor on `nonexistent` — no `locals` block defines it.
-	resp := s.Definition(l, 1, docURI, protocol.Position{Line: 1, Character: 18})
+	resp := s.Definition(l, v, 1, docURI, protocol.Position{Line: 1, Character: 18})
 
 	// Empty response points back at the cursor position.
 	assert.Equal(t, docURI, resp.Result.URI)

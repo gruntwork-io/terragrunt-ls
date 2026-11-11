@@ -19,10 +19,8 @@ type ServerInfo struct {
 
 func NewInitializeResponse(id int) InitializeResponse {
 	return InitializeResponse{
-		Response: Response{
-			RPC: RPCVersion,
-			ID:  &id,
-		},
+		RPC: RPCVersion,
+		ID:  &id,
 		Result: protocol.InitializeResult{
 			Capabilities: protocol.ServerCapabilities{
 				TextDocumentSync:           protocol.TextDocumentSyncKindFull,

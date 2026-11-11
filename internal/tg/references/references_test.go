@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terragrunt/pkg/venv"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -17,7 +19,9 @@ import (
 func TestGetReferences(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
+	v := venv.MemVenv()
+
+	tmpDir := testutils.WorkDir(t, v)
 
 	content := `locals {
   shared = "value"
@@ -27,14 +31,14 @@ inputs = {
   v = local.shared
 }
 `
-	_, err := testutils.CreateFile(tmpDir, "terragrunt.hcl", content)
+	_, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", content)
 	require.NoError(t, err)
 
 	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
 	l := testutils.NewTestLogger(t)
 	s := tg.NewState()
-	s.OpenDocument(t.Context(), l, uri.File(tgPath), content)
+	s.OpenDocument(t.Context(), l, v, venv.Policy{}, uri.File(tgPath), content)
 
 	t.Run("includes declaration when requested", func(t *testing.T) {
 		t.Parallel()

@@ -58,6 +58,31 @@
 					"default": 100,
 					"description": "Controls the maximum number of problems produced by the server."
 				},
+				"terragrunt-ls.allow": {
+					"scope": "machine",
+					"type": "array",
+					"items": {
+						"type": "string",
+						"enum": [
+							"exec",
+							"http",
+							"sops",
+							"env"
+						]
+					},
+					"uniqueItems": true,
+					"default": [],
+					"markdownDescription": "Capabilities that the language server is allowed to use while it parses a configuration. With none set, the server does not run commands, make network requests, decrypt SOPS files, or read environment variables. Each value is passed to the server as `--allow`. Workspace settings cannot set this."
+				},
+				"terragrunt-ls.allowCmds": {
+					"scope": "machine",
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Patterns, such as `jq **`, for commands that `run_cmd()` is allowed to run while the language server parses a configuration. Each value is passed to the server as `--allow-cmd`. Requires `exec` in `#terragrunt-ls.allow#`. Workspace settings cannot set this."
+				},
 				"terragrunt-ls.trace.server": {
 					"scope": "window",
 					"type": "string",
