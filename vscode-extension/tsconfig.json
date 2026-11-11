@@ -7,7 +7,8 @@
 		],
 		"outDir": "out",
 		"rootDir": "src",
-		"sourceMap": true
+		"sourceMap": true,
+		"types": ["node", "mocha", "vscode"]
 	},
 	"include": [
 		"src"
