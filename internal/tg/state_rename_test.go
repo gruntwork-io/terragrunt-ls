@@ -67,7 +67,7 @@ inputs = { v = local.foo }`,
 			docURI := uri.File(tgPath)
 
 			l := testutils.NewTestLogger(t)
-			s := tg.NewState()
+			s := tg.NewState(testutils.NewDocs(t))
 			s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, tt.document)
 
 			resp := s.PrepareRename(l, 1, docURI, tt.position)
@@ -98,7 +98,7 @@ func TestState_TextDocumentRename(t *testing.T) {
 		docURI := uri.File(tgPath)
 
 		l := testutils.NewTestLogger(t)
-		s := tg.NewState()
+		s := tg.NewState(testutils.NewDocs(t))
 		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "1invalid")
@@ -126,7 +126,7 @@ inputs = {
 		require.NoError(t, err)
 
 		l := testutils.NewTestLogger(t)
-		s := tg.NewState()
+		s := tg.NewState(testutils.NewDocs(t))
 		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 5, Character: 14}, "renamed")
@@ -151,7 +151,7 @@ inputs = {
 		docURI := uri.File(tgPath)
 
 		l := testutils.NewTestLogger(t)
-		s := tg.NewState()
+		s := tg.NewState(testutils.NewDocs(t))
 		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 0}, "valid")
@@ -168,7 +168,7 @@ inputs = {
 		docURI := uri.File(commonPath)
 
 		l := testutils.NewTestLogger(t)
-		s := tg.NewState()
+		s := tg.NewState(testutils.NewDocs(t))
 		s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, `locals { foo = "bar" }`)
 
 		resp := s.TextDocumentRename(l, 1, docURI, protocol.Position{Line: 0, Character: 9}, "renamed")

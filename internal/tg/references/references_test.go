@@ -37,7 +37,7 @@ inputs = {
 	tgPath := filepath.Join(tmpDir, "terragrunt.hcl")
 
 	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
+	s := tg.NewState(testutils.NewDocs(t))
 	s.OpenDocument(t.Context(), l, v, venv.Policy{}, uri.File(tgPath), content)
 
 	t.Run("includes declaration when requested", func(t *testing.T) {

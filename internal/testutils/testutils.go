@@ -5,10 +5,13 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
+	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/logger"
 	"testing"
+	"testing/fstest"
 
 	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/stretchr/testify/require"
@@ -134,4 +137,68 @@ func WorkDir(t *testing.T, v *venv.Venv) string {
 	require.NoError(t, err)
 
 	return uri.File(dir).FsPath()
+}
+
+// DocsUnitsIndex is the index page of unit configuration items that [NewDocs]
+// starts from.
+const DocsUnitsIndex = "# Units\n\n" +
+	"## Blocks\n\n" +
+	"| Name | Description |\n" +
+	"| --- | --- |\n" +
+	"| [`dependency`](/reference/hcl/blocks/dependency/) | Reads the outputs of another unit. |\n" +
+	"| [`dependencies`](/reference/hcl/blocks/dependencies/) | Lists the units to run before this one. |\n" +
+	"| [`generate`](/reference/hcl/blocks/generate/) | Writes a file into the working directory. |\n" +
+	"| [`include`](/reference/hcl/blocks/include/) | Merges another configuration file into this one. |\n" +
+	"| [`locals`](/reference/hcl/blocks/locals/) | Defines values to reuse in the file. |\n\n" +
+	"## Attributes\n\n" +
+	"| Name | Description |\n" +
+	"| --- | --- |\n" +
+	"| [`inputs`](/reference/hcl/attributes/inputs/) | Sets the input variables of the module. |\n\n" +
+	"## Functions\n\n" +
+	"| Name | Description |\n" +
+	"| --- | --- |\n" +
+	"| [`get_env`](/reference/hcl/functions/get_env/) | Returns the value of an environment variable. |\n"
+
+// DocsStacksIndex is the index page of stack configuration items that
+// [NewDocs] starts from.
+const DocsStacksIndex = "# Stacks\n\n" +
+	"## Blocks\n\n" +
+	"| Name | Description |\n" +
+	"| --- | --- |\n" +
+	"| [`locals`](/reference/hcl/blocks/locals/) | Defines values to reuse in the file. |\n" +
+	"| [`stack`](/reference/hcl/blocks/stack/) | Defines a nested stack. |\n" +
+	"| [`unit`](/reference/hcl/blocks/unit/) | Defines a unit. |\n\n" +
+	"## Functions\n\n" +
+	"| Name | Description |\n" +
+	"| --- | --- |\n" +
+	"| [`get_env`](/reference/hcl/functions/get_env/) | Returns the value of an environment variable. |\n"
+
+// DocsSnapshot returns a snapshot holding [DocsUnitsIndex] and
+// [DocsStacksIndex].
+func DocsSnapshot() fstest.MapFS {
+	return fstest.MapFS{
+		"units.md":  {Data: []byte(DocsUnitsIndex)},
+		"stacks.md": {Data: []byte(DocsStacksIndex)},
+	}
+}
+
+// DocsBlurb returns what [docs.Docs.Blurb] returns for an item with
+// description whose page is at `/reference/hcl/<page>/` on
+// [docs.DefaultBaseURL], e.g. `blocks/locals`.
+func DocsBlurb(description, page string) string {
+	return description + "\n\n[Terragrunt docs](" + docs.DefaultBaseURL + "/reference/hcl/" + page + "/)"
+}
+
+// NewDocs returns a reference that starts from [DocsSnapshot], links to
+// [docs.DefaultBaseURL], and fetches nothing.
+func NewDocs(t *testing.T) *docs.Docs {
+	t.Helper()
+
+	base, err := url.Parse(docs.DefaultBaseURL)
+	require.NoError(t, err)
+
+	d, err := docs.New(&docs.Options{Snapshot: DocsSnapshot(), BaseURL: base, Logger: NewTestLogger(t)})
+	require.NoError(t, err)
+
+	return d
 }

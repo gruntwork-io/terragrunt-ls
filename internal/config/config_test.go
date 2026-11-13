@@ -51,6 +51,20 @@ func TestLoadAcceptsTheStdioFlag(t *testing.T) {
 	assert.Equal(t, venv.Capabilities{venv.CapabilityExec: {}}, cfg.Policy.Granted)
 }
 
+// TestLoadParsesNoDocsFetch pins that docs fetching is on unless
+// --no-docs-fetch turns it off.
+func TestLoadParsesNoDocsFetch(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(nil)
+	require.NoError(t, err)
+	assert.False(t, cfg.NoDocsFetch)
+
+	cfg, err = config.Load([]string{"--no-docs-fetch"})
+	require.NoError(t, err)
+	assert.True(t, cfg.NoDocsFetch)
+}
+
 // TestLoadRejectsInvalidAllowFlags pins the error that Load returns for each
 // kind of invalid --allow or --allow-cmd value.
 func TestLoadRejectsInvalidAllowFlags(t *testing.T) {

@@ -197,3 +197,13 @@ A process that `exec` lets start is not restricted. It can read files, use the n
 # Let get_env() read the environment variables of terragrunt-ls
 terragrunt-ls --allow=env
 ```
+
+## Docs
+
+Hover and completion show the reference docs of Terragrunt's blocks, attributes, and functions. `terragrunt-ls` has a one-line description of each compiled in. In the background, it fetches the latest list from [docs.terragrunt.com](https://docs.terragrunt.com/reference/hcl/), and the full docs of an item the first time you hover over it. It caches what it fetches in the `terragrunt-ls/docs` directory of your user cache directory, e.g. `~/.cache/terragrunt-ls/docs` on Linux. Once a copy is an hour old, it asks the docs site whether the page changed, and downloads it again only if it did.
+
+To stop `terragrunt-ls` from fetching docs, pass `--no-docs-fetch`. It then shows the descriptions compiled into it, and any docs it cached before.
+
+```bash
+terragrunt-ls --no-docs-fetch
+```
