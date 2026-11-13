@@ -16,7 +16,7 @@ The server provides hover information.
 
 When a Language Server client hovers over a token, the server will provide information about that token.
 
-At the moment, the only hover target that is supported is local variables. When hovering over a local variable, the server will provide the evaluated value of that local.
+Hovering over a local variable shows its evaluated value. Hovering over the name of a Terragrunt function, or of a block or attribute at the top level of the file, shows its docs from the [Terragrunt docs](https://docs.terragrunt.com/reference/hcl/). See [Docs](./setup.md#docs) for where those come from.
 
 ## DefinitionProvider
 
@@ -32,7 +32,7 @@ The server provides completion suggestions.
 
 When a Language Server client requests completions for a token, the server will provide a list of suggestions.
 
-At the moment, the only completions that are supported are the names of attributes and blocks. When requesting completions for an attribute or block name, the server will provide a list of suggestions based on the current context.
+At the moment, the only completions that are supported are the names of attributes and blocks. When requesting completions for an attribute or block name, the server will provide a list of suggestions based on the current context, each with its description from the Terragrunt docs.
 
 ## FormatProvider
 

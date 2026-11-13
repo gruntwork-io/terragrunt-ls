@@ -20,6 +20,9 @@ type Config struct {
 	Policy venv.Policy
 	// LogLevel is the log level to use
 	LogLevel slog.Level
+	// NoDocsFetch limits hover and completion to the docs compiled into
+	// terragrunt-ls and those already cached on disk.
+	NoDocsFetch bool
 }
 
 const (
@@ -36,6 +39,9 @@ const (
 	// AllowCmdFlagName is the flag that takes a pattern for a command that
 	// run_cmd() is allowed to run.
 	AllowCmdFlagName = "allow-cmd"
+	// NoDocsFetchFlagName is the flag that stops terragrunt-ls from fetching
+	// docs from the docs site.
+	NoDocsFetchFlagName = "no-docs-fetch"
 )
 
 const stdioFlagName = "stdio"
@@ -62,6 +68,10 @@ func Load(args []string) (*Config, error) {
 	// transport. The flag's value is unused because stdio is the only transport.
 	fs.Bool(stdioFlagName, true, "Communicate over stdin and stdout. This is the only transport.")
 
+	noDocsFetch := fs.Bool(NoDocsFetchFlagName, false,
+		"Don't fetch docs from the docs site. Hover and completion use the docs compiled into terragrunt-ls "+
+			"and those already cached.")
+
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
@@ -72,9 +82,10 @@ func Load(args []string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		LogFile:  os.Getenv(EnvLogFile),
-		LogLevel: slog.LevelInfo, // default level
-		Policy:   policy,
+		LogFile:     os.Getenv(EnvLogFile),
+		LogLevel:    slog.LevelInfo, // default level
+		Policy:      policy,
+		NoDocsFetch: *noDocsFetch,
 	}
 
 	// Parse log level from environment variable
