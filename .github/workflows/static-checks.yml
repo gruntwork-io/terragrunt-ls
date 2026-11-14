@@ -63,6 +63,10 @@ jobs:
       if: ${{ !cancelled() }}
       run: mise run check:markdownlint
 
+    - name: neovim
+      if: ${{ !cancelled() }}
+      run: mise run check:neovim
+
     - name: shellcheck
       if: ${{ !cancelled() }}
       run: mise run check:shellcheck

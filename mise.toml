@@ -5,7 +5,7 @@ min_version = "2026.11.4"
 actionlint = "1.7.12"
 go = "1.27.4"
 golangci-lint = { version = "2.14.0", os = ["linux", "macos"] }
-lua = { version = "5.4.7", os = ["linux", "macos"] }
+"aqua:neovim/neovim" = { version = "0.12.6", os = ["linux", "macos"] }
 node = "26.13.0"
 rust = { version = "1.99.1", components = "clippy,rustfmt", targets = "wasm32-wasip2" }
 "go:github.com/goph/licensei/cmd/licensei" = "v0.9.0"
@@ -39,6 +39,14 @@ run = "go mod tidy -diff"
 
 [tasks."check:markdownlint"]
 run = "markdownlint-cli2 'docs/**/*.md'"
+
+[tasks."check:neovim"]
+run = '''
+bin=$(mktemp -d)
+trap 'rm -rf "$bin"' EXIT
+go build -o "$bin/terragrunt-ls" .
+nvim -l .github/scripts/neovim-smoke-test.lua "$bin/terragrunt-ls"
+'''
 
 [tasks."check:shellcheck"]
 run = "git ls-files -z '*.sh' | xargs -0 -r shellcheck -x -P SCRIPTDIR"
