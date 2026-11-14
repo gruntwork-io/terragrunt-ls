@@ -92,6 +92,8 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
 
       - name: Publish to Marketplace
-        run: npx @vscode/vsce publish --packagePath $(find . -iname '*.vsix')
+        run: |
+          mapfile -t vsix < <(find . -iname '*.vsix')
+          npx @vscode/vsce publish --packagePath "${vsix[@]}"
         env:
           VSCE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}

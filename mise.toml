@@ -9,8 +9,9 @@ node = "26.13.0"
 rust = { version = "1.99.1", components = "clippy,rustfmt", targets = "wasm32-wasip2" }
 "go:github.com/goph/licensei/cmd/licensei" = "v0.9.0"
 shellcheck = "0.11.0"
-# pipx:codespell installs through uv, and mise lock needs uv to record codespell's dependencies.
-uv = "0.13.7"
+# codespell installs through uv into this Python, and mise lock needs both to pin its dependencies.
+python = { version = "3.14.10", os = ["linux", "macos"] }
+uv = { version = "0.13.7", os = ["linux", "macos"] }
 shfmt = { version = "3.13.1", os = ["linux", "macos"] }
 "npm:markdownlint-cli2" = { version = "0.24.0", os = ["linux", "macos"] }
 "pipx:codespell" = { version = "2.4.1", os = ["linux", "macos"] }
