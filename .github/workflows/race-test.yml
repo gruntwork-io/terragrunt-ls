@@ -20,10 +20,9 @@ jobs:
         persist-credentials: false
 
     - name: Set up mise
-      uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       with:
-        version: 2026.11.3
-        experimental: true
+        version: 2026.11.4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
