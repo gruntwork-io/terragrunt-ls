@@ -2,6 +2,7 @@
 min_version = "2026.11.4"
 
 [tools]
+actionlint = "1.7.12"
 go = "1.27.4"
 golangci-lint = { version = "2.14.0", os = ["linux", "macos"] }
 lua = { version = "5.4.7", os = ["linux", "macos"] }
@@ -15,6 +16,9 @@ uv = { version = "0.13.7", os = ["linux", "macos"] }
 shfmt = { version = "3.13.1", os = ["linux", "macos"] }
 "npm:markdownlint-cli2" = { version = "0.24.0", os = ["linux", "macos"] }
 "pipx:codespell" = { version = "2.4.1", os = ["linux", "macos"] }
+
+[tasks."check:actionlint"]
+run = "actionlint"
 
 [tasks."check:codespell"]
 run = "codespell"
