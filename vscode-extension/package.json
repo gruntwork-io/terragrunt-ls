@@ -101,7 +101,9 @@
 		"vscode:prepublish": "npm run compile && ./scripts/package.sh",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
-		"lint": "eslint"
+		"lint": "eslint",
+		"pretest": "npm run compile && ./scripts/package.sh",
+		"test": "node ./out/test/runTest.js"
 	},
 	"dependencies": {
 		"glob": "14.0.4",
@@ -110,12 +112,10 @@
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@stylistic/eslint-plugin": "^5.10.0",
-		"@types/mocha": "^10.0.6",
 		"@types/node": "^26",
 		"@types/vscode": "~1.98.0",
 		"@vscode/test-electron": "^3.1.0",
 		"eslint": "^10.14.0",
-		"mocha": "^12.0.3",
 		"nodemon": "^3.1.14",
 		"typescript": "~6.0.3",
 		"typescript-eslint": "^8.72.1"

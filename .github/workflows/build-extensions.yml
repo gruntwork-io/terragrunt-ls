@@ -63,6 +63,68 @@ jobs:
       run: npx @vscode/vsce package
       working-directory: vscode-extension
 
+  vscode-extension-e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.98.0 is the minimum in engines.vscode.
+        vscode: ['1.98.0', 'stable']
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up mise
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      with:
+        version: 2026.11.4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - id: cache-paths
+      run: |
+        {
+          echo "go-build=$(go env GOCACHE)"
+          echo "go-mod=$(go env GOMODCACHE)"
+          echo "npm=$(npm config get cache)"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Go Build Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+    - name: Go Mod Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: npm Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.npm }}
+        key: ${{ runner.os }}-npm-${{ hashFiles('vscode-extension/package-lock.json') }}
+
+    # A cache saved under "stable" would never refresh, so only the pinned version is cached.
+    - name: VS Code Cache
+      if: matrix.vscode != 'stable'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: vscode-extension/.vscode-test
+        key: ${{ runner.os }}-vscode-${{ matrix.vscode }}
+
+    - name: Install
+      run: npm ci
+      working-directory: vscode-extension
+
+    - name: E2E Test
+      run: xvfb-run -a npm test
+      working-directory: vscode-extension
+      env:
+        VSCODE_VERSION: ${{ matrix.vscode }}
+
   zed-extension:
     runs-on: ubuntu-latest
 
@@ -97,3 +159,6 @@ jobs:
     - name: Build
       run: cargo build --locked --release --target wasm32-wasip2
       working-directory: zed-extension
+
+    - name: Queries
+      run: mise run check:zed-queries
