@@ -23,13 +23,15 @@ const (
 	FileTypeStack
 	// FileTypeValues is the file type for terragrunt.values.hcl files.
 	FileTypeValues
+	// FileTypeShared is the file type for files that a unit includes, such as root.hcl.
+	FileTypeShared
 )
 
 // DocsConfig returns the kind of configuration whose reference docs apply to
 // files of type t. A file of unknown type is taken to be one a unit includes.
 func (t FileType) DocsConfig() (docs.Config, bool) {
 	switch t {
-	case FileTypeUnit, FileTypeUnknown:
+	case FileTypeUnit, FileTypeShared, FileTypeUnknown:
 		return docs.ConfigUnit, true
 	case FileTypeStack:
 		return docs.ConfigStack, true
