@@ -39,6 +39,10 @@ updates:
     open-pull-requests-limit: 3
     cooldown:
       default-days: 7
+    ignore:
+      # vsce refuses to package when @types/vscode is newer than engines.vscode in package.json.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       npm-dependencies:
         patterns:

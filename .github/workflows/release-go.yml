@@ -103,7 +103,7 @@ jobs:
       - name: Generate SHA256SUMS
         run: |
           cd bin
-          sha256sum *.zip *.tar.gz > SHA256SUMS
+          sha256sum -- *.zip *.tar.gz > SHA256SUMS
           echo "SHA256SUMS:"
           cat SHA256SUMS
 

@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -17,18 +16,19 @@ jobs:
     - name: Set up mise
       uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       with:
-        version: 2026.11.3
-        experimental: true
+        version: 2026.11.4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - id: go-cache-paths
       run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        {
+          echo "go-build=$(go env GOCACHE)"
+          echo "go-mod=$(go env GOMODCACHE)"
 
-        # TODO: Make this less brittle.
-        echo "golanci-lint-cache=/home/runner/.cache/golangci-lint" >> "$GITHUB_OUTPUT"
+          # TODO: Make this less brittle.
+          echo "golanci-lint-cache=/home/runner/.cache/golangci-lint"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

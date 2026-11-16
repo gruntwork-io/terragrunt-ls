@@ -1,14 +1,24 @@
+# mise.lock uses lockfile format 4, which older mise versions can't read.
+min_version = "2026.11.4"
+
 [tools]
+actionlint = "1.7.12"
 go = "1.27.4"
 golangci-lint = { version = "2.14.0", os = ["linux", "macos"] }
 lua = { version = "5.4.7", os = ["linux", "macos"] }
-node = "23.10.0"
-rust = "1.85.1"
+node = "26.13.0"
+rust = { version = "1.99.1", components = "clippy,rustfmt", targets = "wasm32-wasip2" }
 "go:github.com/goph/licensei/cmd/licensei" = "v0.9.0"
 shellcheck = "0.11.0"
+# codespell installs through uv into this Python, and mise lock needs both to pin its dependencies.
+python = { version = "3.14.10", os = ["linux", "macos"] }
+uv = { version = "0.13.7", os = ["linux", "macos"] }
 shfmt = { version = "3.13.1", os = ["linux", "macos"] }
 "npm:markdownlint-cli2" = { version = "0.24.0", os = ["linux", "macos"] }
 "pipx:codespell" = { version = "2.4.1", os = ["linux", "macos"] }
+
+[tasks."check:actionlint"]
+run = "actionlint"
 
 [tasks."check:codespell"]
 run = "codespell"

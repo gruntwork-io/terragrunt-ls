@@ -1,0 +1,99 @@
+name: Build Extensions
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  vscode-extension:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up mise
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      with:
+        version: 2026.11.4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - id: cache-paths
+      run: |
+        {
+          echo "go-build=$(go env GOCACHE)"
+          echo "go-mod=$(go env GOMODCACHE)"
+          echo "npm=$(npm config get cache)"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Go Build Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+    - name: Go Mod Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: npm Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.cache-paths.outputs.npm }}
+        key: ${{ runner.os }}-npm-${{ hashFiles('vscode-extension/package-lock.json') }}
+
+    - name: Install
+      run: npm ci
+      working-directory: vscode-extension
+
+    - name: Lint
+      run: npm run lint
+      working-directory: vscode-extension
+
+    # Runs the same packaging as release.yml, so it fails on what would break a release, such as
+    # @types/vscode moving past engines.vscode.
+    - name: Package
+      run: npx @vscode/vsce package
+      working-directory: vscode-extension
+
+  zed-extension:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up mise
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      with:
+        version: 2026.11.4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cargo Cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          zed-extension/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('zed-extension/Cargo.lock') }}
+
+    - name: Format
+      run: cargo fmt --check
+      working-directory: zed-extension
+
+    - name: Clippy
+      run: cargo clippy --locked --target wasm32-wasip2 -- -D warnings
+      working-directory: zed-extension
+
+    # Zed compiles extensions for wasm32-wasip2.
+    - name: Build
+      run: cargo build --locked --release --target wasm32-wasip2
+      working-directory: zed-extension

@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -17,8 +16,7 @@ jobs:
     - name: Set up mise
       uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       with:
-        version: 2026.11.3
-        experimental: true
+        version: 2026.11.4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
