@@ -14,6 +14,7 @@ shellcheck = "0.11.0"
 python = { version = "3.14.10", os = ["linux", "macos"] }
 uv = { version = "0.13.7", os = ["linux", "macos"] }
 shfmt = { version = "3.13.1", os = ["linux", "macos"] }
+tree-sitter = { version = "0.27.2", os = ["linux", "macos"] }
 "npm:markdownlint-cli2" = { version = "0.24.0", os = ["linux", "macos"] }
 "pipx:codespell" = { version = "2.4.1", os = ["linux", "macos"] }
 
@@ -44,3 +45,6 @@ run = "git ls-files -z '*.sh' | xargs -0 -r shellcheck -x -P SCRIPTDIR"
 
 [tasks."check:shfmt"]
 run = "git ls-files -z '*.sh' | xargs -0 -r shfmt -d"
+
+[tasks."check:zed-queries"]
+run = ".github/scripts/check-zed-queries.sh"
