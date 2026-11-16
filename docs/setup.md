@@ -76,7 +76,29 @@ Visual Studio Code ignores both settings in a workspace's `.vscode/settings.json
 
 ## Neovim
 
-For Neovim, you can install the neovim plugin by adding the following to your editor:
+Neovim 0.11 or later can run `terragrunt-ls` without a plugin. Install it with [Mason](https://github.com/mason-org/mason.nvim):
+
+```vim
+:MasonInstall terragrunt-ls
+```
+
+[nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) provides the `terragrunt_ls` configuration, which attaches the server to `hcl` buffers. [mason-lspconfig.nvim](https://github.com/mason-org/mason-lspconfig.nvim) enables it once the package is installed. Without mason-lspconfig.nvim, enable it yourself:
+
+```lua
+vim.lsp.enable 'terragrunt_ls'
+```
+
+To see language server logs, set `TG_LS_LOG` to the path you want:
+
+```lua
+vim.lsp.config('terragrunt_ls', {
+  cmd_env = { TG_LS_LOG = vim.fn.expand '/tmp/terragrunt-ls.log' },
+})
+```
+
+### Using the Neovim plugin
+
+To run a `terragrunt-ls` that you built from this repository, install the Neovim plugin by adding the following to your editor:
 
 ```lua
 -- ~/.config/nvim/lua/custom/plugins/terragrunt-ls.lua
@@ -109,17 +131,17 @@ return {
 }
 ```
 
-Installation from Mason coming soon!
-
 ### Allowing capabilities in Neovim
 
 To grant the capabilities described in [Allowing capabilities](#allowing-capabilities), add the flags to `cmd`:
 
 ```lua
-terragrunt_ls.setup {
+vim.lsp.config('terragrunt_ls', {
   cmd = { 'terragrunt-ls', '--allow=exec', '--allow-cmd', 'jq **' },
-}
+})
 ```
+
+With the Neovim plugin, pass the same `cmd` to `terragrunt_ls.setup`.
 
 ## Zed
 
