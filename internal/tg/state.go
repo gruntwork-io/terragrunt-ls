@@ -32,13 +32,16 @@ type State struct {
 	Docs *docs.Docs
 	// Map of file names to the files that their include blocks resolve to
 	includes map[string][]string
+	// The attributes and blocks that mark a file with another name as a Terragrunt configuration
+	unitSchema unitSchema
 }
 
 func NewState(d *docs.Docs) State {
 	return State{
-		Configs:  map[string]*store.Store{},
-		includes: map[string][]string{},
-		Docs:     d,
+		Configs:    map[string]*store.Store{},
+		includes:   map[string][]string{},
+		unitSchema: newUnitSchema(),
+		Docs:       d,
 	}
 }
 
@@ -86,11 +89,6 @@ func (s *State) updateState(
 ) []protocol.Diagnostic {
 	filename := docURI.FsPath()
 
-	fileType := DetectFileType(filename)
-	if fileType == store.FileTypeUnknown && s.isIncluded(filename) {
-		fileType = store.FileTypeShared
-	}
-
 	// Keep the partial AST on errors, since the Terragrunt parser just below reports the same errors as diagnostics.
 	indexedAST, err := ast.ParseHCLFile(filename, []byte(text))
 	if err != nil {
@@ -99,6 +97,11 @@ func (s *State) updateState(
 			"uri", docURI,
 			"error", err,
 		)
+	}
+
+	fileType := DetectFileType(filename)
+	if fileType == store.FileTypeUnknown && (s.isIncluded(filename) || s.unitSchema.accepts(indexedAST)) {
+		fileType = store.FileTypeShared
 	}
 
 	st := &store.Store{

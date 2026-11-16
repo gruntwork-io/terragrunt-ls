@@ -23,7 +23,7 @@ const (
 	FileTypeStack
 	// FileTypeValues is the file type for terragrunt.values.hcl files.
 	FileTypeValues
-	// FileTypeShared is the file type for files that a unit includes, such as root.hcl.
+	// FileTypeShared is the file type for files that hold unit configuration under another name, such as root.hcl.
 	FileTypeShared
 )
 
