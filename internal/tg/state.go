@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"terragrunt-ls/internal/ast"
+	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/tg/completion"
@@ -26,10 +27,12 @@ import (
 type State struct {
 	// Map of file names to Terragrunt configs
 	Configs map[string]*store.Store
+	// Docs is the HCL reference that hover and completion show.
+	Docs *docs.Docs
 }
 
-func NewState() State {
-	return State{Configs: map[string]*store.Store{}}
+func NewState(d *docs.Docs) State {
+	return State{Configs: map[string]*store.Store{}, Docs: d}
 }
 
 func (s *State) OpenDocument(
@@ -143,7 +146,13 @@ func (s *State) updateState(
 	return diags
 }
 
-func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol.Position) lsp.HoverResponse {
+func (s *State) Hover(
+	ctx context.Context,
+	l logger.Logger,
+	id int,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.HoverResponse {
 	st, ok := s.Configs[docURI.FsPath()]
 	if !ok {
 		return newEmptyHoverResponse(id)
@@ -155,13 +164,26 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 		"position", position,
 	)
 
+	if value, ok := localHover(l, st, position); ok {
+		return newHoverResponse(id, value)
+	}
+
+	if value, ok := s.docsHover(ctx, st, position); ok {
+		return newHoverResponse(id, value)
+	}
+
+	return newEmptyHoverResponse(id)
+}
+
+// localHover returns the value of the local under the cursor, as an HCL code
+// fence.
+func localHover(l logger.Logger, st *store.Store, position protocol.Position) (string, bool) {
 	if st.FileType != store.FileTypeUnit {
-		return newEmptyHoverResponse(id)
+		return "", false
 	}
 
 	l.Debug(
 		"Config",
-		"uri", docURI,
 		"config", st.Cfg,
 	)
 
@@ -173,24 +195,16 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 		"context", context,
 	)
 
-	if word == "" {
-		return newEmptyHoverResponse(id)
-	}
-
-	if context != hover.HoverContextLocal {
-		return newEmptyHoverResponse(id)
-	}
-
-	if st.Cfg == nil {
-		return newEmptyHoverResponse(id)
+	if word == "" || context != hover.HoverContextLocal || st.Cfg == nil {
+		return "", false
 	}
 
 	if _, ok := st.Cfg.Locals[word]; !ok {
-		return newEmptyHoverResponse(id)
+		return "", false
 	}
 
 	if st.CfgAsCty.IsNull() {
-		return newEmptyHoverResponse(id)
+		return "", false
 	}
 
 	locals := st.CfgAsCty.GetAttr("locals")
@@ -200,13 +214,33 @@ func (s *State) Hover(l logger.Logger, id int, docURI uri.URI, position protocol
 	rootBody := f.Body()
 	rootBody.SetAttributeValue(word, localVal)
 
+	return text.WrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))), true
+}
+
+// docsHover returns the reference docs of the block, attribute, or function
+// under the cursor, as Markdown.
+func (s *State) docsHover(ctx context.Context, st *store.Store, position protocol.Position) (string, bool) {
+	cfg, ok := st.FileType.DocsConfig()
+	if !ok {
+		return "", false
+	}
+
+	kind, name, ok := hover.GetDocsTarget(st, position)
+	if !ok {
+		return "", false
+	}
+
+	return s.Docs.Hover(ctx, cfg, kind, name)
+}
+
+func newHoverResponse(id int, value string) lsp.HoverResponse {
 	return lsp.HoverResponse{
 		RPC: lsp.RPCVersion,
 		ID:  &id,
 		Result: &lsp.HoverResult{
 			Contents: protocol.MarkupContent{
 				Kind:  protocol.MarkupKindMarkdown,
-				Value: text.WrapAsHCLCodeFence(strings.TrimSpace(string(f.Bytes()))),
+				Value: value,
 			},
 		},
 	}
@@ -440,7 +474,7 @@ func (s *State) TextDocumentCompletion(
 		}
 	}
 
-	items := completion.GetCompletions(l, st, position)
+	items := completion.GetCompletions(l, s.Docs, st, position)
 
 	response := lsp.CompletionResponse{
 		RPC:    "2.0",

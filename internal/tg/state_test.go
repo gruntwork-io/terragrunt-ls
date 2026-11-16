@@ -22,7 +22,7 @@ import (
 func TestNewState(t *testing.T) {
 	t.Parallel()
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 
 	assert.NotNil(t, state.Configs)
 }
@@ -118,7 +118,7 @@ func TestState_OpenDocument(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 
 			l := testutils.NewTestLogger(t)
 
@@ -195,7 +195,7 @@ func TestState_UpdateDocument(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 
 			l := testutils.NewTestLogger(t)
 			v := venv.MemVenv()
@@ -300,7 +300,7 @@ func TestState_Hover(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 
 			l := testutils.NewTestLogger(t)
 			v := venv.MemVenv()
@@ -317,7 +317,7 @@ func TestState_Hover(t *testing.T) {
 
 			require.Len(t, state.Configs, 1)
 
-			hover := state.Hover(l, 1, "file:///foo/terragrunt.hcl", tt.position)
+			hover := state.Hover(t.Context(), l, 1, "file:///foo/terragrunt.hcl", tt.position)
 			assert.Equal(t, tt.expected, hover)
 		})
 	}
@@ -342,10 +342,10 @@ func TestState_Hover_Encoding(t *testing.T) {
 		position protocol.Position
 	}{
 		{
-			name:     "block keyword",
+			name:     "block brace",
 			document: document,
 			docURI:   "file:///foo/terragrunt.hcl",
-			position: protocol.Position{Line: 0, Character: 2},
+			position: protocol.Position{Line: 0, Character: 7},
 			expected: `{"id": 1, "jsonrpc": "2.0", "result": null}`,
 		},
 		{
@@ -395,13 +395,13 @@ func TestState_Hover_Encoding(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 
 			l := testutils.NewTestLogger(t)
 
 			state.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, "file:///foo/terragrunt.hcl", tt.document)
 
-			hover := state.Hover(l, 1, tt.docURI, tt.position)
+			hover := state.Hover(t.Context(), l, 1, tt.docURI, tt.position)
 
 			_, body, err := rpc.DecodeMessage([]byte(rpc.EncodeMessage(hover)))
 			require.NoError(t, err)
@@ -573,7 +573,7 @@ func TestState_Definition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 
 			l := testutils.NewTestLogger(t)
 
@@ -616,9 +616,8 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 					{
 						Label: "dependency",
 						Documentation: &protocol.MarkupContent{
-							Kind: protocol.MarkupKindMarkdown,
-							Value: "# dependency\nThe dependency block is used to configure unit dependencies.\nEach dependency block " +
-								"exposes outputs of the dependency unit as variables you can reference in dependent unit configuration.",
+							Kind:  protocol.MarkupKindMarkdown,
+							Value: testutils.DocsBlurb("Reads the outputs of another unit.", "blocks/dependency"),
 						},
 						Kind:             protocol.CompletionItemKindClass,
 						InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -635,9 +634,8 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 					{
 						Label: "dependencies",
 						Documentation: &protocol.MarkupContent{
-							Kind: protocol.MarkupKindMarkdown,
-							Value: "# dependencies\nThe dependencies block is used to enumerate all the Terragrunt units that need to be " +
-								"applied before this unit.",
+							Kind:  protocol.MarkupKindMarkdown,
+							Value: testutils.DocsBlurb("Lists the units to run before this one.", "blocks/dependencies"),
 						},
 						Kind:             protocol.CompletionItemKindClass,
 						InsertTextFormat: protocol.InsertTextFormatSnippet,
@@ -660,7 +658,7 @@ func TestState_TextDocumentCompletion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 			l := testutils.NewTestLogger(t)
 			v := venv.MemVenv()
 
@@ -693,7 +691,7 @@ func TestState_TextDocumentCompletion_StackFile(t *testing.T) {
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	// "uni" is incomplete HCL, so the stack parser will produce diagnostics — that's expected.
@@ -715,7 +713,7 @@ func TestState_TextDocumentCompletion_ValuesFile(t *testing.T) {
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, "loc")
@@ -735,7 +733,7 @@ func TestState_OpenDocument_StackFile(t *testing.T) {
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
@@ -762,7 +760,7 @@ func TestState_OpenDocument_ValuesFile(t *testing.T) {
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, `some_var = "hello"`)
@@ -784,7 +782,7 @@ func TestState_Hover_StackFile(t *testing.T) {
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
@@ -792,8 +790,13 @@ func TestState_Hover_StackFile(t *testing.T) {
 	path   = "vpc"
 }`)
 
-	hover := state.Hover(l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
-	assert.Nil(t, hover.Result)
+	hover := state.Hover(t.Context(), l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
+	require.NotNil(t, hover.Result)
+	assert.Equal(
+		t,
+		testutils.DocsBlurb("Defines a unit.", "blocks/unit"),
+		hover.Result.Contents.Value,
+	)
 }
 
 func TestState_Hover_ValuesFile(t *testing.T) {
@@ -805,12 +808,12 @@ func TestState_Hover_ValuesFile(t *testing.T) {
 	valuesPath := filepath.Join(tmpDir, "terragrunt.values.hcl")
 	valuesURI := uri.File(valuesPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, valuesURI, `some_var = "hello"`)
 
-	hover := state.Hover(l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
+	hover := state.Hover(t.Context(), l, 1, valuesURI, protocol.Position{Line: 0, Character: 0})
 	assert.Nil(t, hover.Result)
 }
 
@@ -823,7 +826,7 @@ func TestState_Definition_StackFile(t *testing.T) {
 	stackPath := filepath.Join(tmpDir, "terragrunt.stack.hcl")
 	stackURI := uri.File(stackPath)
 
-	state := tg.NewState()
+	state := tg.NewState(testutils.NewDocs(t))
 	l := testutils.NewTestLogger(t)
 
 	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
@@ -878,7 +881,7 @@ bar=   "baz"
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			state := tg.NewState()
+			state := tg.NewState(testutils.NewDocs(t))
 			l := testutils.NewTestLogger(t)
 			v := venv.MemVenv()
 

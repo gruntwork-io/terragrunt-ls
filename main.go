@@ -7,8 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"terragrunt-ls/internal/config"
+	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/lsp"
 	"terragrunt-ls/internal/rpc"
@@ -45,8 +49,19 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
 
+	d, err := newDocs(l, cfg)
+	if err != nil {
+		// The generator and TestSnapshotFS check the compiled-in index pages,
+		// so a failure here is a build defect.
+		panic(fmt.Sprintf("loading the docs compiled into terragrunt-ls: %v", err))
+	}
+
 	ctx := context.Background()
-	state := tg.NewState()
+
+	// Fetching runs in the background, so starting it here delays nothing.
+	d.Refresh(ctx)
+
+	state := tg.NewState(d)
 	writer := os.Stdout
 	// The client reads LSP messages from stdout, so output that Terragrunt
 	// writes while parsing is discarded.
@@ -198,7 +213,7 @@ func handleMessage(
 			"Position", request.Params.Position,
 		)
 
-		response := state.Hover(l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
+		response := state.Hover(ctx, l, request.ID, request.Params.TextDocument.URI, request.Params.Position)
 
 		writeResponse(l, writer, response)
 
@@ -340,6 +355,32 @@ func handleMessage(
 
 		writeResponse(l, writer, response)
 	}
+}
+
+// newDocs returns the HCL reference, fetched from the docs site and cached in
+// the user's cache directory unless cfg turns fetching off.
+func newDocs(l logger.Logger, cfg *config.Config) (*docs.Docs, error) {
+	base, err := url.Parse(docs.DefaultBaseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := &docs.Options{Snapshot: docs.SnapshotFS(), BaseURL: base, Logger: l}
+
+	if !cfg.NoDocsFetch {
+		opts.Client = &http.Client{Timeout: docs.FetchTimeout}
+	}
+
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		l.Warn("Not caching docs, since there is no user cache directory", "error", err)
+
+		return docs.New(opts)
+	}
+
+	opts.CacheDir = filepath.Join(cacheDir, "terragrunt-ls", "docs")
+
+	return docs.New(opts)
 }
 
 func writeResponse(l logger.Logger, writer io.Writer, msg any) {

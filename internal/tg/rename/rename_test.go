@@ -118,7 +118,7 @@ inputs = {
 			t.Parallel()
 
 			l := testutils.NewTestLogger(t)
-			s := tg.NewState()
+			s := tg.NewState(testutils.NewDocs(t))
 
 			docURI := uri.File("/test/terragrunt.hcl")
 			s.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, docURI, tt.document)
@@ -158,7 +158,7 @@ dependency "b" {
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
+	s := tg.NewState(testutils.NewDocs(t))
 	docURI := uri.File(hclPath)
 	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
@@ -201,7 +201,7 @@ func TestFindAllOccurrences_NoDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
+	s := tg.NewState(testutils.NewDocs(t))
 	docURI := uri.File(hclPath)
 	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 

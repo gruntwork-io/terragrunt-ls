@@ -8,6 +8,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 
 	"terragrunt-ls/internal/ast"
+	"terragrunt-ls/internal/docs"
 )
 
 // FileType identifies the kind of Terragrunt configuration file.
@@ -23,6 +24,21 @@ const (
 	// FileTypeValues is the file type for terragrunt.values.hcl files.
 	FileTypeValues
 )
+
+// DocsConfig returns the kind of configuration whose reference docs apply to
+// files of type t. A file of unknown type is taken to be one a unit includes.
+func (t FileType) DocsConfig() (docs.Config, bool) {
+	switch t {
+	case FileTypeUnit, FileTypeUnknown:
+		return docs.ConfigUnit, true
+	case FileTypeStack:
+		return docs.ConfigStack, true
+	case FileTypeValues:
+		return "", false
+	}
+
+	return "", false
+}
 
 type Store struct {
 	AST      *ast.IndexedAST

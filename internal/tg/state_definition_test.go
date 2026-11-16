@@ -36,7 +36,7 @@ inputs = {
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
+	s := tg.NewState(testutils.NewDocs(t))
 	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	// Cursor on `foo` in `local.foo`.
@@ -65,7 +65,7 @@ func TestState_Definition_LocalReference_NotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	l := testutils.NewTestLogger(t)
-	s := tg.NewState()
+	s := tg.NewState(testutils.NewDocs(t))
 	s.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
 
 	// Cursor on `nonexistent` — no `locals` block defines it.

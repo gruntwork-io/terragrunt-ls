@@ -56,7 +56,7 @@ func TestGetDefinitionTargetWithContext(t *testing.T) {
 
 			l := testutils.NewTestLogger(t)
 
-			s := tg.NewState()
+			s := tg.NewState(testutils.NewDocs(t))
 
 			s.OpenDocument(t.Context(), l, venv.MemVenv(), venv.Policy{}, "file:///test.hcl", tt.document)
 

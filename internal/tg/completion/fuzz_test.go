@@ -33,7 +33,7 @@ func FuzzGetCompletions(f *testing.F) {
 		position := protocol.Position{Line: line, Character: character}
 		st := &store.Store{Document: document, FileType: fileTypes[int(fileType)%len(fileTypes)]}
 
-		items := completion.GetCompletions(testutils.NewTestLogger(t), st, position)
+		items := completion.GetCompletions(testutils.NewTestLogger(t), testutils.NewDocs(t), st, position)
 
 		if st.FileType == store.FileTypeValues || st.FileType == store.FileTypeUnknown {
 			require.Empty(t, items)

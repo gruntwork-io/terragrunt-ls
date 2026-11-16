@@ -3,6 +3,7 @@ package completion
 
 import (
 	"strings"
+	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
@@ -10,215 +11,49 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func GetCompletions(l logger.Logger, s *store.Store, position protocol.Position) []protocol.CompletionItem {
-	word := text.GetCursorWord(s.Document, position)
-
-	var candidates []protocol.CompletionItem
-
-	switch s.FileType {
-	case store.FileTypeUnit:
-		candidates = newUnitCompletions(position)
-	case store.FileTypeStack:
-		candidates = newStackCompletions(position)
-	case store.FileTypeValues:
-		return []protocol.CompletionItem{}
-	case store.FileTypeUnknown:
-		return []protocol.CompletionItem{}
-	}
-
-	completions := []protocol.CompletionItem{}
-
-	for i := range candidates {
-		if strings.HasPrefix(candidates[i].Label, word) {
-			completions = append(completions, candidates[i])
-		}
-	}
-
-	return completions
+// candidate is a block or attribute that completion offers, and the snippet it
+// inserts.
+type candidate struct {
+	label   string
+	snippet string
+	kind    docs.Kind
 }
 
-// newUnitCompletions returns a list of completions for terragrunt.hcl files.
+// unitCandidates are the completions for terragrunt.hcl files.
 //
 // TODO: Add detection via the AST index to determine
 // whether the cursor is in the context of a block or expression.
-func newUnitCompletions(position protocol.Position) []protocol.CompletionItem {
-	return []protocol.CompletionItem{
-		{
-			Label: "dependency",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# dependency
-The dependency block is used to configure unit dependencies.
-Each dependency block exposes outputs of the dependency unit as variables you can reference in dependent unit ` +
-					`configuration.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `dependency "${1}" {
+var unitCandidates = []candidate{
+	{label: "dependency", kind: docs.KindBlock, snippet: `dependency "${1}" {
 	config_path = "${2}"
-}`,
-			},
-		},
-		{
-			Label: "inputs",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# inputs
-The inputs attribute is a map that is used to specify the input variables and their values to pass in to ` +
-					`OpenTofu/Terraform.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `inputs = {
+}`},
+	{label: "inputs", kind: docs.KindAttribute, snippet: `inputs = {
 	${1} = ${2}
-}`,
-			},
-		},
-		{
-			Label: "locals",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# locals
-The locals block is used to define aliases for Terragrunt expressions that can be referenced elsewhere in ` +
-					`configuration.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `locals {
+}`},
+	{label: "locals", kind: docs.KindBlock, snippet: `locals {
 	${1} = ${2}
-}`,
-			},
-		},
-		{
-			Label: "feature",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# feature
-The feature block is used to configure feature flags in HCL for a specific Terragrunt unit.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `feature "${1}" {
+}`},
+	{label: "feature", kind: docs.KindBlock, snippet: `feature "${1}" {
 	default = ${2}
-}`,
-			},
-		},
-		{
-			Label: "terraform",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# terraform
-The terraform block is used to configure how Terragrunt will interact with OpenTofu/Terraform.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `terraform {
+}`},
+	{label: "terraform", kind: docs.KindBlock, snippet: `terraform {
 	source = "${1}"
-}`,
-			},
-		},
-		{
-			Label: "remote_state",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# remote_state
-The remote_state block is used to configure how Terragrunt will set up remote state configuration.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `remote_state {
+}`},
+	{label: "remote_state", kind: docs.KindBlock, snippet: `remote_state {
 	backend = "${1:s3}"
 	config = {
 		bucket = "${2}"
 		key = "${3}"
 		region = "${4}"
 	}
-}`,
-			},
-		},
-		{
-			Label: "include",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# include
-The include block is used to specify the inclusion of partial Terragrunt configuration.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `include "${1:root}" {
+}`},
+	{label: "include", kind: docs.KindBlock, snippet: `include "${1:root}" {
 	path = ${2:find_in_parent_folders("root.hcl")}
-}`,
-			},
-		},
-		{
-			Label: "dependencies",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# dependencies
-The dependencies block is used to enumerate all the Terragrunt units that need to be applied before this unit.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `dependencies {
+}`},
+	{label: "dependencies", kind: docs.KindBlock, snippet: `dependencies {
 	paths = ["${1}"]
-}`,
-			},
-		},
-		{
-			Label: "generate",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# generate
-The generate block can be used to arbitrarily generate a file in the terragrunt working directory.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `generate "provider" {
+}`},
+	{label: "generate", kind: docs.KindBlock, snippet: `generate "provider" {
   path      = "${1:provider.tf}"
   if_exists = "${2:overwrite}"
   contents = <<EOF
@@ -226,271 +61,107 @@ provider "${3:aws}" {
   region = "${4:us-east-1}"
 }
 EOF
-}`,
-			},
-		},
-		{
-			Label: "engine",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# engine
-The engine block is used to configure Terragrunt engine configuration.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `engine {
+}`},
+	{label: "engine", kind: docs.KindBlock, snippet: `engine {
   source  = "${1:github.com/gruntwork-io/terragrunt-engine-opentofu}"
   version = "${2:v0.0.16}"
-}`,
-			},
-		},
-		{
-			Label: "exclude",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# exclude
-The exclude block provides configuration options to dynamically determine when and how a unit is excluded from the ` +
-					`run queue.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `exclude {
+}`},
+	{label: "exclude", kind: docs.KindBlock, snippet: `exclude {
 	if      = ${1:true}
 	actions = ["${2:all}"]
-}`,
-			},
-		},
-		{
-			Label: "download_dir",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# download_dir
-The download_dir string option can be used to override the default download directory (which is .terragrunt-cache ` +
-					`by default).`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `download_dir = "${1}"`,
-			},
-		},
-		{
-			Label: "prevent_destroy",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# prevent_destroy
-The prevent_destroy boolean attribute prevents the unit from being destroyed.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `prevent_destroy = ${1:true}`,
-			},
-		},
-		{
-			Label: "iam_role",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# iam_role
-The iam_role attribute is used to specify an IAM role that Terragrunt should assume prior to running ` +
-					`OpenTofu/Terraform.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `iam_role = "arn:aws:iam::${1}:role/${2}"`,
-			},
-		},
-		{
-			Label: "iam_assume_role_duration",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# iam_assume_role_duration
-The iam_assume_role_duration attribute is used to specify the STS session duration, in seconds.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `iam_assume_role_duration = ${1:3600}`,
-			},
-		},
-		{
-			Label: "iam_assume_role_session_name",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# iam_assume_role_session_name
-The iam_assume_role_session_name attribute is used to specify the STS session name.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `iam_assume_role_session_name = "${1}"`,
-			},
-		},
-		{
-			Label: "iam_web_identity_token",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# iam_web_identity_token
-The iam_web_identity_token attribute is used along with iam_role to assume a role using the ` +
-					`AssumeRoleWithWebIdentity API.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `iam_web_identity_token = ${1}`,
-			},
-		},
-		{
-			Label: "terraform_binary",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# terraform_binary
-The terraform_binary attribute is used to override the binary Terragrunt uses during runs (which is tofu by default).`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `terraform_binary = "${1}"`,
-			},
-		},
-		{
-			Label: "terraform_version_constraint",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# terraform_version_constraint
-The terraform_version_constraint attribute is used to override the default minimum supported version of ` +
-					`OpenTofu/Terraform.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `terraform_version_constraint = ">= ${1:0.11}"`,
-			},
-		},
-		{
-			Label: "terragrunt_version_constraint",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# terragrunt_version_constraint
-The terragrunt_version_constraint attribute is used to specify which versions of the Terragrunt CLI can be used.`,
-			},
-			Kind:             protocol.CompletionItemKindField,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `terragrunt_version_constraint = ">= ${1:0.23}"`,
-			},
-		},
-	}
+}`},
+	{label: "download_dir", kind: docs.KindAttribute, snippet: `download_dir = "${1}"`},
+	{label: "prevent_destroy", kind: docs.KindAttribute, snippet: `prevent_destroy = ${1:true}`},
+	{label: "iam_role", kind: docs.KindAttribute, snippet: `iam_role = "arn:aws:iam::${1}:role/${2}"`},
+	{label: "iam_assume_role_duration", kind: docs.KindAttribute, snippet: `iam_assume_role_duration = ${1:3600}`},
+	{label: "iam_assume_role_session_name", kind: docs.KindAttribute, snippet: `iam_assume_role_session_name = "${1}"`},
+	{label: "iam_web_identity_token", kind: docs.KindAttribute, snippet: `iam_web_identity_token = ${1}`},
+	{label: "terraform_binary", kind: docs.KindAttribute, snippet: `terraform_binary = "${1}"`},
+	{
+		label:   "terraform_version_constraint",
+		kind:    docs.KindAttribute,
+		snippet: `terraform_version_constraint = ">= ${1:0.11}"`,
+	},
+	{
+		label:   "terragrunt_version_constraint",
+		kind:    docs.KindAttribute,
+		snippet: `terragrunt_version_constraint = ">= ${1:0.23}"`,
+	},
 }
 
-// newStackCompletions returns a list of completions for terragrunt.stack.hcl files.
-func newStackCompletions(position protocol.Position) []protocol.CompletionItem {
-	return []protocol.CompletionItem{
-		{
-			Label: "unit",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# unit
-The unit block references a Terragrunt unit to include in this stack.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `unit "${1}" {
+// stackCandidates are the completions for terragrunt.stack.hcl files.
+var stackCandidates = []candidate{
+	{label: "unit", kind: docs.KindBlock, snippet: `unit "${1}" {
 	source = "${2}"
 	path   = "${3}"
-}`,
-			},
-		},
-		{
-			Label: "stack",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# stack
-The stack block references another Terragrunt stack to nest within this stack.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `stack "${1}" {
+}`},
+	{label: "stack", kind: docs.KindBlock, snippet: `stack "${1}" {
 	source = "${2}"
 	path   = "${3}"
-}`,
-			},
-		},
-		{
-			Label: "locals",
-			Documentation: &protocol.MarkupContent{
-				Kind: protocol.MarkupKindMarkdown,
-				Value: `# locals
-The locals block defines aliases for expressions reusable within the stack file.`,
-			},
-			Kind:             protocol.CompletionItemKindClass,
-			InsertTextFormat: protocol.InsertTextFormatSnippet,
-			TextEdit: &protocol.TextEdit{
-				Range: protocol.Range{
-					Start: protocol.Position{Line: position.Line, Character: 0},
-					End:   protocol.Position{Line: position.Line, Character: position.Character},
-				},
-				NewText: `locals {
+}`},
+	{label: "locals", kind: docs.KindBlock, snippet: `locals {
 	${1} = ${2}
-}`,
+}`},
+}
+
+// GetCompletions returns the blocks and attributes valid in the document that
+// start with the word under the cursor, each with its description from d.
+func GetCompletions(
+	l logger.Logger,
+	d *docs.Docs,
+	s *store.Store,
+	position protocol.Position,
+) []protocol.CompletionItem {
+	word := text.GetCursorWord(s.Document, position)
+
+	var candidates []candidate
+
+	switch s.FileType {
+	case store.FileTypeUnit:
+		candidates = unitCandidates
+	case store.FileTypeStack:
+		candidates = stackCandidates
+	case store.FileTypeValues, store.FileTypeUnknown:
+		return []protocol.CompletionItem{}
+	}
+
+	cfg, _ := s.FileType.DocsConfig()
+
+	completions := []protocol.CompletionItem{}
+
+	for _, c := range candidates {
+		if !strings.HasPrefix(c.label, word) {
+			continue
+		}
+
+		completions = append(completions, completionItem(d, cfg, c, position))
+	}
+
+	return completions
+}
+
+func completionItem(d *docs.Docs, cfg docs.Config, c candidate, position protocol.Position) protocol.CompletionItem {
+	kind := protocol.CompletionItemKindField
+	if c.kind == docs.KindBlock {
+		kind = protocol.CompletionItemKindClass
+	}
+
+	item := protocol.CompletionItem{
+		Label:            c.label,
+		Kind:             kind,
+		InsertTextFormat: protocol.InsertTextFormatSnippet,
+		TextEdit: &protocol.TextEdit{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: position.Line, Character: 0},
+				End:   protocol.Position{Line: position.Line, Character: position.Character},
 			},
+			NewText: c.snippet,
 		},
 	}
+
+	if blurb, ok := d.Blurb(cfg, c.kind, c.label); ok {
+		item.Documentation = &protocol.MarkupContent{Kind: protocol.MarkupKindMarkdown, Value: blurb}
+	}
+
+	return item
 }
