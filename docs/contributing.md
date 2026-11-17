@@ -10,7 +10,7 @@ To get started with development, you will want to install [mise](https://mise.jd
 mise install
 ```
 
-This will install all the necessary dependencies for the project. mise installs codespell with `pipx` or `uv`, so install one of them first. On Windows, `mise install` skips golangci-lint, lua, shellcheck, shfmt, markdownlint-cli2 and codespell, so run the code checks on Linux or macOS.
+This will install all the necessary dependencies for the project. mise installs codespell with `pipx` or `uv`, so install one of them first. On Windows, `mise install` skips golangci-lint, Neovim, shellcheck, shfmt, markdownlint-cli2 and codespell, so run the code checks on Linux or macOS.
 
 ### Dependency updates
 
