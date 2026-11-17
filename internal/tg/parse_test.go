@@ -38,6 +38,16 @@ func TestDetectFileType(t *testing.T) {
 			expected: store.FileTypeValues,
 		},
 		{
+			name:     "unit autoinclude file",
+			filename: "/some/path/terragrunt.autoinclude.hcl",
+			expected: store.FileTypeShared,
+		},
+		{
+			name:     "stack autoinclude file",
+			filename: "/some/path/terragrunt.autoinclude.stack.hcl",
+			expected: store.FileTypeUnknown,
+		},
+		{
 			name:     "arbitrary hcl file",
 			filename: "/some/path/other.hcl",
 			expected: store.FileTypeUnknown,
