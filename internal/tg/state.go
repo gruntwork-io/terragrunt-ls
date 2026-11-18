@@ -162,6 +162,7 @@ func (s *State) Hover(
 		"Hovering over character",
 		"uri", docURI,
 		"position", position,
+		"fileType", st.FileType,
 	)
 
 	if value, ok := localHover(l, st, position); ok {
@@ -269,12 +270,32 @@ func (s *State) Definition(
 		"Definition requested",
 		"uri", docURI,
 		"position", position,
+		"fileType", st.FileType,
 	)
 
-	if !canRename(st) {
+	if st.AST == nil {
 		return newEmptyDefinitionResponse(id, docURI, position)
 	}
 
+	if st.FileType == store.FileTypeStack {
+		return s.definitionStack(l, v, id, st, docURI, position)
+	}
+
+	if st.FileType == store.FileTypeValues {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	return s.definitionUnit(l, v, id, st, docURI, position)
+}
+
+func (s *State) definitionUnit(
+	l logger.Logger,
+	v *venv.Venv,
+	id int,
+	st *store.Store,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.DefinitionResponse {
 	target, context := definition.GetDefinitionTargetWithContext(l, st, position)
 
 	l.Debug(
@@ -455,6 +476,62 @@ func newEmptyDefinitionResponse(id int, docURI uri.URI, position protocol.Positi
 			Range: protocol.Range{
 				Start: position,
 				End:   position,
+			},
+		},
+	}
+}
+
+func (s *State) definitionStack(
+	l logger.Logger,
+	v *venv.Venv,
+	id int,
+	st *store.Store,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.DefinitionResponse {
+	currentDir := filepath.Dir(docURI.FsPath())
+
+	target, context := definition.GetStackDefinitionTargetWithContext(l, v.FS, st, position, currentDir)
+
+	l.Debug(
+		"Stack definition discovered",
+		"target", target,
+		"context", context,
+	)
+
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	switch context {
+	case definition.DefinitionContextUnitSource:
+		if resolved := definition.ResolveUnitSourceLocation(v.FS, target, currentDir); resolved != "" {
+			return newStackDefinitionResponse(id, resolved)
+		}
+
+		l.Debug("Could not resolve unit source location", "source", target)
+	case definition.DefinitionContextStackSource:
+		if resolved := definition.ResolveStackSourceLocation(v.FS, target, currentDir); resolved != "" {
+			return newStackDefinitionResponse(id, resolved)
+		}
+
+		l.Debug("Could not resolve stack source location", "source", target)
+	case definition.DefinitionContextUnitPath, definition.DefinitionContextStackPath:
+		return newStackDefinitionResponse(id, target)
+	}
+
+	return newEmptyDefinitionResponse(id, docURI, position)
+}
+
+func newStackDefinitionResponse(id int, resolved string) lsp.DefinitionResponse {
+	return lsp.DefinitionResponse{
+		RPC: lsp.RPCVersion,
+		ID:  &id,
+		Result: protocol.Location{
+			URI: uri.File(resolved),
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 0},
 			},
 		},
 	}
