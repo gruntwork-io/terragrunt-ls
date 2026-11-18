@@ -142,3 +142,14 @@ func TestResolveStackSourceLocation(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveUnitSourceLocation_ConfigIsDirectory(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	module := filepath.Join(tmpDir, "modules", "vpc")
+	require.NoError(t, os.MkdirAll(filepath.Join(module, "terragrunt.hcl"), 0755))
+
+	resolved := definition.ResolveUnitSourceLocation(venv.OSVenv().FS, "./modules/vpc", tmpDir)
+	assert.Equal(t, module, resolved)
+}

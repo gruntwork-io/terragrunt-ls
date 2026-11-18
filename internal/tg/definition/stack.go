@@ -74,6 +74,7 @@ type blockKind struct {
 	getLabel      func(*aststack.StackAST, *ast.IndexedNode) (string, bool)
 	lookupDir     func(*config.StackConfig, string, string) (string, bool)
 	name          string
+	configFile    string
 	sourceContext string
 	pathContext   string
 }
@@ -81,6 +82,7 @@ type blockKind struct {
 var (
 	unitKind = blockKind{
 		name:          "unit",
+		configFile:    "terragrunt.hcl",
 		getSource:     (*aststack.StackAST).GetUnitSource,
 		isPath:        (*aststack.StackAST).IsUnitPathAttribute,
 		getLabel:      (*aststack.StackAST).GetUnitLabel,
@@ -91,6 +93,7 @@ var (
 
 	stackKind = blockKind{
 		name:          "stack",
+		configFile:    "terragrunt.stack.hcl",
 		getSource:     (*aststack.StackAST).GetStackSource,
 		isPath:        (*aststack.StackAST).IsStackPathAttribute,
 		getLabel:      (*aststack.StackAST).GetStackLabel,
@@ -133,8 +136,8 @@ func blockDefinition(
 
 	l.Debug("Found "+kind.name+" path for definition from parsed config", "blockName", blockName, "dir", dir)
 
-	target := filepath.Join(dir, "terragrunt.hcl")
-	if _, err := fsys.Stat(target); err != nil {
+	target := filepath.Join(dir, kind.configFile)
+	if !isRegularFile(fsys, target) {
 		l.Debug("Generated "+kind.name+" config does not exist", "target", target)
 		return "", DefinitionContextNull, true
 	}
@@ -168,9 +171,15 @@ func resolveSourceLocation(fsys StatFS, source, currentDir, fileName string) str
 	}
 
 	file := filepath.Join(absPath, fileName)
-	if _, err := fsys.Stat(file); err == nil {
+	if isRegularFile(fsys, file) {
 		return file
 	}
 
 	return absPath
+}
+
+func isRegularFile(fsys StatFS, path string) bool {
+	info, err := fsys.Stat(path)
+
+	return err == nil && info.Mode().IsRegular()
 }

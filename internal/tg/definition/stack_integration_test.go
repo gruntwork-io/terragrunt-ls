@@ -148,3 +148,49 @@ unit "database" {
 	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 6, Character: 14})
 	assert.Equal(t, uri.File(generated), resp.Result.URI)
 }
+
+func TestStackDefinition_GeneratedStackPath(t *testing.T) {
+	t.Parallel()
+
+	content := `stack "nested" {
+  source = "./nested-stack"
+  path   = "nested"
+}`
+
+	tmpDir := t.TempDir()
+	generated := filepath.Join(tmpDir, ".terragrunt-stack", "nested", "terragrunt.stack.hcl")
+	require.NoError(t, os.MkdirAll(filepath.Dir(generated), 0755))
+	require.NoError(t, os.WriteFile(generated, []byte(""), 0644))
+
+	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
+	l := testutils.NewTestLogger(t)
+
+	v := venv.OSVenv()
+	state := tg.NewState(testutils.NewDocs(t))
+	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
+
+	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 2, Character: 14})
+	assert.Equal(t, uri.File(generated), resp.Result.URI)
+}
+
+func TestStackDefinition_GeneratedConfigIsDirectory(t *testing.T) {
+	t.Parallel()
+
+	content := `unit "database" {
+  source = "./database"
+  path   = "db"
+}`
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".terragrunt-stack", "db", "terragrunt.hcl"), 0755))
+
+	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
+	l := testutils.NewTestLogger(t)
+
+	v := venv.OSVenv()
+	state := tg.NewState(testutils.NewDocs(t))
+	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
+
+	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 2, Character: 10})
+	assert.Equal(t, docURI, resp.Result.URI)
+}
