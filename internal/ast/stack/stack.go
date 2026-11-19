@@ -1,4 +1,9 @@
-// Package stack provides AST functionality specific to terragrunt.stack.hcl files.
+// Package stack finds the `unit` and `stack` attributes of a terragrunt.stack.hcl file
+// that go-to-definition can navigate from.
+//
+// Only top-level blocks match. A `unit` or `stack` block nested in another block, such as
+// one a stack's `autoinclude` injects into the nested stack, is skipped: its `source` and
+// `path` resolve against the nested stack, not the file being edited.
 package stack
 
 import (
@@ -8,124 +13,92 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// StackAST provides methods for working with terragrunt.stack.hcl files.
-type StackAST struct {
-	*ast.IndexedAST
+// UnitSource returns the literal `source` of the top-level unit block whose `source`
+// attribute contains node.
+func UnitSource(node *ast.IndexedNode) (string, bool) {
+	return literalSource(node, "unit")
 }
 
-// NewStackAST creates a new StackAST from an IndexedAST
-func NewStackAST(indexedAST *ast.IndexedAST) *StackAST {
-	return &StackAST{IndexedAST: indexedAST}
+// StackSource returns the literal `source` of the top-level stack block whose `source`
+// attribute contains node.
+func StackSource(node *ast.IndexedNode) (string, bool) {
+	return literalSource(node, "stack")
 }
 
-// GetUnitLabel returns the label of the given node, if it is a unit block
-func (s *StackAST) GetUnitLabel(node *ast.IndexedNode) (string, bool) {
-	return firstLabelFromContainingBlock(node, isUnitBlock)
+// UnitPathLabel returns the label of the top-level unit block whose `path` attribute
+// contains node. The `path` value may be any expression.
+func UnitPathLabel(node *ast.IndexedNode) (string, bool) {
+	return pathLabel(node, "unit")
 }
 
-// GetStackLabel returns the label of the given node, if it is a stack block
-func (s *StackAST) GetStackLabel(node *ast.IndexedNode) (string, bool) {
-	return firstLabelFromContainingBlock(node, isStackBlock)
+// StackPathLabel returns the label of the top-level stack block whose `path` attribute
+// contains node. The `path` value may be any expression.
+func StackPathLabel(node *ast.IndexedNode) (string, bool) {
+	return pathLabel(node, "stack")
 }
 
-// firstLabelFromContainingBlock walks up from the given node to the nearest
-// block matching blockMatcher (including the node itself) and returns that
-// block's first label.
-func firstLabelFromContainingBlock(node *ast.IndexedNode, blockMatcher func(*ast.IndexedNode) bool) (string, bool) {
-	block := ast.FindFirstParentMatch(node, blockMatcher)
-	if block == nil {
+// literalSource returns the string literal value of the `source` attribute that contains
+// node, when that attribute belongs to a top-level block of blockType.
+func literalSource(node *ast.IndexedNode, blockType string) (string, bool) {
+	block, ok := attributeBlock(node, blockType, "source")
+	if !ok {
 		return "", false
 	}
 
-	return block.Node.(*hclsyntax.Block).Labels[0], true
+	return stringLiteral(block.Body.Attributes["source"].Expr)
 }
 
-// GetUnitSource returns the source attribute value from a unit block
-func (s *StackAST) GetUnitSource(node *ast.IndexedNode) (string, bool) {
-	return getBlockAttribute(node, isUnitBlock, "source")
-}
-
-// IsUnitPathAttribute reports whether the node is inside the path attribute of a unit block,
-// regardless of whether the value is a literal.
-func (s *StackAST) IsUnitPathAttribute(node *ast.IndexedNode) bool {
-	return findBlockAttribute(node, isUnitBlock, "path") != nil
-}
-
-// GetStackSource returns the source attribute value from a stack block
-func (s *StackAST) GetStackSource(node *ast.IndexedNode) (string, bool) {
-	return getBlockAttribute(node, isStackBlock, "source")
-}
-
-// IsStackPathAttribute reports whether the node is inside the path attribute of a stack block,
-// regardless of whether the value is a literal.
-func (s *StackAST) IsStackPathAttribute(node *ast.IndexedNode) bool {
-	return findBlockAttribute(node, isStackBlock, "path") != nil
-}
-
-// isUnitBlock returns TRUE if the node is an HCL block of type "unit"
-func isUnitBlock(inode *ast.IndexedNode) bool {
-	block, ok := inode.Node.(*hclsyntax.Block)
-	return ok && block.Type == "unit" && len(block.Labels) > 0
-}
-
-// isStackBlock returns TRUE if the node is an HCL block of type "stack"
-func isStackBlock(inode *ast.IndexedNode) bool {
-	block, ok := inode.Node.(*hclsyntax.Block)
-	return ok && block.Type == "stack" && len(block.Labels) > 0
-}
-
-// findBlockAttribute returns the attribute named attrName that contains the node,
-// if that attribute belongs to a block matched by blockMatcher.
-func findBlockAttribute(
-	node *ast.IndexedNode,
-	blockMatcher func(*ast.IndexedNode) bool,
-	attrName string,
-) *hclsyntax.Attribute {
-	attr := ast.FindFirstParentMatch(node, ast.IsAttribute)
-	if attr == nil {
-		return nil
-	}
-
-	attrNode, ok := attr.Node.(*hclsyntax.Attribute)
-	if !ok || attrNode.Name != attrName {
-		return nil
-	}
-
-	if ast.FindFirstParentMatch(attr, blockMatcher) == nil {
-		return nil
-	}
-
-	return attrNode
-}
-
-// getBlockAttribute returns the string literal value of the named attribute of a matched block.
-func getBlockAttribute(
-	node *ast.IndexedNode,
-	blockMatcher func(*ast.IndexedNode) bool,
-	attrName string,
-) (string, bool) {
-	attr := findBlockAttribute(node, blockMatcher, attrName)
-	if attr == nil {
+// pathLabel returns the label of the top-level block of blockType whose `path` attribute
+// contains node.
+func pathLabel(node *ast.IndexedNode, blockType string) (string, bool) {
+	block, ok := attributeBlock(node, blockType, "path")
+	if !ok {
 		return "", false
 	}
 
-	return extractStringValue(attr.Expr)
+	return block.Labels[0], true
 }
 
-// extractStringValue extracts a string value from various HCL expression types
-func extractStringValue(expr hclsyntax.Expression) (string, bool) {
+// attributeBlock returns the labeled top-level block of blockType that directly holds the
+// attribute named attrName containing node.
+func attributeBlock(node *ast.IndexedNode, blockType, attrName string) (*hclsyntax.Block, bool) {
+	attrNode := ast.FindFirstParentMatch(node, ast.IsAttribute)
+	if attrNode == nil || attrNode.Node.(*hclsyntax.Attribute).Name != attrName {
+		return nil, false
+	}
+
+	blockNode := ast.FindFirstParentMatch(attrNode, ast.IsBlock)
+	if blockNode == nil {
+		return nil, false
+	}
+
+	block := blockNode.Node.(*hclsyntax.Block)
+	if block.Type != blockType || len(block.Labels) == 0 {
+		return nil, false
+	}
+
+	if ast.FindFirstParentMatch(blockNode.Parent, ast.IsBlock) != nil {
+		return nil, false
+	}
+
+	return block, true
+}
+
+// stringLiteral returns the value of expr when it is a plain string with no interpolation.
+func stringLiteral(expr hclsyntax.Expression) (string, bool) {
 	switch e := expr.(type) {
 	case *hclsyntax.LiteralValueExpr:
 		if e.Val.Type() == cty.String {
 			return e.Val.AsString(), true
 		}
 	case *hclsyntax.TemplateExpr:
-		if len(e.Parts) == 1 {
-			if literal, ok := e.Parts[0].(*hclsyntax.LiteralValueExpr); ok {
-				if literal.Val.Type() == cty.String {
-					return literal.Val.AsString(), true
-				}
-			}
+		if len(e.Parts) != 1 {
+			return "", false
+		}
+
+		literal, ok := e.Parts[0].(*hclsyntax.LiteralValueExpr)
+		if ok && literal.Val.Type() == cty.String {
+			return literal.Val.AsString(), true
 		}
 	}
 

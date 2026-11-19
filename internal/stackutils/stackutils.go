@@ -1,80 +1,47 @@
-// Package stackutils provides shared utilities for working with Terragrunt stack configurations.
+// Package stackutils finds where the blocks of a parsed Terragrunt stack configuration are
+// generated.
 package stackutils
 
 import (
-	"slices"
-
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 )
 
-func findUnit(stackCfg *config.StackConfig, unitName string) *config.Unit {
+// UnitDirs returns the directories that the enabled instances of the unit named name
+// generate into under stackDir, in declaration order. A unit with an `expansion` block has
+// one instance per element, all sharing the block's label. stackCfg is nil when the stack
+// file failed to parse, which yields no directories.
+func UnitDirs(stackCfg *config.StackConfig, name, stackDir string) []string {
 	if stackCfg == nil {
 		return nil
 	}
 
-	idx := slices.IndexFunc(stackCfg.Units, func(u *config.Unit) bool {
-		return u != nil && u.Name == unitName
-	})
-	if idx < 0 {
-		return nil
+	var dirs []string
+
+	for _, unit := range stackCfg.Units {
+		if unit.Name == name && unit.IsEnabled() {
+			dirs = append(dirs, unit.GeneratedPath(stackDir))
+		}
 	}
 
-	return stackCfg.Units[idx]
+	return dirs
 }
 
-func findStack(stackCfg *config.StackConfig, stackName string) *config.Stack {
+// StackDirs returns the directories that the enabled instances of the stack named name
+// generate into under stackDir, in declaration order. A stack with an `expansion` block
+// has one instance per element, all sharing the block's label. stackCfg is nil when the
+// stack file failed to parse, which yields no directories.
+func StackDirs(stackCfg *config.StackConfig, name, stackDir string) []string {
 	if stackCfg == nil {
 		return nil
 	}
 
-	idx := slices.IndexFunc(stackCfg.Stacks, func(s *config.Stack) bool {
-		return s != nil && s.Name == stackName
-	})
-	if idx < 0 {
-		return nil
+	var dirs []string
+
+	for _, stack := range stackCfg.Stacks {
+		if stack.Name == name && stack.IsEnabled() {
+			dirs = append(dirs, stack.GeneratedPath(stackDir))
+		}
 	}
 
-	return stackCfg.Stacks[idx]
-}
-
-// LookupUnitPath looks up the path for a unit from the parsed StackConfig
-func LookupUnitPath(stackCfg *config.StackConfig, unitName string) (string, bool) {
-	unit := findUnit(stackCfg, unitName)
-	if unit == nil {
-		return "", false
-	}
-
-	return unit.Path, true
-}
-
-// LookupStackPath looks up the path for a stack from the parsed StackConfig
-func LookupStackPath(stackCfg *config.StackConfig, stackName string) (string, bool) {
-	stack := findStack(stackCfg, stackName)
-	if stack == nil {
-		return "", false
-	}
-
-	return stack.Path, true
-}
-
-// LookupUnitDir returns the directory a unit is generated into under dir,
-// honoring no_dot_terragrunt_stack.
-func LookupUnitDir(stackCfg *config.StackConfig, unitName, dir string) (string, bool) {
-	unit := findUnit(stackCfg, unitName)
-	if unit == nil {
-		return "", false
-	}
-
-	return unit.GeneratedPath(dir), true
-}
-
-// LookupStackDir returns the directory a stack is generated into under dir,
-// honoring no_dot_terragrunt_stack. Terragrunt only exports this for units.
-func LookupStackDir(stackCfg *config.StackConfig, stackName, dir string) (string, bool) {
-	stack := findStack(stackCfg, stackName)
-	if stack == nil {
-		return "", false
-	}
-
-	return stack.GeneratedPath(dir), true
+	return dirs
 }

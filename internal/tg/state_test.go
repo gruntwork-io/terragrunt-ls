@@ -788,9 +788,6 @@ func TestState_Hover_StackFile(t *testing.T) {
 	_ = state.OpenDocument(t.Context(), l, v, venv.Policy{}, stackURI, `unit "vpc" {
 	source = "./units/vpc"
 	path   = "vpc"
-	values = {
-		name = "vpc"
-	}
 }`)
 
 	hover := state.Hover(t.Context(), l, 1, stackURI, protocol.Position{Line: 0, Character: 0})
