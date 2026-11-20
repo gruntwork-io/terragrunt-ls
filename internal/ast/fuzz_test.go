@@ -4,9 +4,9 @@ import (
 	"terragrunt-ls/internal/ast"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 // FuzzParseHCLFile tests that the index is always built and that a node lookup never returns a node from a later line.
@@ -25,7 +25,7 @@ func FuzzParseHCLFile(f *testing.F) {
 		indexed, err := ast.ParseHCLFile("terragrunt.hcl", contents)
 		require.NotNil(t, indexed, "parse error: %v", err)
 
-		node := indexed.FindNodeAt(hcl.Pos{Line: line, Column: column})
+		node := indexed.FindNodeAt(protocol.Position{Line: uint32(line - 1), Character: uint32(column - 1)})
 		if node == nil {
 			return
 		}

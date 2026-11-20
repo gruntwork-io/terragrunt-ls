@@ -4,6 +4,7 @@ package text
 import (
 	"bufio"
 	"strings"
+	"terragrunt-ls/internal/ast"
 
 	"go.lsp.dev/protocol"
 )
@@ -19,19 +20,17 @@ func GetCursorWord(document string, position protocol.Position) string {
 	}
 
 	line := scanner.Text()
-
-	// LSP treats a character past the end of the line as the end of the line.
-	character := min(position.Character, uint32(len(line)))
+	cursor := ast.LineByteOffset(line, position.Character)
 
 	// Find the start of the word
-	start := character
+	start := cursor
 	for start > 0 && isWordChar(line[start-1]) {
 		start--
 	}
 
 	// Find the end of the word
-	end := character
-	for int(end) < len(line) && isWordChar(line[end]) {
+	end := cursor
+	for end < len(line) && isWordChar(line[end]) {
 		end++
 	}
 

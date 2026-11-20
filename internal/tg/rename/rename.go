@@ -62,14 +62,16 @@ func GetRenameTarget(l logger.Logger, st *store.Store, position protocol.Positio
 		return null
 	}
 
-	inode := st.AST.FindNodeAt(ast.ToHCLPos(position))
+	offset := ast.ByteOffset(st.Document, position)
+
+	inode := st.AST.FindNodeAt(position)
 	if inode == nil {
 		l.Debug("No node at position", "line", position.Line, "character", position.Character)
 		return null
 	}
 
 	if expr, ok := inode.Node.(*hclsyntax.ScopeTraversalExpr); ok {
-		return traversalTarget(expr, position)
+		return traversalTarget(st.Document, expr, offset)
 	}
 
 	for cur := inode; cur != nil; cur = cur.Parent {
@@ -82,23 +84,23 @@ func GetRenameTarget(l logger.Logger, st *store.Store, position protocol.Positio
 			return null
 		}
 
-		if !rangeContainsPosition(attr.NameRange, position) {
+		if !attr.NameRange.ContainsOffset(offset) {
 			return null
 		}
 
 		return RenameTarget{
 			Name:       attr.Name,
 			Context:    RenameContextLocal,
-			IdentRange: ast.FromHCLRange(attr.NameRange),
+			IdentRange: ast.FromHCLRange(st.Document, attr.NameRange),
 		}
 	}
 
 	return null
 }
 
-// traversalTarget extracts a RenameTarget from a ScopeTraversalExpr if the
-// cursor is positioned on its first two traversal steps and the root is `local`.
-func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Position) RenameTarget {
+// traversalTarget extracts a RenameTarget from a ScopeTraversalExpr in doc if offset, the
+// cursor's byte offset in doc, is on its first two traversal steps and the root is `local`.
+func traversalTarget(doc string, expr *hclsyntax.ScopeTraversalExpr, offset int) RenameTarget {
 	null := RenameTarget{Context: RenameContextNull}
 
 	if len(expr.Traversal) < ast.MinReferenceTraversalLen {
@@ -125,14 +127,14 @@ func traversalTarget(expr *hclsyntax.ScopeTraversalExpr, position protocol.Posit
 		Start:    rootStep.SrcRange.Start,
 		End:      attrStep.SrcRange.End,
 	}
-	if !rangeContainsPosition(firstTwo, position) {
+	if !firstTwo.ContainsOffset(offset) {
 		return null
 	}
 
 	return RenameTarget{
 		Name:       attrStep.Name,
 		Context:    RenameContextLocal,
-		IdentRange: ast.FromHCLRange(ast.TraverseAttrIdentRange(&attrStep)),
+		IdentRange: ast.FromHCLRange(doc, ast.TraverseAttrIdentRange(&attrStep)),
 	}
 }
 
@@ -149,12 +151,12 @@ func FindAllOccurrences(target RenameTarget, file string, st *store.Store) []Occ
 		return nil
 	}
 
-	occurrences := definitionOccurrences(target, file, st.AST)
+	occurrences := definitionOccurrences(target, file, st)
 
 	ast.WalkReferences(body, target.Context, target.Name, func(_ *hclsyntax.ScopeTraversalExpr, r hcl.Range) {
 		occurrences = append(occurrences, Occurrence{
 			File:         file,
-			Range:        ast.FromHCLRange(r),
+			Range:        ast.FromHCLRange(st.Document, r),
 			IsDefinition: false,
 		})
 	})
@@ -173,12 +175,12 @@ func FindAllOccurrences(target RenameTarget, file string, st *store.Store) []Occ
 }
 
 // definitionOccurrences finds the definition site(s) of target in the given file.
-func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAST) []Occurrence {
+func definitionOccurrences(target RenameTarget, file string, st *store.Store) []Occurrence {
 	if target.Context != RenameContextLocal {
 		return nil
 	}
 
-	def, ok := iast.Locals[target.Name]
+	def, ok := st.AST.Locals[target.Name]
 	if !ok {
 		return nil
 	}
@@ -190,28 +192,7 @@ func definitionOccurrences(target RenameTarget, file string, iast *ast.IndexedAS
 
 	return []Occurrence{{
 		File:         file,
-		Range:        ast.FromHCLRange(attr.NameRange),
+		Range:        ast.FromHCLRange(st.Document, attr.NameRange),
 		IsDefinition: true,
 	}}
-}
-
-// rangeContainsPosition reports whether p (LSP coordinates) is inside r (HCL
-// coordinates). The end of an HCL range is exclusive.
-func rangeContainsPosition(r hcl.Range, p protocol.Position) bool {
-	line := int(p.Line) + 1
-	col := int(p.Character) + 1
-
-	if line < r.Start.Line || line > r.End.Line {
-		return false
-	}
-
-	if line == r.Start.Line && col < r.Start.Column {
-		return false
-	}
-
-	if line == r.End.Line && col >= r.End.Column {
-		return false
-	}
-
-	return true
 }

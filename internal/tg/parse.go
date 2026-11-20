@@ -3,7 +3,9 @@ package tg
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
+	"terragrunt-ls/internal/ast"
 
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
@@ -88,7 +90,7 @@ func ParseTerragruntBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := hclDiagsToLSPDiags(filteredDiags)
+	diags := hclDiagsToLSPDiags(text, filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
 }
@@ -100,6 +102,10 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 		if diag.Subject == nil {
 			filtered = append(filtered, diag)
 
+			continue
+		}
+
+		if diag.Subject.Filename != filename {
 			continue
 		}
 
@@ -139,9 +145,7 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 			continue
 		}
 
-		if diag.Subject.Filename == filename {
-			filtered = append(filtered, diag)
-		}
+		filtered = append(filtered, diag)
 	}
 
 	return filtered
@@ -209,49 +213,22 @@ func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 		return false
 	}
 
-	lines := strings.Split(text, "\n")
-	line := diag.Subject.Start.Line - 1 // HCL lines are 1-based
+	before := text[:diag.Subject.Start.Byte]
 
-	if line < 0 || line >= len(lines) {
-		return false
-	}
-
-	// The diagnostic start column points to the "." in "keyword.attr".
-	// Check that the characters immediately before the dot match a known keyword.
-	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based, convert to 0-based
-
-	for _, keyword := range unresolvableKeywords {
-		kLen := len(keyword)
-
-		if col < kLen {
-			continue
-		}
-
-		if lines[line][col-kLen:col] == keyword {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(unresolvableKeywords, func(keyword string) bool {
+		return strings.HasSuffix(before, keyword)
+	})
 }
 
-func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
+// hclDiagsToLSPDiags converts hclDiags, whose subjects are in text, to LSP diagnostics.
+func hclDiagsToLSPDiags(text string, hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 	diags := make([]protocol.Diagnostic, 0, len(hclDiags))
 
 	for _, diag := range hclDiags {
 		var diagRange protocol.Range
 
 		if diag.Subject != nil {
-			diagRange = protocol.Range{
-				Start: protocol.Position{
-					Line:      uint32(diag.Subject.Start.Line) - 1,
-					Character: uint32(diag.Subject.Start.Column) - 1,
-				},
-				End: protocol.Position{
-					Line:      uint32(diag.Subject.End.Line) - 1,
-					Character: uint32(diag.Subject.End.Column) - 1,
-				},
-			}
+			diagRange = ast.FromHCLRange(text, *diag.Subject)
 		}
 
 		diags = append(diags, protocol.Diagnostic{
@@ -303,7 +280,7 @@ func ParseStackBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := hclDiagsToLSPDiags(filteredDiags)
+	diags := hclDiagsToLSPDiags(text, filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
 }
