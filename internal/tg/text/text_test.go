@@ -67,6 +67,24 @@ func TestGetCursorWord(t *testing.T) {
 			expected: "hi",
 		},
 		{
+			name:     "word after surrogate pairs",
+			document: `["🧪🧪", local.foo]`,
+			position: protocol.Position{Line: 0, Character: 10},
+			expected: "local.foo",
+		},
+		{
+			name:     "word between surrogate pairs",
+			document: "🧪🧪 hi 🧪🧪",
+			position: protocol.Position{Line: 0, Character: 6},
+			expected: "hi",
+		},
+		{
+			name:     "cursor inside a surrogate pair",
+			document: "🧪hi",
+			position: protocol.Position{Line: 0, Character: 1},
+			expected: "",
+		},
+		{
 			name:     "line past the end of the document",
 			document: "hello\nworld",
 			position: protocol.Position{Line: 5, Character: 2},

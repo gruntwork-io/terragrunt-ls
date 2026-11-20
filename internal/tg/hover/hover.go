@@ -9,7 +9,6 @@ import (
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"go.lsp.dev/protocol"
 )
@@ -73,35 +72,26 @@ func GetDocsTarget(st *store.Store, position protocol.Position) (docs.Kind, stri
 		return "", "", false
 	}
 
-	pos := ast.ToHCLPos(position)
+	offset := ast.ByteOffset(st.Document, position)
 
-	for n := st.AST.FindNodeAt(pos); n != nil; n = n.Parent {
+	for n := st.AST.FindNodeAt(position); n != nil; n = n.Parent {
 		switch node := n.Node.(type) {
 		case *hclsyntax.FunctionCallExpr:
-			if contains(node.NameRange, pos) {
+			if node.NameRange.ContainsOffset(offset) {
 				return docs.KindFunction, node.Name, true
 			}
 		case *hclsyntax.Block:
-			if contains(node.TypeRange, pos) && isTopLevel(n) {
+			if node.TypeRange.ContainsOffset(offset) && isTopLevel(n) {
 				return docs.KindBlock, node.Type, true
 			}
 		case *hclsyntax.Attribute:
-			if contains(node.NameRange, pos) && isTopLevel(n) {
+			if node.NameRange.ContainsOffset(offset) && isTopLevel(n) {
 				return docs.KindAttribute, node.Name, true
 			}
 		}
 	}
 
 	return "", "", false
-}
-
-// contains reports whether pos is in r, comparing lines and columns, since
-// positions from the client carry no byte offset.
-func contains(r hcl.Range, pos hcl.Pos) bool {
-	afterStart := pos.Line > r.Start.Line || pos.Line == r.Start.Line && pos.Column >= r.Start.Column
-	beforeEnd := pos.Line < r.End.Line || pos.Line == r.End.Line && pos.Column < r.End.Column
-
-	return afterStart && beforeEnd
 }
 
 // isTopLevel reports whether a block or attribute is in the file's body rather

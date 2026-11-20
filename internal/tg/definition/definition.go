@@ -38,7 +38,7 @@ func GetDefinitionTargetWithContext(l logger.Logger, store *store.Store, positio
 		return "", DefinitionContextNull
 	}
 
-	node := store.AST.FindNodeAt(ast.ToHCLPos(position))
+	node := store.AST.FindNodeAt(position)
 	if node == nil {
 		l.Debug("No node found at", "line", position.Line, "character", position.Character)
 		return "", DefinitionContextNull

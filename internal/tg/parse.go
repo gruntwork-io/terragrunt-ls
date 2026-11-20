@@ -3,7 +3,9 @@ package tg
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
+	"terragrunt-ls/internal/ast"
 
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
@@ -39,12 +41,14 @@ func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
 	return venv.Restrict(v.WithEnvCloned(), p), rec
 }
 
-// newParsingContext builds a terragrunt ParsingContext for the given file and
-// returns a pointer to the HCL diagnostics slice that the parser will populate.
+// newParsingContext builds a terragrunt ParsingContext for filename, whose
+// contents are text, and returns a pointer to the HCL diagnostics slice that
+// the parser will populate. The subjects of diagnostics in filename count bytes
+// in text.
 func newParsingContext(
 	ctx context.Context,
 	v *venv.Venv,
-	filename string,
+	filename, text string,
 ) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
@@ -56,7 +60,7 @@ func newParsingContext(
 	pctx.SkipOutput = true
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
 	pctx.Parser.DiagnosticsHandler = func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-		*parseDiags = append(*parseDiags, hclDiags...)
+		*parseDiags = append(*parseDiags, rebaseDiags(file, hclDiags, filename, text)...)
 		return hclDiags, nil
 	}
 
@@ -78,7 +82,7 @@ func ParseTerragruntBuffer(
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename, text)
 
 	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
@@ -88,7 +92,7 @@ func ParseTerragruntBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := hclDiagsToLSPDiags(filteredDiags)
+	diags := hclDiagsToLSPDiags(text, filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
 }
@@ -100,6 +104,10 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 		if diag.Subject == nil {
 			filtered = append(filtered, diag)
 
+			continue
+		}
+
+		if diag.Subject.Filename != filename {
 			continue
 		}
 
@@ -139,9 +147,7 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 			continue
 		}
 
-		if diag.Subject.Filename == filename {
-			filtered = append(filtered, diag)
-		}
+		filtered = append(filtered, diag)
 	}
 
 	return filtered
@@ -209,49 +215,22 @@ func isUnresolvableAttributeDiag(diag *hcl.Diagnostic, text string) bool {
 		return false
 	}
 
-	lines := strings.Split(text, "\n")
-	line := diag.Subject.Start.Line - 1 // HCL lines are 1-based
+	before := text[:diag.Subject.Start.Byte]
 
-	if line < 0 || line >= len(lines) {
-		return false
-	}
-
-	// The diagnostic start column points to the "." in "keyword.attr".
-	// Check that the characters immediately before the dot match a known keyword.
-	col := diag.Subject.Start.Column - 1 // HCL columns are 1-based, convert to 0-based
-
-	for _, keyword := range unresolvableKeywords {
-		kLen := len(keyword)
-
-		if col < kLen {
-			continue
-		}
-
-		if lines[line][col-kLen:col] == keyword {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(unresolvableKeywords, func(keyword string) bool {
+		return strings.HasSuffix(before, keyword)
+	})
 }
 
-func hclDiagsToLSPDiags(hclDiags hcl.Diagnostics) []protocol.Diagnostic {
+// hclDiagsToLSPDiags converts hclDiags, whose subjects are in text, to LSP diagnostics.
+func hclDiagsToLSPDiags(text string, hclDiags hcl.Diagnostics) []protocol.Diagnostic {
 	diags := make([]protocol.Diagnostic, 0, len(hclDiags))
 
 	for _, diag := range hclDiags {
 		var diagRange protocol.Range
 
 		if diag.Subject != nil {
-			diagRange = protocol.Range{
-				Start: protocol.Position{
-					Line:      uint32(diag.Subject.Start.Line) - 1,
-					Character: uint32(diag.Subject.Start.Column) - 1,
-				},
-				End: protocol.Position{
-					Line:      uint32(diag.Subject.End.Line) - 1,
-					Character: uint32(diag.Subject.End.Column) - 1,
-				},
-			}
+			diagRange = ast.FromHCLRange(text, *diag.Subject)
 		}
 
 		diags = append(diags, protocol.Diagnostic{
@@ -293,7 +272,7 @@ func ParseStackBuffer(
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename, text)
 
 	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
@@ -303,7 +282,32 @@ func ParseStackBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := hclDiagsToLSPDiags(filteredDiags)
+	diags := hclDiagsToLSPDiags(text, filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
+}
+
+// rebaseDiags returns diags with each subject in filename moved from file onto
+// text. Terragrunt labels a bare include block and reparses the result before
+// decoding, so the subjects of decode diagnostics count bytes in that rewritten
+// source rather than in text.
+func rebaseDiags(file *hcl.File, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
+	src := string(file.Bytes)
+	rebased := make(hcl.Diagnostics, 0, len(diags))
+
+	for _, diag := range diags {
+		if diag.Subject == nil || diag.Subject.Filename != filename {
+			rebased = append(rebased, diag)
+
+			continue
+		}
+
+		// Terragrunt keeps using diag, and its subject can point into the
+		// parsed AST, so the rebased subject goes on a copy.
+		d := *diag
+		d.Subject = new(ast.RebaseHCLRange(src, text, *diag.Subject))
+		rebased = append(rebased, &d)
+	}
+
+	return rebased
 }

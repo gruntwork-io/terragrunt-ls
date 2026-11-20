@@ -4,17 +4,17 @@ import (
 	"terragrunt-ls/internal/ast"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 func TestParseHCLFile(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
-		expectedNodesAt map[hcl.Pos]string
+		expectedNodesAt map[protocol.Position]string
 		name            string
 		contents        string
 	}{
@@ -28,8 +28,8 @@ func TestParseHCLFile(t *testing.T) {
 	foo = "bar"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}: "[1:1-3:2] *hclsyntax.Block",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
 			},
 		},
 		{
@@ -38,8 +38,8 @@ func TestParseHCLFile(t *testing.T) {
 	path = "root.hcl"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}: "[1:1-3:2] *hclsyntax.Block",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
 			},
 		},
 		{
@@ -56,11 +56,11 @@ inputs = {
 	foo = "bar"
 }
 `,
-			expectedNodesAt: map[hcl.Pos]string{
-				{Line: 1, Column: 1}:  "[1:1-3:2] *hclsyntax.Block",
-				{Line: 6, Column: 1}:  "[5:8-7:2] *hclsyntax.Body",
-				{Line: 9, Column: 1}:  "[9:1-11:2] *hclsyntax.Attribute",
-				{Line: 10, Column: 1}: "[9:10-11:2] *hclsyntax.ObjectConsExpr",
+			expectedNodesAt: map[protocol.Position]string{
+				{Line: 0, Character: 0}: "[1:1-3:2] *hclsyntax.Block",
+				{Line: 5, Character: 0}: "[5:8-7:2] *hclsyntax.Body",
+				{Line: 8, Character: 0}: "[9:1-11:2] *hclsyntax.Attribute",
+				{Line: 9, Character: 0}: "[9:10-11:2] *hclsyntax.ObjectConsExpr",
 			},
 		},
 	}
@@ -113,7 +113,7 @@ func TestIndexedAST_FindNodeAt_BasicCases(t *testing.T) {
 		indexed, err := ast.ParseHCLFile("test.hcl", []byte(``))
 		require.NoError(t, err)
 		require.NotNil(t, indexed)
-		node := indexed.FindNodeAt(hcl.Pos{Line: 1, Column: 1})
+		node := indexed.FindNodeAt(protocol.Position{})
 		assert.Nil(t, node, "Should not find a node in an empty file")
 	})
 
@@ -127,7 +127,7 @@ func TestIndexedAST_FindNodeAt_BasicCases(t *testing.T) {
 		indexed, err := ast.ParseHCLFile("test.hcl", []byte(content))
 		require.NoError(t, err)
 		require.NotNil(t, indexed)
-		node := indexed.FindNodeAt(hcl.Pos{Line: 2, Column: 1})
+		node := indexed.FindNodeAt(protocol.Position{Line: 1})
 		assert.NotNil(t, node, "Should find a node within the node span")
 	})
 }
@@ -138,7 +138,7 @@ func TestIsLocalAttribute(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -146,7 +146,7 @@ func TestIsLocalAttribute(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: false,
 		},
 		{
@@ -154,7 +154,7 @@ func TestIsLocalAttribute(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: true,
 		},
 	}
@@ -181,7 +181,7 @@ func TestIsLocalsBlock(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -189,7 +189,7 @@ func TestIsLocalsBlock(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -197,7 +197,7 @@ func TestIsLocalsBlock(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -224,7 +224,7 @@ func TestIsIncludeBlock(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -232,7 +232,7 @@ func TestIsIncludeBlock(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -240,7 +240,7 @@ func TestIsIncludeBlock(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -267,7 +267,7 @@ func TestIsAttribute(t *testing.T) {
 	tc := []struct {
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -275,7 +275,7 @@ func TestIsAttribute(t *testing.T) {
 			content: `locals {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: false,
 		},
 		{
@@ -283,7 +283,7 @@ func TestIsAttribute(t *testing.T) {
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: true,
 		},
 	}
@@ -311,14 +311,14 @@ func TestGetNodeIncludeLabel(t *testing.T) {
 		name     string
 		content  string
 		expected string
-		pos      hcl.Pos
+		pos      protocol.Position
 	}{
 		{
 			name: "not an include block",
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: "",
 		},
 		{
@@ -326,7 +326,7 @@ func TestGetNodeIncludeLabel(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: "root",
 		},
 		{
@@ -334,7 +334,7 @@ func TestGetNodeIncludeLabel(t *testing.T) {
 			content: `include "root" {
 	path = "root.hcl"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
+			pos:      protocol.Position{Line: 1, Character: 17},
 			expected: "root",
 		},
 	}
@@ -369,14 +369,14 @@ func TestGetNodeDependencyLabel(t *testing.T) {
 		name     string
 		content  string
 		expected string
-		pos      hcl.Pos
+		pos      protocol.Position
 	}{
 		{
 			name: "not a dependency block",
 			content: `inputs = {
 	foo = "bar"
 }`,
-			pos:      hcl.Pos{Line: 1, Column: 1},
+			pos:      protocol.Position{Line: 0, Character: 0},
 			expected: "",
 		},
 		{
@@ -384,7 +384,7 @@ func TestGetNodeDependencyLabel(t *testing.T) {
 			content: `dependency "vpc" {
 	config_path = "../vpc"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			expected: "vpc",
 		},
 		{
@@ -392,7 +392,7 @@ func TestGetNodeDependencyLabel(t *testing.T) {
 			content: `dependency "vpc" {
 	config_path = "../vpc"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
+			pos:      protocol.Position{Line: 1, Character: 17},
 			expected: "vpc",
 		},
 		{
@@ -400,7 +400,7 @@ func TestGetNodeDependencyLabel(t *testing.T) {
 			content: `dependency "vpc" {
 	other_field = "../vpc"
 }`,
-			pos:      hcl.Pos{Line: 2, Column: 18},
+			pos:      protocol.Position{Line: 1, Character: 17},
 			expected: "",
 		},
 	}
@@ -435,7 +435,7 @@ func TestFindFirstParentMatch(t *testing.T) {
 		matcher  func(node *ast.IndexedNode) bool
 		name     string
 		content  string
-		pos      hcl.Pos
+		pos      protocol.Position
 		expected bool
 	}{
 		{
@@ -443,7 +443,7 @@ func TestFindFirstParentMatch(t *testing.T) {
 			content: `locals {
 		foo = "bar"
 	}`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			matcher:  ast.IsLocalsBlock,
 			expected: true,
 		},
@@ -452,7 +452,7 @@ func TestFindFirstParentMatch(t *testing.T) {
 			content: `locals {
 		foo = "bar"
 	}`,
-			pos:      hcl.Pos{Line: 2, Column: 2},
+			pos:      protocol.Position{Line: 1, Character: 1},
 			matcher:  ast.IsDependencyBlock,
 			expected: false,
 		},
@@ -499,7 +499,7 @@ func TestScope_Add(t *testing.T) {
 		require.NotNil(t, indexed)
 
 		// Find the block node
-		node := indexed.FindNodeAt(hcl.Pos{Line: 1, Column: 1})
+		node := indexed.FindNodeAt(protocol.Position{})
 		require.NotNil(t, node)
 
 		// Add to the scope directly

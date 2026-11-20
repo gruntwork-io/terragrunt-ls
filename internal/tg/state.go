@@ -15,6 +15,7 @@ import (
 	"terragrunt-ls/internal/tg/rename"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
+	"unicode/utf16"
 
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/gruntwork-io/terragrunt/pkg/venv"
@@ -642,11 +643,17 @@ func (s *State) TextDocumentReferences(
 	}
 }
 
+// getEndOfDocument returns the position just past the last character of doc.
 func getEndOfDocument(doc string) protocol.Position {
 	lines := strings.Split(doc, "\n")
 
+	units := 0
+	for _, r := range lines[len(lines)-1] {
+		units += utf16.RuneLen(r)
+	}
+
 	return protocol.Position{
 		Line:      uint32(len(lines) - 1),
-		Character: uint32(len(lines[len(lines)-1])),
+		Character: uint32(units),
 	}
 }
