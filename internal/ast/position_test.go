@@ -156,6 +156,55 @@ func TestFromHCLPos(t *testing.T) {
 	}
 }
 
+func TestRebaseHCLPos(t *testing.T) {
+	t.Parallel()
+
+	const (
+		from = "include \"\" {\n}\na = local.x.z"
+		to   = "include {\n}\na = local.x.z"
+	)
+
+	tests := []struct {
+		name     string
+		pos      hcl.Pos
+		expected hcl.Pos
+	}{
+		{
+			name:     "unedited line",
+			pos:      hcl.Pos{Line: 3, Column: 12, Byte: 26},
+			expected: hcl.Pos{Line: 3, Column: 12, Byte: 23},
+		},
+		{
+			name:     "end of the document",
+			pos:      hcl.Pos{Line: 3, Column: 14, Byte: 28},
+			expected: hcl.Pos{Line: 3, Column: 14, Byte: 25},
+		},
+		{
+			name:     "past the end of its line in to",
+			pos:      hcl.Pos{Line: 1, Column: 12, Byte: 11},
+			expected: hcl.Pos{Line: 1, Column: 12, Byte: 9},
+		},
+		{
+			name:     "zero position",
+			pos:      hcl.Pos{},
+			expected: hcl.Pos{},
+		},
+		{
+			name:     "line past the end of both documents",
+			pos:      hcl.Pos{Line: 9, Column: 1, Byte: 28},
+			expected: hcl.Pos{Line: 9, Column: 1, Byte: 25},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expected, ast.RebaseHCLPos(from, to, tt.pos))
+		})
+	}
+}
+
 // FuzzPositionsMatchHCL pins that the LSP position of the start of every token HCL lexes is on
 // the token's line, converts back to the token's byte offset, and counts the UTF-16 code units
 // before the token on its line.

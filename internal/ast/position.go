@@ -36,6 +36,35 @@ func FromHCLPos(doc string, pos hcl.Pos) protocol.Position {
 	}
 }
 
+// RebaseHCLRange moves r, a range in from, onto to. See [RebaseHCLPos].
+func RebaseHCLRange(from, to string, r hcl.Range) hcl.Range {
+	r.Start = RebaseHCLPos(from, to, r.Start)
+	r.End = RebaseHCLPos(from, to, r.End)
+
+	return r
+}
+
+// RebaseHCLPos moves pos, a position in from, to the same line and the same byte offset within
+// that line in to. When to is from with some lines edited, a position on an unedited line lands
+// on the same text.
+//
+// The byte offset never passes the end of its line in to. A position whose line is missing from
+// either document keeps its byte offset, up to the end of to.
+func RebaseHCLPos(from, to string, pos hcl.Pos) hcl.Pos {
+	fromStart, _, fromOK := lineAt(from, pos.Line-1)
+	toStart, toLine, toOK := lineAt(to, pos.Line-1)
+
+	if !fromOK || !toOK || pos.Byte < fromStart {
+		pos.Byte = min(pos.Byte, len(to))
+
+		return pos
+	}
+
+	pos.Byte = toStart + min(pos.Byte-fromStart, len(toLine))
+
+	return pos
+}
+
 // ByteOffset returns the byte offset in doc of p, an LSP position. Compare it with the Byte
 // of an HCL position, never the Column: HCL counts the grapheme clusters of each token on its
 // own, which no conversion from an LSP position reproduces.

@@ -41,12 +41,14 @@ func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
 	return venv.Restrict(v.WithEnvCloned(), p), rec
 }
 
-// newParsingContext builds a terragrunt ParsingContext for the given file and
-// returns a pointer to the HCL diagnostics slice that the parser will populate.
+// newParsingContext builds a terragrunt ParsingContext for filename, whose
+// contents are text, and returns a pointer to the HCL diagnostics slice that
+// the parser will populate. The subjects of diagnostics in filename count bytes
+// in text.
 func newParsingContext(
 	ctx context.Context,
 	v *venv.Venv,
-	filename string,
+	filename, text string,
 ) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
@@ -58,7 +60,7 @@ func newParsingContext(
 	pctx.SkipOutput = true
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
 	pctx.Parser.DiagnosticsHandler = func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
-		*parseDiags = append(*parseDiags, hclDiags...)
+		*parseDiags = append(*parseDiags, rebaseDiags(file, hclDiags, filename, text)...)
 		return hclDiags, nil
 	}
 
@@ -80,7 +82,7 @@ func ParseTerragruntBuffer(
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename, text)
 
 	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
@@ -270,7 +272,7 @@ func ParseStackBuffer(
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename, text)
 
 	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
 	if err != nil {
@@ -283,4 +285,29 @@ func ParseStackBuffer(
 	diags := hclDiagsToLSPDiags(text, filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
+}
+
+// rebaseDiags returns diags with each subject in filename moved from file onto
+// text. Terragrunt labels a bare include block and reparses the result before
+// decoding, so the subjects of decode diagnostics count bytes in that rewritten
+// source rather than in text.
+func rebaseDiags(file *hcl.File, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
+	src := string(file.Bytes)
+	rebased := make(hcl.Diagnostics, 0, len(diags))
+
+	for _, diag := range diags {
+		if diag.Subject == nil || diag.Subject.Filename != filename {
+			rebased = append(rebased, diag)
+
+			continue
+		}
+
+		// Terragrunt keeps using diag, and its subject can point into the
+		// parsed AST, so the rebased subject goes on a copy.
+		d := *diag
+		d.Subject = new(ast.RebaseHCLRange(src, text, *diag.Subject))
+		rebased = append(rebased, &d)
+	}
+
+	return rebased
 }

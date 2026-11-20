@@ -12,6 +12,7 @@ import (
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 func TestDetectFileType(t *testing.T) {
@@ -296,6 +297,83 @@ inputs = {
 			}
 
 			assert.NotNil(t, cfg, "expected config to not be nil")
+		})
+	}
+}
+
+// TestParseTerragruntBuffer_BareIncludeDiagnosticRanges pins that diagnostics
+// in a unit with a bare include block point into the buffer as written.
+// Terragrunt decodes a copy of the buffer with a label added to the include
+// block, so their byte offsets start out a few bytes past the text they name.
+func TestParseTerragruntBuffer_BareIncludeDiagnosticRanges(t *testing.T) {
+	t.Parallel()
+
+	const include = `include {
+  path = find_in_parent_folders("root.hcl")
+}
+
+locals {
+  x = {}
+}
+
+`
+
+	tests := []struct {
+		name    string
+		content string
+		want    []protocol.Range
+	}{
+		{
+			name:    "unsupported attribute at the end of the buffer",
+			content: include + "inputs = local.x.z",
+			want: []protocol.Range{{
+				Start: protocol.Position{Line: 8, Character: 16},
+				End:   protocol.Position{Line: 8, Character: 18},
+			}},
+		},
+		{
+			name:    "unsupported attribute inside a block",
+			content: include + "inputs = {\n  a = local.x.missing\n}\n",
+			want: []protocol.Range{{
+				Start: protocol.Position{Line: 9, Character: 13},
+				End:   protocol.Position{Line: 9, Character: 21},
+			}},
+		},
+		{
+			name:    "unresolvable local",
+			content: include + "inputs = {\n  a = local.missing\n}\n",
+			want:    []protocol.Range{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+			tmpDir := testutils.WorkDir(t, v)
+
+			_, err := testutils.CreateFile(v, tmpDir, "root.hcl", "inputs = {}\n")
+			require.NoError(t, err)
+
+			unitDir := filepath.Join(tmpDir, "unit")
+			require.NoError(t, v.FS.MkdirAll(unitDir, 0755))
+
+			_, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filepath.Join(unitDir, "terragrunt.hcl"),
+				tt.content,
+			)
+
+			got := make([]protocol.Range, 0, len(diags))
+			for _, diag := range diags {
+				got = append(got, diag.Range)
+			}
+
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
