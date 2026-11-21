@@ -106,18 +106,18 @@
 		"test": "node ./out/test/runTest.js"
 	},
 	"dependencies": {
-		"glob": "14.0.4",
+		"glob": "14.0.6",
 		"vscode-languageclient": "^11.0.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
-		"@stylistic/eslint-plugin": "^5.10.0",
+		"@stylistic/eslint-plugin": "^6.0.0",
 		"@types/node": "^26",
 		"@types/vscode": "~1.98.0",
 		"@vscode/test-electron": "^3.1.0",
-		"eslint": "^10.14.0",
+		"eslint": "^10.15.0",
 		"nodemon": "^3.1.14",
-		"typescript": "~6.0.3",
+		"typescript": "~7.0.2",
 		"typescript-eslint": "^8.72.1"
 	}
 }
