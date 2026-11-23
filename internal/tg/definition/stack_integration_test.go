@@ -14,10 +14,7 @@ import (
 	"go.lsp.dev/uri"
 )
 
-func TestStackDefinition_Integration(t *testing.T) {
-	t.Parallel()
-
-	content := `unit "database" {
+const basicStack = `unit "database" {
   source = "./database"
   path   = "db"
 }
@@ -27,51 +24,171 @@ stack "nested" {
   path   = "nested"
 }`
 
-	tmpDir := t.TempDir()
-	filename := filepath.Join(tmpDir, "terragrunt.stack.hcl")
-	docURI := uri.File(filename)
-
-	l := testutils.NewTestLogger(t)
-
-	v := venv.OSVenv()
-	state := tg.NewState(testutils.NewDocs(t))
-	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content)
-	require.Empty(t, diags, "Expected no diagnostics")
+func TestStackDefinition(t *testing.T) {
+	t.Parallel()
 
 	tests := []struct {
-		name        string
-		description string
-		line        uint32
-		character   uint32
-		expectEmpty bool
+		name    string
+		content string
+		target  string
+		files   []string
+		dirs    []string
+		line    uint32
+		char    uint32
 	}{
 		{
-			name:        "unit source attribute value",
-			line:        1,  // second line (0-indexed)
-			character:   15, // middle of "./database"
-			expectEmpty: false,
-			description: "clicking on unit source attribute value should provide definition",
+			name:    "unit source",
+			content: basicStack,
+			files:   []string{"database/terragrunt.hcl"},
+			line:    1,
+			char:    15,
+			target:  "database/terragrunt.hcl",
 		},
 		{
-			name:        "stack source attribute value",
-			line:        5,  // sixth line (0-indexed)
-			character:   15, // middle of "./nested-stack"
-			expectEmpty: false,
-			description: "clicking on stack source attribute value should provide definition",
+			name:    "unit source without terragrunt.hcl",
+			content: basicStack,
+			files:   []string{"database/main.tf"},
+			line:    1,
+			char:    15,
 		},
 		{
-			name:        "path attribute value",
-			line:        2,  // third line (0-indexed)
-			character:   10, // middle of "db"
-			expectEmpty: false,
-			description: "clicking on path attribute value should provide definition",
+			name:    "unit source whose terragrunt.hcl is a directory",
+			content: basicStack,
+			dirs:    []string{"database/terragrunt.hcl"},
+			line:    1,
+			char:    15,
 		},
 		{
-			name:        "outside attributes",
-			line:        0, // first line
-			character:   5, // middle of "unit"
-			expectEmpty: true,
-			description: "clicking outside of source/path attributes should not provide definition",
+			name:    "unit source that does not exist",
+			content: basicStack,
+			line:    1,
+			char:    15,
+		},
+		{
+			name:    "stack source",
+			content: basicStack,
+			files:   []string{"nested-stack/terragrunt.stack.hcl"},
+			line:    6,
+			char:    15,
+			target:  "nested-stack/terragrunt.stack.hcl",
+		},
+		{
+			name:    "stack source with only terragrunt.hcl",
+			content: basicStack,
+			files:   []string{"nested-stack/terragrunt.hcl"},
+			line:    6,
+			char:    15,
+		},
+		{
+			name:    "unit path",
+			content: basicStack,
+			files:   []string{".terragrunt-stack/db/terragrunt.hcl"},
+			line:    2,
+			char:    12,
+			target:  ".terragrunt-stack/db/terragrunt.hcl",
+		},
+		{
+			name:    "unit path whose generated config is a directory",
+			content: basicStack,
+			dirs:    []string{".terragrunt-stack/db/terragrunt.hcl"},
+			line:    2,
+			char:    12,
+		},
+		{
+			name:    "unit path before generation",
+			content: basicStack,
+			line:    2,
+			char:    12,
+		},
+		{
+			name:    "stack path",
+			content: basicStack,
+			files:   []string{".terragrunt-stack/nested/terragrunt.stack.hcl"},
+			line:    7,
+			char:    12,
+			target:  ".terragrunt-stack/nested/terragrunt.stack.hcl",
+		},
+		{
+			name: "computed unit path",
+			content: `locals {
+  name = "db"
+}
+
+unit "database" {
+  source = "./database"
+  path   = local.name
+}`,
+			files:  []string{".terragrunt-stack/db/terragrunt.hcl"},
+			line:   6,
+			char:   14,
+			target: ".terragrunt-stack/db/terragrunt.hcl",
+		},
+		{
+			name: "no_dot_terragrunt_stack unit path",
+			content: `unit "database" {
+  source                  = "./database"
+  path                    = "db"
+  no_dot_terragrunt_stack = true
+}`,
+			files:  []string{"db/terragrunt.hcl"},
+			line:   2,
+			char:   30,
+			target: "db/terragrunt.hcl",
+		},
+		{
+			name: "expanded unit path skips instances that were not generated",
+			content: `unit "app" {
+  expansion {
+    for_each = toset(["a", "b"])
+  }
+
+  source = "./app"
+  path   = "app-${each.key}"
+}`,
+			files:  []string{".terragrunt-stack/app-b/terragrunt.hcl"},
+			line:   6,
+			char:   12,
+			target: ".terragrunt-stack/app-b/terragrunt.hcl",
+		},
+		{
+			name: "disabled unit path",
+			content: `unit "database" {
+  source  = "./database"
+  path    = "db"
+  enabled = false
+}`,
+			files: []string{".terragrunt-stack/db/terragrunt.hcl"},
+			line:  2,
+			char:  12,
+		},
+		{
+			name: "unit injected by autoinclude",
+			content: `unit "app" {
+  source = "./app"
+  path   = "app"
+}
+
+stack "nested" {
+  source = "./nested-stack"
+  path   = "nested"
+
+  autoinclude {
+    unit "app" {
+      source = "./app"
+      path   = "app"
+    }
+  }
+}`,
+			files: []string{"app/terragrunt.hcl", ".terragrunt-stack/app/terragrunt.hcl"},
+			line:  12,
+			char:  16,
+		},
+		{
+			name:    "unit keyword with generated config",
+			content: basicStack,
+			files:   []string{".terragrunt-stack/db/terragrunt.hcl"},
+			line:    0,
+			char:    2,
 		},
 	}
 
@@ -79,118 +196,39 @@ stack "nested" {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			position := protocol.Position{Line: tt.line, Character: tt.character}
-			defResponse := state.Definition(l, v, 1, docURI, position)
+			tmpDir := t.TempDir()
 
-			if tt.expectEmpty {
-				assert.Equal(t, docURI, defResponse.Result.URI, tt.description)
-				assert.Equal(t, position, defResponse.Result.Range.Start, tt.description)
-			} else {
-				assert.NotEqual(t, protocol.Location{}, defResponse.Result, tt.description)
-				t.Logf("Definition result: %+v", defResponse.Result)
+			for _, f := range tt.files {
+				path := filepath.Join(tmpDir, f)
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+				require.NoError(t, os.WriteFile(path, nil, 0o644))
 			}
+
+			for _, d := range tt.dirs {
+				require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, d), 0o755))
+			}
+
+			docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
+			l := testutils.NewTestLogger(t)
+			v := venv.OSVenv()
+
+			state := tg.NewState(testutils.NewDocs(t))
+			state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, tt.content)
+
+			position := protocol.Position{Line: tt.line, Character: tt.char}
+			got := state.Definition(l, v, 1, docURI, position).Result
+
+			// With no target, Definition answers with the cursor position.
+			if tt.target == "" {
+				assert.Equal(t, protocol.Location{
+					URI:   docURI,
+					Range: protocol.Range{Start: position, End: position},
+				}, got)
+
+				return
+			}
+
+			assert.Equal(t, protocol.Location{URI: uri.File(filepath.Join(tmpDir, tt.target))}, got)
 		})
 	}
-}
-
-func TestStackDefinition_PathOnlyOnPathAttribute(t *testing.T) {
-	t.Parallel()
-
-	content := `unit "database" {
-  source = "./database"
-  path   = "db"
-}`
-
-	tmpDir := t.TempDir()
-	generated := filepath.Join(tmpDir, ".terragrunt-stack", "db", "terragrunt.hcl")
-	require.NoError(t, os.MkdirAll(filepath.Dir(generated), 0755))
-	require.NoError(t, os.WriteFile(generated, []byte(""), 0644))
-
-	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
-	l := testutils.NewTestLogger(t)
-
-	v := venv.OSVenv()
-	state := tg.NewState(testutils.NewDocs(t))
-	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
-
-	onPath := state.Definition(l, v, 1, docURI, protocol.Position{Line: 2, Character: 10})
-	assert.Equal(t, uri.File(generated), onPath.Result.URI)
-
-	// On the `unit` keyword, do not navigate, even though the generated file exists.
-	onKeyword := state.Definition(l, v, 1, docURI, protocol.Position{Line: 0, Character: 2})
-	assert.Equal(t, docURI, onKeyword.Result.URI)
-}
-
-func TestStackDefinition_ComputedPath(t *testing.T) {
-	t.Parallel()
-
-	content := `locals {
-  name = "db"
-}
-
-unit "database" {
-  source = "./database"
-  path   = local.name
-}`
-
-	tmpDir := t.TempDir()
-	generated := filepath.Join(tmpDir, ".terragrunt-stack", "db", "terragrunt.hcl")
-	require.NoError(t, os.MkdirAll(filepath.Dir(generated), 0755))
-	require.NoError(t, os.WriteFile(generated, []byte(""), 0644))
-
-	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
-	l := testutils.NewTestLogger(t)
-
-	v := venv.OSVenv()
-	state := tg.NewState(testutils.NewDocs(t))
-	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
-
-	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 6, Character: 14})
-	assert.Equal(t, uri.File(generated), resp.Result.URI)
-}
-
-func TestStackDefinition_GeneratedStackPath(t *testing.T) {
-	t.Parallel()
-
-	content := `stack "nested" {
-  source = "./nested-stack"
-  path   = "nested"
-}`
-
-	tmpDir := t.TempDir()
-	generated := filepath.Join(tmpDir, ".terragrunt-stack", "nested", "terragrunt.stack.hcl")
-	require.NoError(t, os.MkdirAll(filepath.Dir(generated), 0755))
-	require.NoError(t, os.WriteFile(generated, []byte(""), 0644))
-
-	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
-	l := testutils.NewTestLogger(t)
-
-	v := venv.OSVenv()
-	state := tg.NewState(testutils.NewDocs(t))
-	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
-
-	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 2, Character: 14})
-	assert.Equal(t, uri.File(generated), resp.Result.URI)
-}
-
-func TestStackDefinition_GeneratedConfigIsDirectory(t *testing.T) {
-	t.Parallel()
-
-	content := `unit "database" {
-  source = "./database"
-  path   = "db"
-}`
-
-	tmpDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".terragrunt-stack", "db", "terragrunt.hcl"), 0755))
-
-	docURI := uri.File(filepath.Join(tmpDir, "terragrunt.stack.hcl"))
-	l := testutils.NewTestLogger(t)
-
-	v := venv.OSVenv()
-	state := tg.NewState(testutils.NewDocs(t))
-	require.Empty(t, state.OpenDocument(t.Context(), l, v, venv.Policy{}, docURI, content))
-
-	resp := state.Definition(l, v, 1, docURI, protocol.Position{Line: 2, Character: 10})
-	assert.Equal(t, docURI, resp.Result.URI)
 }

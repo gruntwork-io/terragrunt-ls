@@ -3,6 +3,7 @@ package tg
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/docs"
@@ -288,157 +289,6 @@ func (s *State) Definition(
 	return s.definitionUnit(l, v, id, st, docURI, position)
 }
 
-func (s *State) definitionUnit(
-	l logger.Logger,
-	v *venv.Venv,
-	id int,
-	st *store.Store,
-	docURI uri.URI,
-	position protocol.Position,
-) lsp.DefinitionResponse {
-	target, context := definition.GetDefinitionTargetWithContext(l, st, position)
-
-	l.Debug(
-		"Definition discovered",
-		"target", target,
-		"context", context,
-	)
-
-	if target == "" {
-		return newEmptyDefinitionResponse(id, docURI, position)
-	}
-
-	switch context {
-	case definition.DefinitionContextLocal:
-		if loc, ok := s.findLocalDefinition(l, st, docURI, position, target); ok {
-			return lsp.DefinitionResponse{
-				RPC: lsp.RPCVersion, ID: &id,
-				Result: loc,
-			}
-		}
-
-	case definition.DefinitionContextInclude:
-		l.Debug(
-			"Store content",
-			"store", st,
-		)
-
-		if st.Cfg == nil {
-			return newEmptyDefinitionResponse(id, docURI, position)
-		}
-
-		l.Debug(
-			"Includes",
-			"includes", st.Cfg.ProcessedIncludes,
-		)
-
-		for _, include := range st.Cfg.ProcessedIncludes {
-			if include.Name == target {
-				l.Debug(
-					"Jumping to target",
-					"include", include,
-				)
-
-				path := include.Path
-				if !filepath.IsAbs(path) {
-					path = filepath.Join(filepath.Dir(docURI.FsPath()), path)
-				}
-
-				defURI := uri.File(path)
-
-				l.Debug(
-					"URI of target",
-					"URI", defURI,
-				)
-
-				return lsp.DefinitionResponse{
-					RPC: lsp.RPCVersion,
-					ID:  &id,
-					Result: protocol.Location{
-						URI: defURI,
-						Range: protocol.Range{
-							Start: protocol.Position{
-								Line:      0,
-								Character: 0,
-							},
-							End: protocol.Position{
-								Line:      0,
-								Character: 0,
-							},
-						},
-					},
-				}
-			}
-		}
-	case definition.DefinitionContextDependency:
-		l.Debug(
-			"Store content",
-			"store", st,
-		)
-
-		if st.Cfg == nil {
-			return newEmptyDefinitionResponse(id, docURI, position)
-		}
-
-		l.Debug(
-			"Dependencies",
-			"dependencies", st.Cfg.TerragruntDependencies,
-		)
-
-		for _, dep := range st.Cfg.TerragruntDependencies {
-			if dep.Name == target {
-				l.Debug(
-					"Jumping to target",
-					"dependency", dep,
-				)
-
-				path := dep.ConfigPath.AsString()
-
-				defURI := uri.File(path)
-				if !filepath.IsAbs(path) {
-					defURI = uri.File(filepath.Join(filepath.Dir(docURI.FsPath()), path, "terragrunt.hcl"))
-				}
-
-				_, err := v.FS.Stat(defURI.FsPath())
-				if err != nil {
-					l.Warn(
-						"Dependency does not exist",
-						"dependency", dep,
-						"error", err,
-					)
-
-					return newEmptyDefinitionResponse(id, docURI, position)
-				}
-
-				l.Debug(
-					"URI of target",
-					"URI", defURI,
-				)
-
-				return lsp.DefinitionResponse{
-					RPC: lsp.RPCVersion,
-					ID:  &id,
-					Result: protocol.Location{
-						URI: defURI,
-						Range: protocol.Range{
-							Start: protocol.Position{
-								Line:      0,
-								Character: 0,
-							},
-							End: protocol.Position{
-								Line:      0,
-								Character: 0,
-							},
-						},
-					},
-				}
-			}
-		}
-	}
-
-	return newEmptyDefinitionResponse(id, docURI, position)
-}
-
 // findLocalDefinition locates the `<name> = ...` declaration in the current
 // file's locals block. Returns the location of the bare identifier.
 func (s *State) findLocalDefinition(
@@ -476,62 +326,6 @@ func newEmptyDefinitionResponse(id int, docURI uri.URI, position protocol.Positi
 			Range: protocol.Range{
 				Start: position,
 				End:   position,
-			},
-		},
-	}
-}
-
-func (s *State) definitionStack(
-	l logger.Logger,
-	v *venv.Venv,
-	id int,
-	st *store.Store,
-	docURI uri.URI,
-	position protocol.Position,
-) lsp.DefinitionResponse {
-	currentDir := filepath.Dir(docURI.FsPath())
-
-	target, context := definition.GetStackDefinitionTargetWithContext(l, v.FS, st, position, currentDir)
-
-	l.Debug(
-		"Stack definition discovered",
-		"target", target,
-		"context", context,
-	)
-
-	if target == "" {
-		return newEmptyDefinitionResponse(id, docURI, position)
-	}
-
-	switch context {
-	case definition.DefinitionContextUnitSource:
-		if resolved := definition.ResolveUnitSourceLocation(v.FS, target, currentDir); resolved != "" {
-			return newStackDefinitionResponse(id, resolved)
-		}
-
-		l.Debug("Could not resolve unit source location", "source", target)
-	case definition.DefinitionContextStackSource:
-		if resolved := definition.ResolveStackSourceLocation(v.FS, target, currentDir); resolved != "" {
-			return newStackDefinitionResponse(id, resolved)
-		}
-
-		l.Debug("Could not resolve stack source location", "source", target)
-	case definition.DefinitionContextUnitPath, definition.DefinitionContextStackPath:
-		return newStackDefinitionResponse(id, target)
-	}
-
-	return newEmptyDefinitionResponse(id, docURI, position)
-}
-
-func newStackDefinitionResponse(id int, resolved string) lsp.DefinitionResponse {
-	return lsp.DefinitionResponse{
-		RPC: lsp.RPCVersion,
-		ID:  &id,
-		Result: protocol.Location{
-			URI: uri.File(resolved),
-			Range: protocol.Range{
-				Start: protocol.Position{Line: 0, Character: 0},
-				End:   protocol.Position{Line: 0, Character: 0},
 			},
 		},
 	}
@@ -725,5 +519,128 @@ func getEndOfDocument(doc string) protocol.Position {
 	return protocol.Position{
 		Line:      uint32(len(lines) - 1),
 		Character: uint32(len(lines[len(lines)-1])),
+	}
+}
+
+// definitionUnit answers go-to-definition in a unit or unknown Terragrunt file.
+func (s *State) definitionUnit(
+	l logger.Logger,
+	v *venv.Venv,
+	id int,
+	st *store.Store,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.DefinitionResponse {
+	target, context := definition.GetDefinitionTargetWithContext(l, st, position)
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	var (
+		loc protocol.Location
+		ok  bool
+	)
+
+	switch context {
+	case definition.DefinitionContextLocal:
+		loc, ok = s.findLocalDefinition(l, st, docURI, position, target)
+	case definition.DefinitionContextInclude:
+		loc, ok = includeLocation(st.Cfg, docURI, target)
+	case definition.DefinitionContextDependency:
+		loc, ok = dependencyLocation(l, v, st.Cfg, docURI, target)
+	}
+
+	if !ok {
+		l.Debug("No definition found", "target", target, "context", context)
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug("Definition discovered", "target", target, "context", context, "location", loc)
+
+	return newDefinitionResponse(id, loc)
+}
+
+// definitionStack answers go-to-definition in a terragrunt.stack.hcl file.
+func (s *State) definitionStack(
+	l logger.Logger,
+	v *venv.Venv,
+	id int,
+	st *store.Store,
+	docURI uri.URI,
+	position protocol.Position,
+) lsp.DefinitionResponse {
+	target := definition.StackDefinitionTarget(l, v.FS, st, position, filepath.Dir(docURI.FsPath()))
+	if target == "" {
+		return newEmptyDefinitionResponse(id, docURI, position)
+	}
+
+	l.Debug("Stack definition discovered", "target", target)
+
+	return newDefinitionResponse(id, protocol.Location{URI: uri.File(target)})
+}
+
+// includeLocation returns the start of the file that the include block named name points
+// at. cfg is nil when the document failed to parse, which yields no location.
+func includeLocation(cfg *config.TerragruntConfig, docURI uri.URI, name string) (protocol.Location, bool) {
+	if cfg == nil {
+		return protocol.Location{}, false
+	}
+
+	for _, include := range cfg.ProcessedIncludes {
+		if include.Name != name {
+			continue
+		}
+
+		path := include.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(filepath.Dir(docURI.FsPath()), path)
+		}
+
+		return protocol.Location{URI: uri.File(path)}, true
+	}
+
+	return protocol.Location{}, false
+}
+
+// dependencyLocation returns the start of the config that the dependency block named name
+// points at, when that config exists. cfg is nil when the document failed to parse, which
+// yields no location.
+func dependencyLocation(
+	l logger.Logger,
+	v *venv.Venv,
+	cfg *config.TerragruntConfig,
+	docURI uri.URI,
+	name string,
+) (protocol.Location, bool) {
+	if cfg == nil {
+		return protocol.Location{}, false
+	}
+
+	idx := slices.IndexFunc(cfg.TerragruntDependencies, func(dep config.Dependency) bool {
+		return dep.Name == name
+	})
+	if idx < 0 {
+		return protocol.Location{}, false
+	}
+
+	path := cfg.TerragruntDependencies[idx].ConfigPath.AsString()
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(filepath.Dir(docURI.FsPath()), path, "terragrunt.hcl")
+	}
+
+	if _, err := v.FS.Stat(path); err != nil {
+		l.Warn("Dependency does not exist", "dependency", name, "error", err)
+		return protocol.Location{}, false
+	}
+
+	return protocol.Location{URI: uri.File(path)}, true
+}
+
+// newDefinitionResponse answers a definition request with loc.
+func newDefinitionResponse(id int, loc protocol.Location) lsp.DefinitionResponse {
+	return lsp.DefinitionResponse{
+		RPC:    lsp.RPCVersion,
+		ID:     &id,
+		Result: loc,
 	}
 }

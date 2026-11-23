@@ -1,0 +1,126 @@
+// Package redact holds values that may carry credentials, rendering them
+// without the credentials wherever they are formatted or logged.
+//
+// Ported from Terragrunt's internal/redact package, which this module cannot
+// import.
+package redact
+
+import (
+	"log/slog"
+	"net/url"
+	"strings"
+)
+
+// Placeholder replaces each query value when a [URL] is rendered.
+const Placeholder = "REDACTED"
+
+// forcedGetterSeparator divides a forced getter name, such as git or s3, from
+// the address it applies to.
+const forcedGetterSeparator = "::"
+
+// revisionKeys are the query keys that name which revision of a source an
+// address points at: the ref of a git source, the version of a registry
+// source. They select code rather than authorize a fetch, so rendering them
+// as written reveals no credential.
+var revisionKeys = map[string]struct{}{
+	"ref":     {},
+	"version": {},
+}
+
+// URL is an address that may carry credentials in its userinfo or its query.
+// Formatting or logging one renders [URL.String].
+//
+// fmt does not call String on an unexported struct field when it prints the
+// struct holding it, so a URL kept in an unexported field of a struct
+// formatted with %v prints its raw address.
+type URL struct {
+	raw string
+}
+
+// NewURL wraps raw.
+func NewURL(raw string) URL {
+	return URL{raw: raw}
+}
+
+// String renders the address with its user and password removed and every
+// query value but the revision replaced by [Placeholder]. A forced getter
+// prefix such as git:: is kept, and the address after it is rendered the same
+// way. An address [url.Parse] rejects, such as the SCP form git@host:path,
+// keeps everything ahead of its query as written.
+//
+// The ref and version query values render as written, so a rendered address
+// still names the revision it points at.
+func (u URL) String() string {
+	forced, rest, ok := strings.Cut(u.raw, forcedGetterSeparator)
+	if ok && isGetterName(forced) {
+		return forced + forcedGetterSeparator + render(rest)
+	}
+
+	return render(u.raw)
+}
+
+// GoString renders the address as [URL.String] does, covering the %#v verb,
+// which does not consult String.
+func (u URL) GoString() string {
+	return u.String()
+}
+
+// LogValue renders the address as [URL.String] does. Without it,
+// [slog.JSONHandler] marshals the struct, which has no exported fields, as {}.
+func (u URL) LogValue() slog.Value {
+	return slog.StringValue(u.String())
+}
+
+// render removes the userinfo from raw and redacts its query. When [url.Parse]
+// rejects raw, only the query is redacted.
+func render(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		base, rawQuery, ok := strings.Cut(raw, "?")
+		if !ok {
+			return raw
+		}
+
+		return base + "?" + redactQuery(rawQuery)
+	}
+
+	parsed.User = nil
+
+	if parsed.RawQuery == "" {
+		return parsed.String()
+	}
+
+	parsed.RawQuery = redactQuery(parsed.RawQuery)
+
+	return parsed.String()
+}
+
+// redactQuery replaces every value of rawQuery but the ones named by
+// [revisionKeys] with [Placeholder], dropping any pair that does not parse.
+func redactQuery(rawQuery string) string {
+	query := (&url.URL{RawQuery: rawQuery}).Query()
+
+	for key, values := range query {
+		if _, revision := revisionKeys[key]; revision {
+			continue
+		}
+
+		for i := range values {
+			values[i] = Placeholder
+		}
+	}
+
+	return query.Encode()
+}
+
+// isGetterName reports whether name can be a forced getter name: one or more
+// ASCII letters and digits.
+func isGetterName(name string) bool {
+	return name != "" && !strings.ContainsFunc(name, notASCIIAlphanumeric)
+}
+
+// notASCIIAlphanumeric reports whether r is anything but an ASCII letter or
+// digit.
+func notASCIIAlphanumeric(r rune) bool {
+	return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9')
+}
