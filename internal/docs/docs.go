@@ -1,6 +1,6 @@
 // Package docs provides the Terragrunt HCL reference that hover and completion
-// show. Index pages compiled into terragrunt-ls give each block, attribute, and
-// function a one-line description. The index pages, and each item's page once
+// show. Index pages compiled into terragrunt-ls give each block, attribute,
+// function, and variable a one-line description. The index pages, and each item's page once
 // a hover asks for it, are fetched in the background from the Markdown version
 // of the docs site and cached on disk, so no request waits on the network.
 package docs
@@ -16,6 +16,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,7 +26,7 @@ import (
 
 //go:generate go run ./snapshotgen
 
-//go:embed snapshot/*.md
+//go:embed snapshot
 var snapshot embed.FS
 
 // Kind is a kind of HCL reference item, as its docs URL names it.
@@ -34,6 +36,7 @@ const (
 	KindBlock     Kind = "blocks"
 	KindAttribute Kind = "attributes"
 	KindFunction  Kind = "functions"
+	KindVariable  Kind = "variables"
 )
 
 // Config is a kind of configuration file, as the URL of its index page names
@@ -50,16 +53,43 @@ const (
 // Configs lists every [Config].
 var Configs = []Config{ConfigUnit, ConfigStack}
 
+// Variable is a built-in variable whose page lists its fields.
+type Variable struct {
+	// Name is the variable as an expression reads it, e.g. `path`.
+	Name string
+	// Experiment is the Terragrunt experiment that the variable needs, or empty.
+	Experiment string
+}
+
+// Variables lists every [Variable].
+var Variables = []Variable{{Name: "path", Experiment: "path-variable"}}
+
+// LookupVariable returns the [Variable] with name.
+func LookupVariable(name string) (Variable, bool) {
+	i := slices.IndexFunc(Variables, func(v Variable) bool { return v.Name == name })
+	if i < 0 {
+		return Variable{}, false
+	}
+
+	return Variables[i], true
+}
+
 // Item is an entry of an index page.
 type Item struct {
 	Kind        Kind
 	Name        string
 	Description string
+	Experiment  string
 }
 
 // FetchingNote ends a hover that shows an item's description while its page is
 // fetched.
 const FetchingNote = "_Fetching more from the docs…_"
+
+// ExperimentNote returns the note that hover and completion show for an item that needs experiment.
+func ExperimentNote(experiment string) string {
+	return "**Experimental:** The Terragrunt CLI reads this only with `--experiment " + experiment + "`."
+}
 
 // DefaultBaseURL is the docs site.
 const DefaultBaseURL = "https://docs.terragrunt.com"
@@ -109,19 +139,27 @@ type Options struct {
 
 // Docs is the HCL reference. Its methods are safe for concurrent use.
 type Docs struct {
-	indexes  map[Config]map[itemKey]Item
-	pages    map[itemKey]page
-	inflight map[string]struct{}
-	failed   map[string]time.Time
-	sem      chan struct{}
-	opts     Options
-	wg       sync.WaitGroup
-	mu       sync.Mutex
+	indexes   map[Config]map[itemKey]Item
+	variables map[string]map[itemKey]Item
+	pages     map[itemKey]page
+	inflight  map[string]struct{}
+	failed    map[string]time.Time
+	sem       chan struct{}
+	opts      Options
+	wg        sync.WaitGroup
+	mu        sync.Mutex
 }
 
 type itemKey struct {
 	kind Kind
 	name string
+}
+
+// indexPage is a page that lists items, at `/reference/hcl/<name>.md` and at `<name>.md` in the snapshot and the cache.
+type indexPage struct {
+	parse func(page []byte) ([]Item, error)
+	set   func(items []Item)
+	name  string
 }
 
 // page is the hover summary of an item's page.
@@ -160,30 +198,31 @@ func New(options *Options) (*Docs, error) {
 	}
 
 	d := &Docs{
-		opts:     opts,
-		indexes:  map[Config]map[itemKey]Item{},
-		pages:    map[itemKey]page{},
-		inflight: map[string]struct{}{},
-		failed:   map[string]time.Time{},
-		sem:      make(chan struct{}, maxConcurrentFetches),
+		opts:      opts,
+		indexes:   map[Config]map[itemKey]Item{},
+		variables: map[string]map[itemKey]Item{},
+		pages:     map[itemKey]page{},
+		inflight:  map[string]struct{}{},
+		failed:    map[string]time.Time{},
+		sem:       make(chan struct{}, maxConcurrentFetches),
 	}
 
-	for _, cfg := range Configs {
-		body, err := fs.ReadFile(opts.Snapshot, string(cfg)+".md")
+	for _, index := range d.indexPages() {
+		body, err := fs.ReadFile(opts.Snapshot, index.name+".md")
 		if err != nil {
-			return nil, fmt.Errorf("reading the %s index snapshot: %w", cfg, err)
+			return nil, fmt.Errorf("reading the %s index snapshot: %w", index.name, err)
 		}
 
-		items, err := ParseIndex(body)
+		items, err := index.parse(body)
 		if err != nil {
-			return nil, fmt.Errorf("parsing the %s index snapshot: %w", cfg, err)
+			return nil, fmt.Errorf("parsing the %s index snapshot: %w", index.name, err)
 		}
 
-		d.setIndex(cfg, items)
+		index.set(items)
 
-		if cached, _, ok := d.readCache(indexCachePath(cfg)); ok {
-			if items, err := ParseIndex(cached); err == nil {
-				d.setIndex(cfg, items)
+		if cached, _, ok := d.readCache(index.name + ".md"); ok {
+			if items, err := index.parse(cached); err == nil {
+				index.set(items)
 			}
 		}
 	}
@@ -195,13 +234,15 @@ func New(options *Options) (*Docs, error) {
 // missing or older than the maximum age. Cancelling ctx cancels the fetches,
 // so pass the server's context, not a request's.
 func (d *Docs) Refresh(ctx context.Context) {
-	for _, cfg := range Configs {
-		if _, modified, ok := d.readCache(indexCachePath(cfg)); ok && time.Since(modified) < d.opts.MaxAge {
+	for _, index := range d.indexPages() {
+		cachePath := index.name + ".md"
+
+		if _, modified, ok := d.readCache(cachePath); ok && time.Since(modified) < d.opts.MaxAge {
 			continue
 		}
 
-		d.fetch(ctx, indexURLPath(cfg), indexCachePath(cfg), func(body []byte) error {
-			items, err := ParseIndex(body)
+		d.fetch(ctx, "/reference/hcl/"+cachePath, cachePath, func(body []byte) error {
+			items, err := index.parse(body)
 			if err != nil {
 				return err
 			}
@@ -209,7 +250,7 @@ func (d *Docs) Refresh(ctx context.Context) {
 			d.mu.Lock()
 			defer d.mu.Unlock()
 
-			d.setIndex(cfg, items)
+			index.set(items)
 
 			return nil
 		})
@@ -221,12 +262,21 @@ func (d *Docs) Wait() {
 	d.wg.Wait()
 }
 
-// Lookup returns the item of kind with name, when it's valid in cfg.
+// Lookup returns the item of kind with name that is valid in cfg, or the variable or field with name in any cfg.
 func (d *Docs) Lookup(cfg Config, kind Kind, name string) (Item, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	item, ok := d.indexes[cfg][itemKey{kind: kind, name: name}]
+	key := itemKey{kind: kind, name: name}
+
+	if kind == KindVariable {
+		variable, _, _ := strings.Cut(name, ".")
+		item, ok := d.variables[variable][key]
+
+		return item, ok
+	}
+
+	item, ok := d.indexes[cfg][key]
 
 	return item, ok
 }
@@ -264,7 +314,7 @@ func (d *Docs) Hover(ctx context.Context, cfg Config, kind Kind, name string) (s
 
 	switch {
 	case found:
-		return p.summary + "\n\n" + d.link(item), true
+		return p.summary + "\n\n" + d.footer(item), true
 	case fetching:
 		return d.blurb(item) + "\n\n" + FetchingNote, true
 	default:
@@ -273,7 +323,16 @@ func (d *Docs) Hover(ctx context.Context, cfg Config, kind Kind, name string) (s
 }
 
 func (d *Docs) blurb(item Item) string {
-	return item.Description + "\n\n" + d.link(item)
+	return item.Description + "\n\n" + d.footer(item)
+}
+
+// footer returns the experiment note of item, when it has one, and the link to its page.
+func (d *Docs) footer(item Item) string {
+	if item.Experiment == "" {
+		return d.link(item)
+	}
+
+	return ExperimentNote(item.Experiment) + "\n\n" + d.link(item)
 }
 
 // page returns the summary of an item's page from memory, or from the disk
@@ -416,15 +475,36 @@ func (d *Docs) cachePage(rel string, page Page) error {
 	return d.writeCache(etagCachePath(rel), []byte(page.ETag))
 }
 
-// setIndex replaces the index of cfg. The caller holds d.mu, or has not
-// shared d yet.
-func (d *Docs) setIndex(cfg Config, items []Item) {
+// indexPages returns the index page of each [Config] and of each [Variable], whose set needs d.mu once d is shared.
+func (d *Docs) indexPages() []indexPage {
+	pages := make([]indexPage, 0, len(Configs)+len(Variables))
+
+	for _, cfg := range Configs {
+		pages = append(pages, indexPage{
+			name:  string(cfg),
+			parse: ParseIndex,
+			set:   func(items []Item) { d.indexes[cfg] = itemIndex(items) },
+		})
+	}
+
+	for _, v := range Variables {
+		pages = append(pages, indexPage{
+			name:  itemSlug(KindVariable, v.Name),
+			parse: func(page []byte) ([]Item, error) { return ParseVariable(v, page) },
+			set:   func(items []Item) { d.variables[v.Name] = itemIndex(items) },
+		})
+	}
+
+	return pages
+}
+
+func itemIndex(items []Item) map[itemKey]Item {
 	index := make(map[itemKey]Item, len(items))
 	for _, item := range items {
 		index[itemKey{kind: item.Kind, name: item.Name}] = item
 	}
 
-	d.indexes[cfg] = index
+	return index
 }
 
 func (d *Docs) link(item Item) string {
@@ -518,22 +598,19 @@ func etagCachePath(rel string) string {
 	return rel + ".etag"
 }
 
-func indexURLPath(cfg Config) string {
-	return "/reference/hcl/" + string(cfg) + ".md"
-}
-
-func indexCachePath(cfg Config) string {
-	return string(cfg) + ".md"
-}
-
 func pageURLPath(key itemKey) string {
-	return "/reference/hcl/" + string(key.kind) + "/" + key.name + ".md"
+	return "/reference/hcl/" + itemSlug(key.kind, key.name) + ".md"
 }
 
 func pageCachePath(key itemKey) string {
-	return path.Join(string(key.kind), key.name+".md")
+	return itemSlug(key.kind, key.name) + ".md"
 }
 
 func itemPagePath(kind Kind, name string) string {
-	return "/reference/hcl/" + string(kind) + "/" + name + "/"
+	return "/reference/hcl/" + itemSlug(kind, name) + "/"
+}
+
+// itemSlug returns the path of an item's page under `/reference/hcl/`, e.g. `variables/path/unit` for `path.unit`.
+func itemSlug(kind Kind, name string) string {
+	return path.Join(string(kind), strings.ReplaceAll(name, ".", "/"))
 }

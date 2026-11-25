@@ -7,6 +7,9 @@ const fixture = path.resolve(__dirname, '..', '..', 'testFixture', 'terragrunt.h
 // The position of `greeting` in `local.greeting` on the fixture's inputs line.
 const localReference = new vscode.Position(5, 21);
 
+// The position of `unit` in `path.unit` on the fixture's inputs line.
+const pathField = new vscode.Position(6, 19);
+
 // Runs inside the VS Code that runTest.ts launches. VS Code fails the run when the promise rejects.
 export async function run(): Promise<void> {
 	const document = await vscode.workspace.openTextDocument(fixture);
@@ -19,6 +22,10 @@ export async function run(): Promise<void> {
 
 	const hover = await waitForHover(document.uri, localReference, 30_000);
 	assert.match(hover, /greeting = "hello"/);
+
+	const fieldHover = await waitForHover(document.uri, pathField, 30_000);
+	assert.match(fieldHover, /absolute path of the directory of the unit/);
+	assert.match(fieldHover, /Experimental/);
 }
 
 // Polls for a hover, since the server answers only after it starts and parses the document.

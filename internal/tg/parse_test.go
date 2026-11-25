@@ -2,6 +2,7 @@ package tg_test
 
 import (
 	"path/filepath"
+	"strings"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg"
 	"terragrunt-ls/internal/tg/store"
@@ -12,6 +13,7 @@ import (
 	"github.com/gruntwork-io/terragrunt/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
 )
 
 func TestDetectFileType(t *testing.T) {
@@ -355,4 +357,183 @@ func TestParseTerragruntBufferReadsTheBuffer(t *testing.T) {
 			assert.Equal(t, map[string]any{"source": "buffer"}, cfg.Inputs)
 		})
 	}
+}
+
+func TestParseTerragruntBufferPathVariable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		check   func(t *testing.T, cfg *config.TerragruntConfig, rootDir, unitDir string)
+		name    string
+		content string
+	}{
+		{
+			name: "path.unit in locals",
+			content: `locals {
+  unit_dir = path.unit
+}
+`,
+			check: func(t *testing.T, cfg *config.TerragruntConfig, _, unitDir string) {
+				t.Helper()
+
+				assert.Equal(t, unitDir, cfg.Locals["unit_dir"])
+			},
+		},
+		{
+			name: "path.download in inputs",
+			content: `inputs = {
+  download_dir = path.download
+}
+`,
+			check: func(t *testing.T, cfg *config.TerragruntConfig, _, unitDir string) {
+				t.Helper()
+
+				downloadDir, ok := cfg.Inputs["download_dir"].(string)
+				require.True(t, ok)
+				assert.True(
+					t,
+					strings.HasPrefix(downloadDir, filepath.Join(unitDir, ".terragrunt-cache")+string(filepath.Separator)),
+				)
+			},
+		},
+		{
+			name: "path.include and path.unit in an included file",
+			content: `include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+`,
+			check: func(t *testing.T, cfg *config.TerragruntConfig, rootDir, unitDir string) {
+				t.Helper()
+
+				assert.Equal(t, filepath.Join(rootDir, "root.hcl"), cfg.Inputs["root_file"])
+				assert.Equal(t, unitDir, cfg.Inputs["unit_dir"])
+			},
+		},
+		{
+			name: "get_original_terragrunt_dir in locals",
+			content: `locals {
+  unit_dir = get_original_terragrunt_dir()
+}
+`,
+			check: func(t *testing.T, cfg *config.TerragruntConfig, _, unitDir string) {
+				t.Helper()
+
+				assert.Equal(t, unitDir, cfg.Locals["unit_dir"])
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+			rootDir := testutils.WorkDir(t, v)
+			unitDir := filepath.Join(rootDir, "app")
+
+			_, err := testutils.CreateFile(v, rootDir, "root.hcl", `inputs = {
+  root_file = path.include
+  unit_dir  = path.unit
+}
+`)
+			require.NoError(t, err)
+
+			cfg, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filepath.Join(unitDir, "terragrunt.hcl"),
+				tt.content,
+			)
+
+			assert.Empty(t, diags)
+			require.NotNil(t, cfg)
+			tt.check(t, cfg, rootDir, unitDir)
+		})
+	}
+}
+
+func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		message  func(filename string) string
+		name     string
+		content  string
+		severity protocol.DiagnosticSeverity
+	}{
+		{
+			name: "path.stack in a unit",
+			content: `locals {
+  stack_dir = path.stack
+}
+`,
+			severity: protocol.DiagnosticSeverityError,
+			message: func(string) string {
+				return `Unsupported attribute: This object does not have an attribute named "stack".`
+			},
+		},
+		{
+			name: "path.download in locals",
+			content: `locals {
+  download_dir = path.download
+}
+`,
+			severity: protocol.DiagnosticSeverityError,
+			message: func(filename string) string {
+				return config.PathDownloadInLocalsError{ConfigPath: filename, Local: "download_dir"}.Error()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+			filename := filepath.Join(testutils.WorkDir(t, v), "terragrunt.hcl")
+
+			_, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filename,
+				tt.content,
+			)
+
+			require.Len(t, diags, 1)
+			assert.Equal(t, tt.severity, diags[0].Severity)
+			assert.Equal(t, protocol.String(tt.message(filename)), diags[0].Message)
+		})
+	}
+}
+
+func TestParseStackBufferPathVariable(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+	stackDir := testutils.WorkDir(t, v)
+
+	cfg, diags := tg.ParseStackBuffer(
+		t.Context(),
+		testutils.NewTestLogger(t),
+		v,
+		venv.Policy{},
+		filepath.Join(stackDir, "terragrunt.stack.hcl"),
+		`locals {
+  stack_dir = path.stack
+}
+
+unit "vpc" {
+  source = "./units/vpc"
+  path   = "vpc"
+}
+`,
+	)
+
+	assert.Empty(t, diags)
+	require.NotNil(t, cfg)
+	assert.Equal(t, stackDir, cfg.Locals["stack_dir"])
 }

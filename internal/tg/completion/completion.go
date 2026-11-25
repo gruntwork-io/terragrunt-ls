@@ -2,12 +2,16 @@
 package completion
 
 import (
+	"slices"
 	"strings"
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"go.lsp.dev/protocol"
 )
 
@@ -104,14 +108,36 @@ var stackCandidates = []candidate{
 }`},
 }
 
+// variableFields are the variable fields that completion offers in each file type.
+var variableFields = map[store.FileType][]string{
+	store.FileTypeUnit:    {"path.download", "path.unit"},
+	store.FileTypeStack:   {"path.stack"},
+	store.FileTypeUnknown: {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
+}
+
+// localsExcludedFields are the variable fields that Terragrunt rejects in locals.
+var localsExcludedFields = []string{"path.download"}
+
+// literalTokens are the tokens of text that is not code: string literals, heredocs and comments.
+var literalTokens = []hclsyntax.TokenType{hclsyntax.TokenQuotedLit, hclsyntax.TokenStringLit, hclsyntax.TokenComment}
+
 // GetCompletions returns the blocks and attributes valid in the document that
-// start with the word under the cursor, each with its description from d.
+// start with the word under the cursor, or the variable fields before the cursor, each with its description from d.
 func GetCompletions(
 	l logger.Logger,
 	d *docs.Docs,
 	s *store.Store,
 	position protocol.Position,
 ) []protocol.CompletionItem {
+	prefix, prefixRange := text.GetCursorWordPrefix(s.Document, position)
+	if variable, ok := readsVariable(prefix); ok {
+		if inLiteral(l, s.Document, text.GetCursorOffset(s.Document, position)) {
+			return []protocol.CompletionItem{}
+		}
+
+		return fieldCompletions(d, s, variable, prefix, prefixRange)
+	}
+
 	word := text.GetCursorWord(s.Document, position)
 
 	var candidates []candidate
@@ -164,4 +190,83 @@ func completionItem(d *docs.Docs, cfg docs.Config, c candidate, position protoco
 	}
 
 	return item
+}
+
+// readsVariable returns the variable whose field prefix reads.
+func readsVariable(prefix string) (docs.Variable, bool) {
+	name, _, ok := strings.Cut(prefix, ".")
+	if !ok {
+		return docs.Variable{}, false
+	}
+
+	return docs.LookupVariable(name)
+}
+
+// inLiteral reports whether the text before offset is in a string literal, a heredoc or a comment of document.
+func inLiteral(l logger.Logger, document string, offset int) bool {
+	tokens, diags := hclsyntax.LexConfig([]byte(document), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		l.Debug("Lexing the document for completion", "error", diags.Error())
+	}
+
+	for _, token := range tokens {
+		if token.Range.Start.Byte < offset && offset <= token.Range.End.Byte {
+			return slices.Contains(literalTokens, token.Type)
+		}
+	}
+
+	return false
+}
+
+// inLocals reports whether position is in a locals block of indexed.
+func inLocals(indexed *ast.IndexedAST, position protocol.Position) bool {
+	if indexed == nil {
+		return false
+	}
+
+	for n := indexed.FindNodeAt(ast.ToHCLPos(position)); n != nil; n = n.Parent {
+		if ast.IsLocalsBlock(n) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// fieldCompletions returns the fields of variable valid at prefixRange in s that start with prefix, which they replace.
+func fieldCompletions(
+	d *docs.Docs,
+	s *store.Store,
+	variable docs.Variable,
+	prefix string,
+	prefixRange protocol.Range,
+) []protocol.CompletionItem {
+	cfg, _ := s.FileType.DocsConfig()
+	locals := inLocals(s.AST, prefixRange.End)
+	completions := []protocol.CompletionItem{}
+
+	for _, field := range variableFields[s.FileType] {
+		if !strings.HasPrefix(field, prefix) || locals && slices.Contains(localsExcludedFields, field) {
+			continue
+		}
+
+		item := protocol.CompletionItem{
+			Label:            field,
+			Kind:             protocol.CompletionItemKindVariable,
+			InsertTextFormat: protocol.InsertTextFormatPlainText,
+			TextEdit:         &protocol.TextEdit{Range: prefixRange, NewText: field},
+		}
+
+		if variable.Experiment != "" {
+			item.Detail = protocol.NewOptional("Experimental")
+		}
+
+		if blurb, ok := d.Blurb(cfg, docs.KindVariable, field); ok {
+			item.Documentation = &protocol.MarkupContent{Kind: protocol.MarkupKindMarkdown, Value: blurb}
+		}
+
+		completions = append(completions, item)
+	}
+
+	return completions
 }

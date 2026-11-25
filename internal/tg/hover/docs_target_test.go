@@ -85,3 +85,60 @@ func TestGetDocsTargetWithoutAST(t *testing.T) {
 	_, _, found := hover.GetDocsTarget(&store.Store{}, protocol.Position{})
 	assert.False(t, found)
 }
+
+func TestGetDocsTargetVariable(t *testing.T) {
+	t.Parallel()
+
+	const document = `locals {
+  unit_dir = path.unit
+  file     = "${path.include}/x"
+  same     = local.path
+  dirs     = [for path in path.read : path]
+  whole    = path
+}
+
+unit "vpc" {
+  path = "vpc"
+}
+`
+
+	tc := []struct {
+		name     string
+		target   string
+		position protocol.Position
+		found    bool
+	}{
+		{name: "variable", position: protocol.Position{Line: 1, Character: 14}, target: "path", found: true},
+		{name: "field", position: protocol.Position{Line: 1, Character: 19}, target: "path.unit", found: true},
+		{
+			name:     "field in a template",
+			position: protocol.Position{Line: 2, Character: 23},
+			target:   "path.include",
+			found:    true,
+		},
+		{name: "attribute of a local", position: protocol.Position{Line: 3, Character: 20}},
+		{name: "for collection", position: protocol.Position{Line: 4, Character: 32}, target: "path.read", found: true},
+		{name: "for value", position: protocol.Position{Line: 4, Character: 39}},
+		{name: "variable alone", position: protocol.Position{Line: 5, Character: 14}, target: "path", found: true},
+		{name: "attribute named path", position: protocol.Position{Line: 9, Character: 3}},
+	}
+
+	indexed, err := ast.ParseHCLFile("terragrunt.stack.hcl", []byte(document))
+	require.NoError(t, err)
+
+	st := &store.Store{AST: indexed, Document: document, FileType: store.FileTypeStack}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			kind, target, found := hover.GetDocsTarget(st, tt.position)
+			require.Equal(t, tt.found, found)
+			assert.Equal(t, tt.target, target)
+
+			if tt.found {
+				assert.Equal(t, docs.KindVariable, kind)
+			}
+		})
+	}
+}

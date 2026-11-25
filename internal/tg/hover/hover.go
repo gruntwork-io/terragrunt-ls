@@ -66,7 +66,7 @@ func GetHoverTargetWithContext(l logger.Logger, store *store.Store, position pro
 }
 
 // GetDocsTarget returns the kind and name of the HCL reference item under the
-// cursor: the name of a function call, or the type of a top-level block or the
+// cursor: the name of a function call, a variable or its field, or the type of a top-level block or the
 // name of a top-level attribute.
 func GetDocsTarget(st *store.Store, position protocol.Position) (docs.Kind, string, bool) {
 	if st.AST == nil {
@@ -89,10 +89,51 @@ func GetDocsTarget(st *store.Store, position protocol.Position) (docs.Kind, stri
 			if contains(node.NameRange, pos) && isTopLevel(n) {
 				return docs.KindAttribute, node.Name, true
 			}
+		case *hclsyntax.ScopeTraversalExpr:
+			if name, ok := variableTarget(n, node.Traversal, pos); ok {
+				return docs.KindVariable, name, true
+			}
 		}
 	}
 
 	return "", "", false
+}
+
+// variableTarget returns the variable, or the variable field, that traversal reads at pos.
+func variableTarget(n *ast.IndexedNode, traversal hcl.Traversal, pos hcl.Pos) (string, bool) {
+	name := traversal.RootName()
+	if _, ok := docs.LookupVariable(name); !ok || declaredByFor(n, name, pos) {
+		return "", false
+	}
+
+	if contains(traversal[0].SourceRange(), pos) {
+		return name, true
+	}
+
+	const fieldStep = 1
+
+	if len(traversal) <= fieldStep {
+		return "", false
+	}
+
+	field, ok := traversal[fieldStep].(hcl.TraverseAttr)
+	if !ok || !contains(field.SrcRange, pos) {
+		return "", false
+	}
+
+	return name + "." + field.Name, true
+}
+
+// declaredByFor reports whether a for expression around n declares name for the expressions at pos.
+func declaredByFor(n *ast.IndexedNode, name string, pos hcl.Pos) bool {
+	for p := n.Parent; p != nil; p = p.Parent {
+		expr, ok := p.Node.(*hclsyntax.ForExpr)
+		if ok && (expr.KeyVar == name || expr.ValVar == name) && !contains(expr.CollExpr.Range(), pos) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // contains reports whether pos is in r, comparing lines and columns, since

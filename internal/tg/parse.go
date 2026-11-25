@@ -2,6 +2,7 @@ package tg
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -44,14 +45,22 @@ func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
 func newParsingContext(
 	ctx context.Context,
 	filename string,
-) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
+) (context.Context, *config.ParsingContext, *hcl.Diagnostics, error) {
 	parseDiags := &hcl.Diagnostics{}
 
-	pctx := config.NewParsingContext(
-		config.WithStrictControls(options.NewTerragruntOptions().StrictControls),
-	)
+	opts, err := options.NewTerragruntOptionsWithConfigPath(filename)
+	if err != nil {
+		return ctx, nil, nil, err
+	}
+
+	opts.Experiments.ExperimentMode()
+
+	pctx := config.NewParsingContext(config.WithStrictControls(opts.StrictControls))
+	pctx.Experiments = opts.Experiments
 	pctx.TerragruntConfigPath = filename
+	pctx.OriginalTerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
+	pctx.DownloadDir = opts.DownloadDir
 	pctx.SkipOutput = true
 	pctx.MaxFoldersToCheck = defaultMaxFoldersToCheck
 	pctx.Parser.DiagnosticsHandler = func(file *hcl.File, hclDiags hcl.Diagnostics) (hcl.Diagnostics, error) {
@@ -59,12 +68,11 @@ func newParsingContext(
 		return hclDiags, nil
 	}
 
-	return config.WithCaches(ctx), pctx, parseDiags
+	return config.WithCaches(ctx), pctx, parseDiags, nil
 }
 
 // ParseTerragruntBuffer parses text as the unit configuration at filename. The
-// parse runs in a copy of v that is limited to p. It reads text in place of the
-// file at filename, and every other file it reads from v.
+// parse runs in a copy of v that is limited to p, with text in place of the file at filename.
 //
 // The returned diagnostics include an Information diagnostic for each distinct
 // command or SOPS decryption that p denied. The parse replaces p.Observe to
@@ -78,7 +86,13 @@ func ParseTerragruntBuffer(
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, filename)
+
+	ctx, pctx, parseDiags, err := newParsingContext(ctx, filename)
+	if err != nil {
+		l.Error("Error building the Terragrunt parsing context", "error", err)
+
+		return nil, []protocol.Diagnostic{}
+	}
 
 	cfg, err := new(config.Store).ResolveRunConfigFromBytes(
 		ctx,
@@ -95,9 +109,23 @@ func ParseTerragruntBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := hclDiagsToLSPDiags(filteredDiags)
+	diags := append(hclDiagsToLSPDiags(filteredDiags), pathDownloadDiagnostics(err)...)
 
 	return cfg, append(diags, denials.diagnostics()...)
+}
+
+// pathDownloadDiagnostics returns an Error diagnostic when err holds a [config.PathDownloadInLocalsError].
+func pathDownloadDiagnostics(err error) []protocol.Diagnostic {
+	var pathDownload config.PathDownloadInLocalsError
+	if !errors.As(err, &pathDownload) {
+		return nil
+	}
+
+	return []protocol.Diagnostic{{
+		Severity: protocol.DiagnosticSeverityError,
+		Source:   protocol.NewOptional("terragrunt-ls"),
+		Message:  protocol.String(pathDownload.Error()),
+	}}
 }
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
@@ -300,9 +328,15 @@ func ParseStackBuffer(
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, new(config.Store), pctx, filename, text, nil)
+	ctx, pctx, parseDiags, err := newParsingContext(ctx, filename)
+	if err != nil {
+		l.Error("Error building the Terragrunt parsing context", "error", err)
+
+		return nil, []protocol.Diagnostic{}
+	}
+
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, new(config.Store), pctx, filename, text)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)

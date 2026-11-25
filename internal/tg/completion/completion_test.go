@@ -1,12 +1,15 @@
 package completion_test
 
 import (
+	"strings"
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/testutils"
 	"terragrunt-ls/internal/tg/completion"
 	"terragrunt-ls/internal/tg/store"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
 )
 
@@ -307,6 +310,157 @@ EOF
 			completions := completion.GetCompletions(l, testutils.NewDocs(t), &tt.store, tt.position)
 
 			assert.ElementsMatch(t, tt.completions, completions)
+		})
+	}
+}
+
+func TestGetCompletionsVariableFields(t *testing.T) {
+	t.Parallel()
+
+	fields := map[string]string{
+		"path.download": "The directory in which OpenTofu/Terraform runs.",
+		"path.include":  "The included file.",
+		"path.read":     "The file that `read_terragrunt_config` reads.",
+		"path.stack":    "The directory of the stack file.",
+		"path.unit":     "The directory of the unit.",
+	}
+
+	tc := []struct {
+		name     string
+		document string
+		labels   []string
+		fileType store.FileType
+		position protocol.Position
+		start    uint32
+	}{
+		{
+			name:     "unit inputs",
+			document: "inputs = {\n  dir = path.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			labels:   []string{"path.download", "path.unit"},
+		},
+		{
+			name:     "unit locals",
+			document: "locals {\n  dir = path.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "unit interpolation",
+			document: "inputs = {\n  dir = \"${path.u\"\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 17},
+			start:    11,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "stack locals",
+			document: "locals {\n  dir = path.\n}\n",
+			fileType: store.FileTypeStack,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			labels:   []string{"path.stack"},
+		},
+		{
+			name:     "included file inputs",
+			document: "inputs = {\n  dir = path.\n}\n",
+			fileType: store.FileTypeUnknown,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			labels:   []string{"path.download", "path.include", "path.read", "path.stack", "path.unit"},
+		},
+		{
+			name:     "included file locals",
+			document: "locals {\n  dir = path.\n}\n",
+			fileType: store.FileTypeUnknown,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			labels:   []string{"path.include", "path.read", "path.stack", "path.unit"},
+		},
+		{
+			name:     "values file",
+			document: "dir = path.\n",
+			fileType: store.FileTypeValues,
+			position: protocol.Position{Line: 0, Character: 11},
+		},
+		{
+			name:     "attribute of a local",
+			document: "inputs = {\n  dir = local.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 14},
+		},
+		{
+			name:     "string literal",
+			document: "inputs = {\n  dir = \"../path.\"\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 17},
+		},
+		{
+			name:     "comment",
+			document: "# path.\ninputs = {}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 0, Character: 7},
+		},
+		{
+			name:     "block comment",
+			document: "/* see path. */\ninputs = {}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 0, Character: 12},
+		},
+		{
+			name:     "block comment of two lines",
+			document: "/*\n  path.\n*/\ninputs = {}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 7},
+		},
+		{
+			name:     "heredoc",
+			document: "inputs = {\n  dir = <<EOF\npath.\nEOF\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 2, Character: 5},
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			expected := []protocol.CompletionItem{}
+
+			for _, label := range tt.labels {
+				expected = append(expected, protocol.CompletionItem{
+					Label:  label,
+					Kind:   protocol.CompletionItemKindVariable,
+					Detail: protocol.NewOptional("Experimental"),
+					Documentation: &protocol.MarkupContent{
+						Kind: protocol.MarkupKindMarkdown,
+						Value: testutils.DocsExperimentBlurb(
+							fields[label],
+							"variables/"+strings.ReplaceAll(label, ".", "/"),
+							"path-variable",
+						),
+					},
+					InsertTextFormat: protocol.InsertTextFormatPlainText,
+					TextEdit: &protocol.TextEdit{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: tt.position.Line, Character: tt.start},
+							End:   tt.position,
+						},
+						NewText: label,
+					},
+				})
+			}
+
+			indexed, err := ast.ParseHCLFile("terragrunt.hcl", []byte(tt.document))
+			require.NotNil(t, indexed, err)
+
+			st := &store.Store{AST: indexed, Document: tt.document, FileType: tt.fileType}
+			completions := completion.GetCompletions(testutils.NewTestLogger(t), testutils.NewDocs(t), st, tt.position)
+			assert.Equal(t, expected, completions)
 		})
 	}
 }

@@ -4,4 +4,5 @@ locals {
 
 inputs = {
   greeting = local.greeting
+  unit_dir = path.unit
 }

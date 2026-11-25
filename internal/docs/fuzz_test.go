@@ -3,6 +3,7 @@ package docs_test
 import (
 	"net/url"
 	"regexp"
+	"strings"
 	"terragrunt-ls/internal/docs"
 	"terragrunt-ls/internal/testutils"
 	"testing"
@@ -31,6 +32,32 @@ func FuzzParseIndex(f *testing.F) {
 		for _, item := range items {
 			assert.Contains(t, []docs.Kind{docs.KindBlock, docs.KindAttribute, docs.KindFunction}, item.Kind)
 			assert.Regexp(t, itemName, item.Name)
+		}
+	})
+}
+
+// FuzzParseVariable tests that every item ParseVariable returns is the variable or one of its fields, with safe names.
+func FuzzParseVariable(f *testing.F) {
+	f.Add([]byte(testutils.DocsPathVariable))
+	f.Add([]byte("> d\n## Fields\n- [`path.a`](/reference/hcl/variables/path/a/): \\|"))
+
+	path := docs.Variable{Name: "path", Experiment: "path-variable"}
+
+	f.Fuzz(func(t *testing.T, page []byte) {
+		items, err := docs.ParseVariable(path, page)
+		if err != nil {
+			return
+		}
+
+		require.LessOrEqual(t, len(items), docs.MaxIndexItems+1)
+		assert.Equal(t, "path", items[0].Name)
+
+		for _, item := range items[1:] {
+			assert.Equal(t, docs.KindVariable, item.Kind)
+
+			field, ok := strings.CutPrefix(item.Name, "path.")
+			require.True(t, ok, item.Name)
+			assert.Regexp(t, itemName, field)
 		}
 	})
 }

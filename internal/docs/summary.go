@@ -9,6 +9,12 @@ import (
 // linkTarget matches the target of a Markdown link.
 var linkTarget = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
+// listItemName matches the code label that opens a list item, e.g. "- [`path.unit`](...)".
+var listItemName = regexp.MustCompile("^-\\s+\\[(`[^`]+`)\\]")
+
+// experimentalTitle is the line that the docs site gives for the title of the aside of an experiment.
+const experimentalTitle = "Experimental"
+
 // section is a `##` section of a page. The part of the page before the first
 // one has no heading.
 type section struct {
@@ -19,7 +25,7 @@ type section struct {
 // Summarize returns what a hover shows of an item's page, which is at pageURL:
 // the description, the attribute's type, the function's signature, the first
 // paragraph of the usage, the function's parameters as a list, and the names of
-// the block's attributes and nested blocks. Links resolve against pageURL.
+// the block's attributes and nested blocks, and the variable's fields, with links resolved against pageURL.
 func Summarize(page []byte, pageURL *url.URL) string {
 	var parts []string
 
@@ -34,6 +40,10 @@ func Summarize(page []byte, pageURL *url.URL) string {
 		case "Attributes", "Blocks":
 			if names := subsectionNames(s.lines); len(names) > 0 {
 				parts = append(parts, "**"+s.heading+":** "+strings.Join(names, ", "))
+			}
+		case "Fields":
+			if names := listItemNames(s.lines); len(names) > 0 {
+				parts = append(parts, "**Fields:** "+strings.Join(names, ", "))
 			}
 		}
 	}
@@ -81,7 +91,7 @@ func preamble(lines []string) []string {
 		case strings.HasPrefix(line, "> "):
 			parts = append(parts, strings.TrimPrefix(line, "> "))
 		default:
-			parts = append(parts, line)
+			parts = append(parts, strings.TrimSuffix(line, "\\"))
 		}
 	}
 
@@ -105,6 +115,7 @@ func usage(lines []string) []string {
 		switch {
 		case strings.HasPrefix(line, "### "):
 			return parts
+		case line == experimentalTitle:
 		case isFence(line):
 			i = fenceEnd(lines, i)
 		case !strings.HasPrefix(line, "|"):
@@ -169,6 +180,19 @@ func subsectionNames(lines []string) []string {
 		name := strings.TrimPrefix(line, "### ")
 		if !inFence && name != line && strings.HasPrefix(name, "`") && strings.HasSuffix(name, "`") {
 			names = append(names, name)
+		}
+	}
+
+	return names
+}
+
+// listItemNames returns the code labels of the list items of a section, e.g. the fields of a variable.
+func listItemNames(lines []string) []string {
+	var names []string
+
+	for _, line := range lines {
+		if m := listItemName.FindStringSubmatch(line); m != nil {
+			names = append(names, m[1])
 		}
 	}
 
