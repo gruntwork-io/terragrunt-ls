@@ -12,6 +12,8 @@ When loading a document, the server will use Terragrunt's configuration parsing 
 
 The parse turns on every Terragrunt experiment. See [Experiments](./setup.md#experiments).
 
+In a file other than `terragrunt.hcl` and `terragrunt.stack.hcl`, such as a `root.hcl`, the server reports no errors for `path.include`, `path.read` and `path.stack`, or for a `try` call that reads them. Terragrunt sets these fields only when another file includes or reads the file.
+
 ## HoverProvider
 
 The server provides hover information.

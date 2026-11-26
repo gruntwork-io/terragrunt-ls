@@ -935,7 +935,11 @@ inputs = {
 
 	localHover := state.Hover(t.Context(), l, 1, unitURI, protocol.Position{Line: 5, Character: 16})
 	require.NotNil(t, localHover.Result)
-	assert.Equal(t, "```hcl\nunit_dir = \""+unitDir+"\"\n```", localHover.Result.Contents.Value)
+	assert.Equal(
+		t,
+		"```hcl\nunit_dir = \""+strings.ReplaceAll(unitDir, `\`, `\\`)+"\"\n```",
+		localHover.Result.Contents.Value,
+	)
 
 	fieldHover := state.Hover(t.Context(), l, 1, unitURI, protocol.Position{Line: 1, Character: 19})
 	require.NotNil(t, fieldHover.Result)

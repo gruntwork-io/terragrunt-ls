@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"terragrunt-ls/internal/ast"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/sirupsen/logrus"
+	"github.com/zclconf/go-cty/cty"
 	"go.lsp.dev/protocol"
 )
 
@@ -112,27 +114,44 @@ func ParseTerragruntBuffer(
 
 	filteredDiags := filterHCLDiags(l, *parseDiags, filename, text)
 
-	diags := append(hclDiagsToLSPDiags(filteredDiags), pathDownloadDiagnostics(err)...)
+	diags := append(hclDiagsToLSPDiags(filteredDiags), pathDownloadDiagnostics(l, err, filename, text)...)
 
 	return cfg, append(diags, denials.diagnostics()...)
 }
 
-// pathDownloadDiagnostics returns an Error diagnostic when err holds a [config.PathDownloadInLocalsError].
-func pathDownloadDiagnostics(err error) []protocol.Diagnostic {
+// pathDownloadDiagnostics returns an Error diagnostic at the local of a [config.PathDownloadInLocalsError] in err.
+func pathDownloadDiagnostics(l logger.Logger, err error, filename, text string) []protocol.Diagnostic {
 	var pathDownload config.PathDownloadInLocalsError
 	if !errors.As(err, &pathDownload) {
 		return nil
 	}
 
-	return []protocol.Diagnostic{{
+	diag := protocol.Diagnostic{
 		Severity: protocol.DiagnosticSeverityError,
 		Source:   protocol.NewOptional("terragrunt-ls"),
 		Message:  protocol.String(pathDownload.Error()),
-	}}
+	}
+
+	if pathDownload.ConfigPath != filename {
+		return []protocol.Diagnostic{diag}
+	}
+
+	indexed, parseErr := ast.ParseHCLFile(filename, []byte(text))
+	if parseErr != nil {
+		l.Debug("Error indexing the buffer for the path.download diagnostic", "error", parseErr)
+	}
+
+	if local, ok := indexed.Locals[pathDownload.Local]; ok {
+		diag.Range = ast.FromHCLRange(local.Range())
+	}
+
+	return []protocol.Diagnostic{diag}
 }
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
 	filtered := hcl.Diagnostics{}
+
+	var sharedPathSubjects []hcl.Range
 
 	for _, diag := range diags {
 		if diag.Subject == nil {
@@ -146,6 +165,10 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 			"diag", diag,
 			"filename", filename,
 		)
+
+		if diag.Subject.Filename != filename {
+			continue
+		}
 
 		if isMissingOutputDiag(diag) {
 			l.Debug(
@@ -177,12 +200,30 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 			continue
 		}
 
-		if diag.Subject.Filename == filename {
-			filtered = append(filtered, diag)
+		if isSharedPathDiag(diag) {
+			l.Debug(
+				"Filtering shared path field diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			sharedPathSubjects = append(sharedPathSubjects, *diag.Subject)
+
+			continue
 		}
+
+		filtered = append(filtered, diag)
 	}
 
-	return filtered
+	if len(sharedPathSubjects) == 0 {
+		return filtered
+	}
+
+	subjects := withLocalReferences(l, sharedPathSubjects, filename, text)
+
+	return slices.DeleteFunc(filtered, func(diag *hcl.Diagnostic) bool {
+		return followsSharedPathDiag(diag, subjects)
+	})
 }
 
 const (
@@ -203,6 +244,116 @@ func isMissingOutputDiag(diag *hcl.Diagnostic) bool {
 	}
 
 	return diag.Detail == OutputsMissingDetail
+}
+
+// sharedPathFields are the path fields that Terragrunt sets only when another file includes or reads the file.
+var sharedPathFields = []string{"include", "read", "stack"}
+
+func isSharedPathDiag(diag *hcl.Diagnostic) bool {
+	if diag.Expression == nil || shadowsPath(diag.EvalContext) {
+		return false
+	}
+
+	fileType := DetectFileType(diag.Subject.Filename)
+	if fileType != store.FileTypeShared && fileType != store.FileTypeUnknown {
+		return false
+	}
+
+	switch diag.Summary {
+	case UnsupportedAttributeSummary, invalidIndexSummary:
+		traversal, diags := hcl.AbsTraversalForExpr(diag.Expression)
+
+		return !diags.HasErrors() && readsSharedPathField(traversal)
+	case ErrorInFunctionCallSummary:
+		call, ok := diag.Expression.(*hclsyntax.FunctionCallExpr)
+
+		return ok && call.Name == "try" && slices.ContainsFunc(call.Variables(), readsSharedPathField)
+	default:
+		return false
+	}
+}
+
+// shadowsPath reports whether an expression in the chain of scope declares a path variable of its own.
+func shadowsPath(scope *hcl.EvalContext) bool {
+	declarations := 0
+
+	for ; scope != nil; scope = scope.Parent() {
+		if _, ok := scope.Variables[config.MetadataPath]; ok {
+			declarations++
+		}
+	}
+
+	return declarations > 1
+}
+
+// readsSharedPathField reports whether traversal reads a field of sharedPathFields and nothing in that field.
+func readsSharedPathField(traversal hcl.Traversal) bool {
+	steps := traversal.SimpleSplit().Rel
+	if traversal.RootName() != config.MetadataPath || len(steps) != 1 {
+		return false
+	}
+
+	switch step := steps[0].(type) {
+	case hcl.TraverseAttr:
+		return slices.Contains(sharedPathFields, step.Name)
+	case hcl.TraverseIndex:
+		return step.Key.Type() == cty.String && slices.Contains(sharedPathFields, step.Key.AsString())
+	default:
+		return false
+	}
+}
+
+const (
+	// invalidIndexSummary is the summary for an index that an object does not have.
+	invalidIndexSummary = "Invalid index"
+
+	// unsuitableValueSummary is the summary for a value that an attribute cannot hold.
+	unsuitableValueSummary = "Unsuitable value type"
+
+	// unknownValueDetail is the detail for an attribute whose expression gave no value.
+	unknownValueDetail = "Unsuitable value: value must be known"
+)
+
+// withLocalReferences returns subjects with each reference in text to a local whose value holds one of them.
+func withLocalReferences(l logger.Logger, subjects []hcl.Range, filename, text string) []hcl.Range {
+	indexed, err := ast.ParseHCLFile(filename, []byte(text))
+	if err != nil {
+		l.Debug("Error indexing the buffer for the shared path field diags", "error", err)
+	}
+
+	body := indexed.HCLFile.Body.(*hclsyntax.Body)
+	found := map[string]struct{}{}
+
+	for range len(indexed.Locals) {
+		before := len(found)
+
+		for name, local := range indexed.Locals {
+			if _, ok := found[name]; ok || !slices.ContainsFunc(subjects, local.Range().Overlaps) {
+				continue
+			}
+
+			found[name] = struct{}{}
+
+			ast.WalkReferences(body, config.MetadataLocal, name, func(expr *hclsyntax.ScopeTraversalExpr, _ hcl.Range) {
+				subjects = append(subjects, expr.Range())
+			})
+		}
+
+		if len(found) == before {
+			break
+		}
+	}
+
+	return subjects
+}
+
+// followsSharedPathDiag reports whether diag is the unknown value error of an expression that holds one of subjects.
+func followsSharedPathDiag(diag *hcl.Diagnostic, subjects []hcl.Range) bool {
+	if diag.Summary != unsuitableValueSummary || diag.Detail != unknownValueDetail || diag.Context == nil {
+		return false
+	}
+
+	return slices.ContainsFunc(subjects, diag.Context.Overlaps)
 }
 
 const (

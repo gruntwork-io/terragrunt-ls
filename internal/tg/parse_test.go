@@ -468,10 +468,11 @@ func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		message  func(filename string) string
-		name     string
-		content  string
-		severity protocol.DiagnosticSeverity
+		message   func(filename string) string
+		name      string
+		content   string
+		diagRange protocol.Range
+		severity  protocol.DiagnosticSeverity
 	}{
 		{
 			name: "path.stack in a unit",
@@ -480,6 +481,10 @@ func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
 }
 `,
 			severity: protocol.DiagnosticSeverityError,
+			diagRange: protocol.Range{
+				Start: protocol.Position{Line: 1, Character: 18},
+				End:   protocol.Position{Line: 1, Character: 24},
+			},
 			message: func(string) string {
 				return `Unsupported attribute: This object does not have an attribute named "stack".`
 			},
@@ -487,10 +492,15 @@ func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
 		{
 			name: "path.download in locals",
 			content: `locals {
+  unit_dir     = path.unit
   download_dir = path.download
 }
 `,
 			severity: protocol.DiagnosticSeverityError,
+			diagRange: protocol.Range{
+				Start: protocol.Position{Line: 2, Character: 2},
+				End:   protocol.Position{Line: 2, Character: 30},
+			},
 			message: func(filename string) string {
 				return config.PathDownloadInLocalsError{ConfigPath: filename, Local: "download_dir"}.Error()
 			},
@@ -515,9 +525,243 @@ func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
 
 			require.Len(t, diags, 1)
 			assert.Equal(t, tt.severity, diags[0].Severity)
+			assert.Equal(t, tt.diagRange, diags[0].Range)
 			assert.Equal(t, protocol.String(tt.message(filename)), diags[0].Message)
 		})
 	}
+}
+
+func TestParseTerragruntBufferPathDownloadInIncludedLocals(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+	rootDir := testutils.WorkDir(t, v)
+
+	_, err := testutils.CreateFile(v, rootDir, "root.hcl", "locals {\n  download_dir = path.download\n}\n")
+	require.NoError(t, err)
+
+	_, diags := tg.ParseTerragruntBuffer(
+		t.Context(),
+		testutils.NewTestLogger(t),
+		v,
+		venv.Policy{},
+		filepath.Join(rootDir, "app", "terragrunt.hcl"),
+		unitIncludingRoot+"\nlocals {\n  download_dir = path.unit\n}\n",
+	)
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, protocol.DiagnosticSeverityError, diags[0].Severity)
+	assert.Equal(t, protocol.NewOptional("terragrunt-ls"), diags[0].Source)
+	assert.Equal(t, protocol.Range{}, diags[0].Range)
+}
+
+func TestParseTerragruntBufferPathVariableInIncludedFile(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+	rootDir := testutils.WorkDir(t, v)
+
+	_, err := testutils.CreateFile(v, rootDir, "root.hcl", "inputs = { stack_dir = path.stack }\n")
+	require.NoError(t, err)
+
+	_, diags := tg.ParseTerragruntBuffer(
+		t.Context(),
+		testutils.NewTestLogger(t),
+		v,
+		venv.Policy{},
+		filepath.Join(rootDir, "app", "terragrunt.hcl"),
+		unitIncludingRoot,
+	)
+
+	assert.Empty(t, diags)
+}
+
+func TestParseTerragruntBufferPathVariableSharedFile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		messages []string
+	}{
+		{
+			name: "fields of an including or reading file",
+			content: `locals {
+  include_path = path.include
+}
+
+inputs = {
+  read_path = path.read
+  stack_dir = path.stack
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "try with the fields of an including or reading file",
+			content: `locals {
+  common_dir = dirname(try(path.include, path.read))
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "try with a function call on each field",
+			content: `locals {
+  common_dir = try(dirname(path.include), dirname(path.read))
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "index form of a field",
+			content: `inputs = {
+  dir = path["include"]
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "field in a typed attribute",
+			content: `terraform {
+  source = "${dirname(path.include)}/modules/x"
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "try in a typed attribute",
+			content: `terraform {
+  source = "${dirname(try(path.include, path.read))}/modules/x"
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "try in a local that a typed attribute reads",
+			content: `locals {
+  common_dir = dirname(try(path.include, path.read))
+}
+
+terraform {
+  source = "${local.common_dir}/modules/x"
+}
+`,
+			messages: []string{},
+		},
+		{
+			name: "field in a chain of locals that a typed attribute reads",
+			content: `locals {
+  root_file = path.include
+  root_dir  = dirname(local.root_file)
+}
+
+download_dir = "${local.root_dir}/cache"
+`,
+			messages: []string{},
+		},
+		{
+			name: "unknown field in a local that a typed attribute reads",
+			content: `locals {
+  root_file = path.include
+  typo_dir  = path.unti
+}
+
+download_dir = "${local.typo_dir}/cache"
+`,
+			messages: []string{
+				`Unsupported attribute: This object does not have an attribute named "unti".`,
+				"Unsuitable value type: Unsuitable value: value must be known",
+			},
+		},
+		{
+			name: "unknown field",
+			content: `inputs = {
+  dir = path.unti
+}
+`,
+			messages: []string{`Unsupported attribute: This object does not have an attribute named "unti".`},
+		},
+		{
+			name: "unknown field in a typed attribute",
+			content: `terraform {
+  source = "${path.unti}/modules/x"
+}
+`,
+			messages: []string{
+				`Unsupported attribute: This object does not have an attribute named "unti".`,
+				"Unsuitable value type: Unsuitable value: value must be known",
+			},
+		},
+		{
+			name: "attribute of a field",
+			content: `inputs = {
+  dir = path.include.missing
+}
+`,
+			messages: []string{`Unsupported attribute: This object does not have an attribute named "include".`},
+		},
+		{
+			name: "field of a for variable",
+			content: `inputs = {
+  dirs = [for path in [{}] : path.include]
+}
+`,
+			messages: []string{`Unsupported attribute: This object does not have an attribute named "include".`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+
+			_, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filepath.Join(testutils.WorkDir(t, v), "root.hcl"),
+				tt.content,
+			)
+
+			require.Len(t, diags, len(tt.messages))
+
+			for i, message := range tt.messages {
+				assert.Equal(t, protocol.String(message), diags[i].Message)
+			}
+		})
+	}
+}
+
+func TestParseTerragruntBufferPathVariableSharedFileInvalidTry(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+
+	_, diags := tg.ParseTerragruntBuffer(
+		t.Context(),
+		testutils.NewTestLogger(t),
+		v,
+		venv.Policy{},
+		filepath.Join(testutils.WorkDir(t, v), "root.hcl"),
+		`inputs = {
+  dir = try(path.include.missing, path.read.missing)
+}
+`,
+	)
+
+	require.Len(t, diags, 1)
+	assert.Equal(t, protocol.DiagnosticSeverityError, diags[0].Severity)
+	assert.Equal(
+		t,
+		protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 8},
+			End:   protocol.Position{Line: 1, Character: 12},
+		},
+		diags[0].Range,
+	)
 }
 
 func TestParseStackBufferPathVariable(t *testing.T) {
@@ -546,4 +790,29 @@ unit "vpc" {
 	assert.Empty(t, diags)
 	require.NotNil(t, cfg)
 	assert.Equal(t, stackDir, cfg.Locals["stack_dir"])
+}
+
+func TestParseStackBufferPathVariableErrors(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+
+	_, diags := tg.ParseStackBuffer(
+		t.Context(),
+		testutils.NewTestLogger(t),
+		v,
+		venv.Policy{},
+		filepath.Join(testutils.WorkDir(t, v), "terragrunt.stack.hcl"),
+		`locals {
+  include_path = path.include
+}
+`,
+	)
+
+	require.Len(t, diags, 1)
+	assert.Equal(
+		t,
+		protocol.String(`Unsupported attribute: This object does not have an attribute named "include".`),
+		diags[0].Message,
+	)
 }

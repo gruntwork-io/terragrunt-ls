@@ -9,6 +9,7 @@ import (
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 	"terragrunt-ls/internal/tg/text"
+	"unicode/utf16"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -112,14 +113,12 @@ var stackCandidates = []candidate{
 var variableFields = map[store.FileType][]string{
 	store.FileTypeUnit:    {"path.download", "path.unit"},
 	store.FileTypeStack:   {"path.stack"},
+	store.FileTypeShared:  {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
 	store.FileTypeUnknown: {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
 }
 
 // localsExcludedFields are the variable fields that Terragrunt rejects in locals.
 var localsExcludedFields = []string{"path.download"}
-
-// literalTokens are the tokens of text that is not code: string literals, heredocs and comments.
-var literalTokens = []hclsyntax.TokenType{hclsyntax.TokenQuotedLit, hclsyntax.TokenStringLit, hclsyntax.TokenComment}
 
 // GetCompletions returns the blocks and attributes valid in the document that
 // start with the word under the cursor, or the variable fields before the cursor, each with its description from d.
@@ -131,11 +130,7 @@ func GetCompletions(
 ) []protocol.CompletionItem {
 	prefix, prefixRange := text.GetCursorWordPrefix(s.Document, position)
 	if variable, ok := readsVariable(prefix); ok {
-		if inLiteral(l, s.Document, text.GetCursorOffset(s.Document, position)) {
-			return []protocol.CompletionItem{}
-		}
-
-		return fieldCompletions(d, s, variable, prefix, prefixRange)
+		return fieldCompletions(l, d, s, variable, prefix, prefixRange)
 	}
 
 	word := text.GetCursorWord(s.Document, position)
@@ -202,29 +197,48 @@ func readsVariable(prefix string) (docs.Variable, bool) {
 	return docs.LookupVariable(name)
 }
 
-// inLiteral reports whether the text before offset is in a string literal, a heredoc or a comment of document.
-func inLiteral(l logger.Logger, document string, offset int) bool {
-	tokens, diags := hclsyntax.LexConfig([]byte(document), "", hcl.InitialPos)
-	if diags.HasErrors() {
-		l.Debug("Lexing the document for completion", "error", diags.Error())
+// skippedTokens are the tokens that HCL skips between a dot and the name after it.
+var skippedTokens = []hclsyntax.TokenType{hclsyntax.TokenNewline, hclsyntax.TokenComment}
+
+// rootAt returns the identifier token of tokens that starts at offset and follows no dot.
+func rootAt(tokens hclsyntax.Tokens, offset int) (hclsyntax.Token, bool) {
+	i := slices.IndexFunc(tokens, func(token hclsyntax.Token) bool {
+		return token.Type == hclsyntax.TokenIdent && token.Range.Start.Byte == offset
+	})
+	if i < 0 {
+		return hclsyntax.Token{}, false
 	}
 
+	before := i - 1
+	for before >= 0 && slices.Contains(skippedTokens, tokens[before].Type) {
+		before--
+	}
+
+	if before >= 0 && tokens[before].Type == hclsyntax.TokenDot {
+		return hclsyntax.Token{}, false
+	}
+
+	return tokens[i], true
+}
+
+// identifierRest returns the text from offset to the end of the identifier token of tokens that holds offset.
+func identifierRest(tokens hclsyntax.Tokens, document string, offset int) string {
 	for _, token := range tokens {
-		if token.Range.Start.Byte < offset && offset <= token.Range.End.Byte {
-			return slices.Contains(literalTokens, token.Type)
+		if token.Type == hclsyntax.TokenIdent && token.Range.Start.Byte <= offset && offset < token.Range.End.Byte {
+			return document[offset:token.Range.End.Byte]
 		}
 	}
 
-	return false
+	return ""
 }
 
-// inLocals reports whether position is in a locals block of indexed.
-func inLocals(indexed *ast.IndexedAST, position protocol.Position) bool {
+// inLocals reports whether pos is in a locals block of indexed.
+func inLocals(indexed *ast.IndexedAST, pos hcl.Pos) bool {
 	if indexed == nil {
 		return false
 	}
 
-	for n := indexed.FindNodeAt(ast.ToHCLPos(position)); n != nil; n = n.Parent {
+	for n := indexed.FindNodeAt(pos); n != nil; n = n.Parent {
 		if ast.IsLocalsBlock(n) {
 			return true
 		}
@@ -233,17 +247,53 @@ func inLocals(indexed *ast.IndexedAST, position protocol.Position) bool {
 	return false
 }
 
-// fieldCompletions returns the fields of variable valid at prefixRange in s that start with prefix, which they replace.
+// placeholder is an identifier character that completes a reference that ends at the cursor.
+const placeholder = "_"
+
+// declaredByFor reports whether a for expression of document declares name for the reference from pos to offset.
+func declaredByFor(l logger.Logger, document, name string, pos hcl.Pos, offset int) bool {
+	indexed, err := ast.ParseHCLFile("", []byte(document[:offset]+placeholder+document[offset:]))
+	if err != nil {
+		l.Debug("Parsing the document for completion", "error", err)
+	}
+
+	for n := indexed.FindNodeAt(pos); n != nil; n = n.Parent {
+		expr, ok := n.Node.(*hclsyntax.ForExpr)
+		if ok && (expr.KeyVar == name || expr.ValVar == name) && !expr.CollExpr.Range().ContainsOffset(offset) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// fieldCompletions returns the fields of variable valid in s that start with prefix, the text of prefixRange.
 func fieldCompletions(
+	l logger.Logger,
 	d *docs.Docs,
 	s *store.Store,
 	variable docs.Variable,
 	prefix string,
 	prefixRange protocol.Range,
 ) []protocol.CompletionItem {
-	cfg, _ := s.FileType.DocsConfig()
-	locals := inLocals(s.AST, prefixRange.End)
 	completions := []protocol.CompletionItem{}
+	offset := text.GetCursorOffset(s.Document, prefixRange.End)
+
+	tokens, diags := hclsyntax.LexConfig([]byte(s.Document), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		l.Debug("Lexing the document for completion", "error", diags.Error())
+	}
+
+	root, ok := rootAt(tokens, offset-len(prefix))
+	if !ok || declaredByFor(l, s.Document, variable.Name, root.Range.Start, offset) {
+		return completions
+	}
+
+	reference := prefixRange
+	reference.End.Character += uint32(len(utf16.Encode([]rune(identifierRest(tokens, s.Document, offset)))))
+
+	cfg, _ := s.FileType.DocsConfig()
+	locals := inLocals(s.AST, root.Range.Start)
 
 	for _, field := range variableFields[s.FileType] {
 		if !strings.HasPrefix(field, prefix) || locals && slices.Contains(localsExcludedFields, field) {
@@ -254,7 +304,7 @@ func fieldCompletions(
 			Label:            field,
 			Kind:             protocol.CompletionItemKindVariable,
 			InsertTextFormat: protocol.InsertTextFormatPlainText,
-			TextEdit:         &protocol.TextEdit{Range: prefixRange, NewText: field},
+			TextEdit:         &protocol.TextEdit{Range: reference, NewText: field},
 		}
 
 		if variable.Experiment != "" {

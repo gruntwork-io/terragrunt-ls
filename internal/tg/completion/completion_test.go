@@ -332,6 +332,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 		fileType store.FileType
 		position protocol.Position
 		start    uint32
+		end      uint32
 	}{
 		{
 			name:     "unit inputs",
@@ -339,6 +340,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeUnit,
 			position: protocol.Position{Line: 1, Character: 13},
 			start:    8,
+			end:      13,
 			labels:   []string{"path.download", "path.unit"},
 		},
 		{
@@ -347,6 +349,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeUnit,
 			position: protocol.Position{Line: 1, Character: 13},
 			start:    8,
+			end:      13,
 			labels:   []string{"path.unit"},
 		},
 		{
@@ -355,6 +358,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeUnit,
 			position: protocol.Position{Line: 1, Character: 17},
 			start:    11,
+			end:      17,
 			labels:   []string{"path.unit"},
 		},
 		{
@@ -363,6 +367,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeStack,
 			position: protocol.Position{Line: 1, Character: 13},
 			start:    8,
+			end:      13,
 			labels:   []string{"path.stack"},
 		},
 		{
@@ -371,6 +376,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeUnknown,
 			position: protocol.Position{Line: 1, Character: 13},
 			start:    8,
+			end:      13,
 			labels:   []string{"path.download", "path.include", "path.read", "path.stack", "path.unit"},
 		},
 		{
@@ -379,7 +385,113 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 			fileType: store.FileTypeUnknown,
 			position: protocol.Position{Line: 1, Character: 13},
 			start:    8,
+			end:      13,
 			labels:   []string{"path.include", "path.read", "path.stack", "path.unit"},
+		},
+		{
+			name:     "shared file inputs",
+			document: "inputs = {\n  dir = path.\n}\n",
+			fileType: store.FileTypeShared,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			end:      13,
+			labels:   []string{"path.download", "path.include", "path.read", "path.stack", "path.unit"},
+		},
+		{
+			name:     "shared file locals",
+			document: "locals {\n  dir = path.\n}\n",
+			fileType: store.FileTypeShared,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			end:      13,
+			labels:   []string{"path.include", "path.read", "path.stack", "path.unit"},
+		},
+		{
+			name:     "unit field under the cursor",
+			document: "inputs = {\n  dir = path.unit\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 14},
+			start:    8,
+			end:      17,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "unit field before a dot",
+			document: "inputs = {\n  dir = path.unit.x\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 14},
+			start:    8,
+			end:      17,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "unit locals at the end of the file",
+			document: "locals {\n  dir = path.",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 13},
+			start:    8,
+			end:      13,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "collection of a for expression",
+			document: "inputs = {\n  dirs = [for path in [path.] : path]\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 28},
+			start:    23,
+			end:      28,
+			labels:   []string{"path.download", "path.unit"},
+		},
+		{
+			name:     "for variable",
+			document: "inputs = {\n  dirs = [for path in [{}] : path.]\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 34},
+		},
+		{
+			name:     "for variable at the end of the file",
+			document: "inputs = {\n  dirs = [for path in [{}] : path.",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 34},
+		},
+		{
+			name:     "for variable after characters outside the Basic Multilingual Plane",
+			document: "inputs = { xs = [\"\U0001F600\U0001F600\U0001F600\", [for path in [{}] : path.]] }",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 0, Character: 52},
+		},
+		{
+			name:     "unit field with a dash under the cursor",
+			document: "inputs = {\n  dir = path.u-name\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 14},
+			start:    8,
+			end:      19,
+			labels:   []string{"path.unit"},
+		},
+		{
+			name:     "identifier with a dash that ends with path",
+			document: "inputs = {\n  x = dependency.base-path.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 27},
+		},
+		{
+			name:     "attribute named path after a dot and a space",
+			document: "inputs = {\n  x = local. path.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 18},
+		},
+		{
+			name:     "attribute named path after a dot and a comment",
+			document: "inputs = {\n  x = local./* c */path.\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 1, Character: 24},
+		},
+		{
+			name:     "attribute named path after a dot on the line before",
+			document: "inputs = {\n  x = [local.\n    path.]\n}\n",
+			fileType: store.FileTypeUnit,
+			position: protocol.Position{Line: 2, Character: 9},
 		},
 		{
 			name:     "values file",
@@ -448,7 +560,7 @@ func TestGetCompletionsVariableFields(t *testing.T) {
 					TextEdit: &protocol.TextEdit{
 						Range: protocol.Range{
 							Start: protocol.Position{Line: tt.position.Line, Character: tt.start},
-							End:   tt.position,
+							End:   protocol.Position{Line: tt.position.Line, Character: tt.end},
 						},
 						NewText: label,
 					},
