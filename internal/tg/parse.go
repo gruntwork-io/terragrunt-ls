@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/logger"
 	"terragrunt-ls/internal/tg/store"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/gruntwork-io/terragrunt/pkg/options"
 	"github.com/gruntwork-io/terragrunt/pkg/venv"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/sirupsen/logrus"
 	"go.lsp.dev/protocol"
 )
@@ -309,6 +312,8 @@ func DetectFileType(filename string) store.FileType {
 		return store.FileTypeUnit
 	case "terragrunt.stack.hcl":
 		return store.FileTypeStack
+	case "terragrunt.autoinclude.hcl":
+		return store.FileTypeShared
 	case "terragrunt.values.hcl":
 		return store.FileTypeValues
 	default:
@@ -347,4 +352,53 @@ func ParseStackBuffer(
 	diags := hclDiagsToLSPDiags(filteredDiags)
 
 	return cfg, append(diags, denials.diagnostics()...)
+}
+
+// unitSchema holds the names of the attributes and blocks that Terragrunt accepts at the top level of a unit
+// configuration.
+type unitSchema struct {
+	attributes map[string]struct{}
+	blocks     map[string]struct{}
+}
+
+func newUnitSchema() unitSchema {
+	implied, _ := gohcl.ImpliedBodySchema(&config.TerragruntConfigFile{})
+
+	schema := unitSchema{
+		attributes: make(map[string]struct{}, len(implied.Attributes)),
+		blocks:     make(map[string]struct{}, len(implied.Blocks)),
+	}
+
+	for _, attr := range implied.Attributes {
+		schema.attributes[attr.Name] = struct{}{}
+	}
+
+	for _, block := range implied.Blocks {
+		schema.blocks[block.Type] = struct{}{}
+	}
+
+	return schema
+}
+
+// accepts reports whether every top-level attribute and block of file is one that a unit configuration can hold. A
+// file with none is accepted.
+func (u unitSchema) accepts(file *ast.IndexedAST) bool {
+	body, ok := file.HCLFile.Body.(*hclsyntax.Body)
+	if !ok {
+		return false
+	}
+
+	for name := range body.Attributes {
+		if _, ok := u.attributes[name]; !ok {
+			return false
+		}
+	}
+
+	for _, block := range body.Blocks {
+		if _, ok := u.blocks[block.Type]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
