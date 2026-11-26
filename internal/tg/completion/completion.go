@@ -117,7 +117,7 @@ func GetCompletions(
 	var candidates []candidate
 
 	switch s.FileType {
-	case store.FileTypeUnit:
+	case store.FileTypeUnit, store.FileTypeShared:
 		candidates = unitCandidates
 	case store.FileTypeStack:
 		candidates = stackCandidates

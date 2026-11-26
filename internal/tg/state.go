@@ -3,6 +3,7 @@ package tg
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"terragrunt-ls/internal/ast"
 	"terragrunt-ls/internal/docs"
@@ -29,10 +30,19 @@ type State struct {
 	Configs map[string]*store.Store
 	// Docs is the HCL reference that hover and completion show.
 	Docs *docs.Docs
+	// Map of file names to the files that their include blocks resolve to
+	includes map[string][]string
+	// The attributes and blocks that mark a file with another name as a Terragrunt configuration
+	unitSchema unitSchema
 }
 
 func NewState(d *docs.Docs) State {
-	return State{Configs: map[string]*store.Store{}, Docs: d}
+	return State{
+		Configs:    map[string]*store.Store{},
+		includes:   map[string][]string{},
+		unitSchema: newUnitSchema(),
+		Docs:       d,
+	}
 }
 
 func (s *State) OpenDocument(
@@ -78,7 +88,6 @@ func (s *State) updateState(
 	text string,
 ) []protocol.Diagnostic {
 	filename := docURI.FsPath()
-	fileType := DetectFileType(filename)
 
 	// Keep the partial AST on errors, since the Terragrunt parser just below reports the same errors as diagnostics.
 	indexedAST, err := ast.ParseHCLFile(filename, []byte(text))
@@ -88,6 +97,11 @@ func (s *State) updateState(
 			"uri", docURI,
 			"error", err,
 		)
+	}
+
+	fileType := DetectFileType(filename)
+	if fileType == store.FileTypeUnknown && (s.isIncluded(filename) || s.unitSchema.accepts(indexedAST)) {
+		fileType = store.FileTypeShared
 	}
 
 	st := &store.Store{
@@ -100,7 +114,7 @@ func (s *State) updateState(
 	var diags []protocol.Diagnostic
 
 	switch fileType {
-	case store.FileTypeUnit:
+	case store.FileTypeUnit, store.FileTypeShared:
 		cfg, unitDiags := ParseTerragruntBuffer(ctx, l, v, p, filename, text)
 
 		l.Debug(
@@ -112,6 +126,8 @@ func (s *State) updateState(
 		cfgAsCty := cty.NilVal
 
 		if cfg != nil {
+			s.includes[filename] = includePaths(filename, cfg)
+
 			if converted, err := config.TerragruntConfigAsCty(cfg); err == nil {
 				cfgAsCty = converted
 			}
@@ -178,7 +194,7 @@ func (s *State) Hover(
 // localHover returns the value of the local under the cursor, as an HCL code
 // fence.
 func localHover(l logger.Logger, st *store.Store, position protocol.Position) (string, bool) {
-	if st.FileType != store.FileTypeUnit {
+	if st.FileType != store.FileTypeUnit && st.FileType != store.FileTypeShared {
 		return "", false
 	}
 
@@ -611,7 +627,38 @@ func canRename(st *store.Store) bool {
 		return false
 	}
 
-	return st.FileType == store.FileTypeUnit || st.FileType == store.FileTypeUnknown
+	return st.FileType == store.FileTypeUnit ||
+		st.FileType == store.FileTypeShared ||
+		st.FileType == store.FileTypeUnknown
+}
+
+// isIncluded reports whether an include block of a parsed file resolves to filename.
+func (s *State) isIncluded(filename string) bool {
+	for _, paths := range s.includes {
+		if slices.Contains(paths, filename) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// includePaths returns the files that the include blocks of cfg resolve to. filename is the file that cfg was parsed
+// from.
+func includePaths(filename string, cfg *config.TerragruntConfig) []string {
+	paths := make([]string, 0, len(cfg.ProcessedIncludes))
+
+	for _, include := range cfg.ProcessedIncludes {
+		path := include.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(filepath.Dir(filename), path)
+		}
+
+		// Document paths come from a URI, which lowercases the drive letter on Windows.
+		paths = append(paths, uri.File(path).FsPath())
+	}
+
+	return paths
 }
 
 func (s *State) TextDocumentReferences(
