@@ -309,3 +309,60 @@ inputs = {
 		})
 	}
 }
+
+func TestParseTerragruntBufferReadsTheBuffer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		setup func(t *testing.T, v *venv.Venv, tmpDir string) string
+		name  string
+	}{
+		{
+			name: "file on disk holds other content",
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
+				t.Helper()
+
+				path, err := testutils.CreateFile(v, tmpDir, "terragrunt.hcl", `inputs = {
+  source = "disk"
+}
+`)
+				require.NoError(t, err)
+
+				return path
+			},
+		},
+		{
+			name: "directory does not exist",
+			setup: func(t *testing.T, v *venv.Venv, tmpDir string) string {
+				t.Helper()
+
+				return filepath.Join(tmpDir, "unsaved", "terragrunt.hcl")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+			filename := tt.setup(t, v, testutils.WorkDir(t, v))
+
+			cfg, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filename,
+				`inputs = {
+  source = "buffer"
+}
+`,
+			)
+
+			assert.Empty(t, diags)
+			require.NotNil(t, cfg)
+			assert.Equal(t, map[string]any{"source": "buffer"}, cfg.Inputs)
+		})
+	}
+}

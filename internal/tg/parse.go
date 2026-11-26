@@ -46,13 +46,12 @@ func restrict(v *venv.Venv, p venv.Policy) (*venv.Venv, *denialRecorder) {
 // returns a pointer to the HCL diagnostics slice that the parser will populate.
 func newParsingContext(
 	ctx context.Context,
-	v *venv.Venv,
 	filename string,
 ) (context.Context, *config.ParsingContext, *hcl.Diagnostics) {
 	parseDiags := &hcl.Diagnostics{}
 
 	pctx := config.NewParsingContext(
-		config.WithStrictControls(options.NewTerragruntOptions(v.Exec).StrictControls),
+		config.WithStrictControls(options.NewTerragruntOptions().StrictControls),
 	)
 	pctx.TerragruntConfigPath = filename
 	pctx.WorkingDir = filepath.Dir(filename)
@@ -67,7 +66,8 @@ func newParsingContext(
 }
 
 // ParseTerragruntBuffer parses text as the unit configuration at filename. The
-// parse runs in a copy of v that is limited to p.
+// parse runs in a copy of v that is limited to p. It reads text in place of the
+// file at filename, and every other file it reads from v.
 //
 // The returned diagnostics include an Information diagnostic for each distinct
 // command or SOPS decryption that p denied. The parse replaces p.Observe to
@@ -81,9 +81,16 @@ func ParseTerragruntBuffer(
 ) (*config.TerragruntConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, filename)
 
-	cfg, err := config.ParseConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
+	cfg, err := new(config.Store).ResolveRunConfigFromBytes(
+		ctx,
+		tgLogger,
+		v,
+		pctx,
+		filename,
+		[]byte(text),
+	)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing Terragrunt config", "error", err)
@@ -298,9 +305,9 @@ func ParseStackBuffer(
 ) (*config.StackConfig, []protocol.Diagnostic) {
 	tgLogger := newTGLogger(l)
 	v, denials := restrict(v, p)
-	ctx, pctx, parseDiags := newParsingContext(ctx, v, filename)
+	ctx, pctx, parseDiags := newParsingContext(ctx, filename)
 
-	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, pctx, filename, text, nil)
+	cfg, err := config.ReadStackConfigString(ctx, tgLogger, v, new(config.Store), pctx, filename, text, nil)
 	if err != nil {
 		// Just log the error for now
 		l.Error("Error parsing stack config", "error", err)
