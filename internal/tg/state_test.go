@@ -912,3 +912,51 @@ bar=   "baz"
 		})
 	}
 }
+
+func TestState_PathVariable(t *testing.T) {
+	t.Parallel()
+
+	v := venv.MemVenv()
+	unitDir := filepath.Join(testutils.WorkDir(t, v), "app")
+	unitURI := uri.File(filepath.Join(unitDir, "terragrunt.hcl"))
+
+	state := tg.NewState(testutils.NewDocs(t))
+	l := testutils.NewTestLogger(t)
+
+	diags := state.OpenDocument(t.Context(), l, v, venv.Policy{}, unitURI, `locals {
+  unit_dir = path.unit
+}
+
+inputs = {
+  dir = local.unit_dir
+}
+`)
+	assert.Empty(t, diags)
+
+	localHover := state.Hover(t.Context(), l, 1, unitURI, protocol.Position{Line: 5, Character: 16})
+	require.NotNil(t, localHover.Result)
+	assert.Equal(
+		t,
+		"```hcl\nunit_dir = \""+strings.ReplaceAll(unitDir, `\`, `\\`)+"\"\n```",
+		localHover.Result.Contents.Value,
+	)
+
+	fieldHover := state.Hover(t.Context(), l, 1, unitURI, protocol.Position{Line: 1, Character: 19})
+	require.NotNil(t, fieldHover.Result)
+	assert.Equal(
+		t,
+		testutils.DocsExperimentBlurb("The directory of the unit.", "variables/path/unit", "path-variable"),
+		fieldHover.Result.Contents.Value,
+	)
+
+	state.UpdateDocument(t.Context(), l, v, venv.Policy{}, unitURI, "inputs = {\n  unit_dir = path.\n}\n")
+
+	completion := state.TextDocumentCompletion(l, 1, unitURI, protocol.Position{Line: 1, Character: 18})
+
+	labels := make([]string, 0, len(completion.Result))
+	for _, item := range completion.Result {
+		labels = append(labels, item.Label)
+	}
+
+	assert.Equal(t, []string{"path.download", "path.unit"}, labels)
+}

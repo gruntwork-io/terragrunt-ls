@@ -27,7 +27,7 @@ func NewInitializeResponse(id int) InitializeResponse {
 				HoverProvider:              protocol.Boolean(true),
 				DefinitionProvider:         protocol.Boolean(true),
 				ReferencesProvider:         protocol.Boolean(true),
-				CompletionProvider:         &protocol.CompletionOptions{},
+				CompletionProvider:         &protocol.CompletionOptions{TriggerCharacters: []string{"."}},
 				DocumentFormattingProvider: protocol.Boolean(true),
 				RenameProvider: &protocol.RenameOptions{
 					PrepareProvider: new(true),

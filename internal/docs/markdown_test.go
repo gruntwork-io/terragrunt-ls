@@ -48,6 +48,76 @@ func TestParseIndexTooManyItems(t *testing.T) {
 	require.ErrorIs(t, err, docs.ErrTooManyItems)
 }
 
+func TestParseVariable(t *testing.T) {
+	t.Parallel()
+
+	path := docs.Variable{Name: "path", Experiment: "path-variable"}
+
+	tc := []struct {
+		err      error
+		name     string
+		page     string
+		expected []docs.Item
+	}{
+		{
+			name: "description and fields",
+			page: "# path\n\n" +
+				"> Holds the \\`absolute\\` paths.\n\n" +
+				"## Usage\n\n" +
+				"> A quote in the usage.\n\n" +
+				"- [`path.usage`](/reference/hcl/variables/path/usage/): Not in the fields list.\n\n" +
+				"## Fields\n\n" +
+				"- [`path.unit`](/reference/hcl/variables/path/unit/): The unit directory.\n" +
+				"- [`path.other`](/reference/hcl/variables/path/unit/): Names a different page.\n" +
+				"- [`env.unit`](/reference/hcl/variables/env/unit/): Belongs to another variable.\n" +
+				"- [`path.Upper`](/reference/hcl/variables/path/Upper/): Is not a valid name.\n" +
+				"- [`path.read`](/reference/hcl/variables/path/read): The file that \\`read_terragrunt_config\\` reads.\n",
+			expected: []docs.Item{
+				{Kind: docs.KindVariable, Name: "path", Description: "Holds the `absolute` paths.", Experiment: "path-variable"},
+				{Kind: docs.KindVariable, Name: "path.unit", Description: "The unit directory.", Experiment: "path-variable"},
+				{
+					Kind:        docs.KindVariable,
+					Name:        "path.read",
+					Description: "The file that `read_terragrunt_config` reads.",
+					Experiment:  "path-variable",
+				},
+			},
+		},
+		{
+			name: "no fields",
+			page: "# path\n\n> Holds the paths.\n\n## Fields\n\n",
+			err:  docs.ErrEmptyIndex,
+		},
+		{
+			name: "no description",
+			page: "# path\n\n## Fields\n\n- [`path.unit`](/reference/hcl/variables/path/unit/): The unit directory.\n",
+			err:  docs.ErrEmptyIndex,
+		},
+		{
+			name: "too many fields",
+			page: "# path\n\n> Holds the paths.\n\n## Fields\n\n" +
+				strings.Repeat("- [`path.unit`](/reference/hcl/variables/path/unit/): The unit directory.\n", docs.MaxIndexItems+1),
+			err: docs.ErrTooManyItems,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			items, err := docs.ParseVariable(path, []byte(tt.page))
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, items)
+		})
+	}
+}
+
 func TestSummarize(t *testing.T) {
 	t.Parallel()
 
@@ -131,6 +201,39 @@ func TestSummarize(t *testing.T) {
 			expected: "Returns the OS.\n\n```hcl\nget_platform() --> string\n```",
 		},
 		{
+			name: "variable",
+			page: "# path\n\n" +
+				"> Holds the absolute paths.\n\n" +
+				"## Usage\n\n" +
+				"Each field is one location.\n\n" +
+				"## Fields\n\n" +
+				"- [`path.stack`](/reference/hcl/variables/path/stack/): The stack directory.\n" +
+				"- [`path.unit`](/reference/hcl/variables/path/unit/): The unit directory.\n",
+			expected: "Holds the absolute paths.\n\n" +
+				"Each field is one location.\n\n" +
+				"**Fields:** `path.stack`, `path.unit`",
+		},
+		{
+			name: "variable field",
+			page: "# path.unit\n\n" +
+				"> The directory of the unit.\n\n" +
+				"**Type:** `string`\\\n" +
+				"**Defined in:** `unit`\n\n" +
+				"A field of the [`path`](/reference/hcl/variables/path/) variable.\n\n" +
+				"## Usage\n\n" +
+				"Experimental\n\n" +
+				"`path.unit` needs the [`path-variable`](/reference/experiments/active#path-variable) experiment.\n\n" +
+				"`path.unit` is defined in a unit.\n\n" +
+				"## Examples\n\n" +
+				"```hcl\nlocals {}\n```\n",
+			expected: "The directory of the unit.\n\n" +
+				"**Type:** `string`\n\n" +
+				"**Defined in:** `unit`\n\n" +
+				"A field of the [`path`](https://docs.example.com/reference/hcl/variables/path/) variable.\n\n" +
+				"`path.unit` needs the " +
+				"[`path-variable`](https://docs.example.com/reference/experiments/active#path-variable) experiment.",
+		},
+		{
 			name:     "unclosed code block",
 			page:     "# x\n\n> Does x.\n\n## Usage\n\n```hcl\nx {\n",
 			expected: "Does x.",
@@ -161,9 +264,24 @@ func TestSnapshotFS(t *testing.T) {
 		})
 	}
 
+	for _, v := range docs.Variables {
+		t.Run(v.Name, func(t *testing.T) {
+			t.Parallel()
+
+			body, err := snapshot.Open("variables/" + v.Name + ".md")
+			require.NoError(t, err)
+			require.NoError(t, body.Close())
+		})
+	}
+
 	base, err := url.Parse(docs.DefaultBaseURL)
 	require.NoError(t, err)
 
-	_, err = docs.New(&docs.Options{Snapshot: snapshot, BaseURL: base})
+	d, err := docs.New(&docs.Options{Snapshot: snapshot, BaseURL: base})
 	require.NoError(t, err)
+
+	for _, name := range []string{"path", "path.download", "path.include", "path.read", "path.stack", "path.unit"} {
+		_, ok := d.Lookup(docs.ConfigUnit, docs.KindVariable, name)
+		assert.True(t, ok, name)
+	}
 }

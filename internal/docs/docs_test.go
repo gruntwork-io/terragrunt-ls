@@ -367,3 +367,99 @@ func TestDocsRefresh(t *testing.T) {
 	_, ok = offline.Lookup(docs.ConfigUnit, docs.KindFunction, "get_platform")
 	assert.True(t, ok)
 }
+
+func TestDocsVariableBlurb(t *testing.T) {
+	t.Parallel()
+
+	d := testutils.NewDocs(t)
+
+	tc := []struct {
+		name        string
+		description string
+		page        string
+	}{
+		{name: "path", description: "Holds the absolute paths of the unit and the stack.", page: "variables/path"},
+		{name: "path.unit", description: "The directory of the unit.", page: "variables/path/unit"},
+		{name: "path.stack", description: "The directory of the stack file.", page: "variables/path/stack"},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, cfg := range docs.Configs {
+				blurb, ok := d.Blurb(cfg, docs.KindVariable, tt.name)
+				require.True(t, ok, cfg)
+				assert.Equal(t, testutils.DocsExperimentBlurb(tt.description, tt.page, "path-variable"), blurb)
+			}
+		})
+	}
+
+	_, ok := d.Blurb(docs.ConfigUnit, docs.KindVariable, "path.missing")
+	assert.False(t, ok)
+}
+
+func TestDocsHoverFetchesAVariableFieldPage(t *testing.T) {
+	t.Parallel()
+
+	const fieldPage = "# path.unit\n\n" +
+		"> The directory of the unit.\n\n" +
+		"**Type:** `string`\\\n" +
+		"**Defined in:** `unit`\n\n" +
+		"## Usage\n\n" +
+		"Experimental\n\n" +
+		"`path.unit` is defined in a unit.\n"
+
+	s := newDocsServer(t, map[string]string{"/reference/hcl/variables/path/unit.md": fieldPage})
+	opts := serverOptions(t, s)
+	d := newDocs(t, opts)
+	footer := "\n\n" + docs.ExperimentNote("path-variable") +
+		"\n\n[Terragrunt docs](" + s.URL + "/reference/hcl/variables/path/unit/)"
+
+	first, ok := d.Hover(t.Context(), docs.ConfigUnit, docs.KindVariable, "path.unit")
+	require.True(t, ok)
+	assert.Equal(t, "The directory of the unit."+footer+"\n\n"+docs.FetchingNote, first)
+
+	d.Wait()
+
+	second, ok := d.Hover(t.Context(), docs.ConfigUnit, docs.KindVariable, "path.unit")
+	require.True(t, ok)
+	assert.Equal(
+		t,
+		"The directory of the unit.\n\n**Type:** `string`\n\n**Defined in:** `unit`\n\n"+
+			"`path.unit` is defined in a unit."+footer,
+		second,
+	)
+
+	cached, err := os.ReadFile(filepath.Join(opts.CacheDir, docs.CacheVersion, "variables", "path", "unit.md"))
+	require.NoError(t, err)
+	assert.Equal(t, fieldPage, string(cached))
+}
+
+func TestDocsRefreshVariable(t *testing.T) {
+	t.Parallel()
+
+	page := testutils.DocsPathVariable +
+		"- [`path.module`](/reference/hcl/variables/path/module/): The directory of the module.\n"
+
+	s := newDocsServer(t, map[string]string{"/reference/hcl/variables/path.md": page})
+	opts := serverOptions(t, s)
+	d := newDocs(t, opts)
+
+	d.Refresh(t.Context())
+	d.Wait()
+
+	item, ok := d.Lookup(docs.ConfigStack, docs.KindVariable, "path.module")
+	require.True(t, ok)
+	assert.Equal(t, "The directory of the module.", item.Description)
+
+	cached, err := os.ReadFile(filepath.Join(opts.CacheDir, docs.CacheVersion, "variables", "path.md"))
+	require.NoError(t, err)
+	assert.Equal(t, page, string(cached))
+
+	opts.Client = nil
+	offline := newDocs(t, opts)
+
+	_, ok = offline.Lookup(docs.ConfigUnit, docs.KindVariable, "path.module")
+	assert.True(t, ok)
+}

@@ -173,12 +173,24 @@ const DocsStacksIndex = "# Stacks\n\n" +
 	"| --- | --- |\n" +
 	"| [`get_env`](/reference/hcl/functions/get_env/) | Returns the value of an environment variable. |\n"
 
-// DocsSnapshot returns a snapshot holding [DocsUnitsIndex] and
-// [DocsStacksIndex].
+// DocsPathVariable is the page of the `path` variable that [NewDocs] starts from.
+const DocsPathVariable = "# path\n\n" +
+	"> Holds the absolute paths of the unit and the stack.\n\n" +
+	"## Usage\n\n" +
+	"Each field of `path` is the absolute path of one location.\n\n" +
+	"## Fields\n\n" +
+	"- [`path.download`](/reference/hcl/variables/path/download/): The directory in which OpenTofu/Terraform runs.\n" +
+	"- [`path.include`](/reference/hcl/variables/path/include/): The included file.\n" +
+	"- [`path.read`](/reference/hcl/variables/path/read/): The file that `read_terragrunt_config` reads.\n" +
+	"- [`path.stack`](/reference/hcl/variables/path/stack/): The directory of the stack file.\n" +
+	"- [`path.unit`](/reference/hcl/variables/path/unit/): The directory of the unit.\n"
+
+// DocsSnapshot returns a snapshot holding [DocsUnitsIndex], [DocsStacksIndex] and [DocsPathVariable].
 func DocsSnapshot() fstest.MapFS {
 	return fstest.MapFS{
-		"units.md":  {Data: []byte(DocsUnitsIndex)},
-		"stacks.md": {Data: []byte(DocsStacksIndex)},
+		"units.md":          {Data: []byte(DocsUnitsIndex)},
+		"stacks.md":         {Data: []byte(DocsStacksIndex)},
+		"variables/path.md": {Data: []byte(DocsPathVariable)},
 	}
 }
 
@@ -187,6 +199,12 @@ func DocsSnapshot() fstest.MapFS {
 // [docs.DefaultBaseURL], e.g. `blocks/locals`.
 func DocsBlurb(description, page string) string {
 	return description + "\n\n[Terragrunt docs](" + docs.DefaultBaseURL + "/reference/hcl/" + page + "/)"
+}
+
+// DocsExperimentBlurb returns what [docs.Docs.Blurb] returns for an item of page that needs experiment.
+func DocsExperimentBlurb(description, page, experiment string) string {
+	return description + "\n\n" + docs.ExperimentNote(experiment) +
+		"\n\n[Terragrunt docs](" + docs.DefaultBaseURL + "/reference/hcl/" + page + "/)"
 }
 
 // NewDocs returns a reference that starts from [DocsSnapshot], links to

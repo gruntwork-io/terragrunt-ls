@@ -18,7 +18,7 @@ func TestInitializeResponseEncoding(t *testing.T) {
 		"jsonrpc": "2.0",
 		"result": {
 			"capabilities": {
-				"completionProvider": {},
+				"completionProvider": {"triggerCharacters": ["."]},
 				"definitionProvider": true,
 				"documentFormattingProvider": true,
 				"hoverProvider": true,
