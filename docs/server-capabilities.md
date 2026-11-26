@@ -44,8 +44,8 @@ After `path.`, the server suggests the fields of the `path` variable that the fi
 
 - `path.unit` and `path.download` in `terragrunt.hcl`.
 - `path.stack` in `terragrunt.stack.hcl`.
-- All fields in other `.hcl` files, such as a `root.hcl` that a unit includes.
-- No fields in `terragrunt.values.hcl`.
+- All fields in a file that a unit can include, such as a `root.hcl`.
+- No fields in `terragrunt.values.hcl`, or in an `.hcl` file that is not a Terragrunt configuration.
 
 Terragrunt rejects `path.download` in `locals`, so the server does not suggest it in a `locals` block. The server suggests no fields in a string, a heredoc or a comment. Each suggestion is marked as experimental. A `.` starts a completion request.
 

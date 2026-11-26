@@ -111,10 +111,9 @@ var stackCandidates = []candidate{
 
 // variableFields are the variable fields that completion offers in each file type.
 var variableFields = map[store.FileType][]string{
-	store.FileTypeUnit:    {"path.download", "path.unit"},
-	store.FileTypeStack:   {"path.stack"},
-	store.FileTypeShared:  {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
-	store.FileTypeUnknown: {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
+	store.FileTypeUnit:   {"path.download", "path.unit"},
+	store.FileTypeStack:  {"path.stack"},
+	store.FileTypeShared: {"path.download", "path.include", "path.read", "path.stack", "path.unit"},
 }
 
 // localsExcludedFields are the variable fields that Terragrunt rejects in locals.

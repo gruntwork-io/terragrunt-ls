@@ -531,6 +531,54 @@ func TestParseTerragruntBufferPathVariableErrors(t *testing.T) {
 	}
 }
 
+func TestParseTerragruntBufferPathDownloadReportsEachErrorOnce(t *testing.T) {
+	t.Parallel()
+
+	content := `terraform {
+  source = upper()
+}
+
+inputs = {
+  download_dir = path.download
+}
+`
+	messages := []string{
+		`Not enough function arguments: Function "upper" expects 1 argument(s). Missing value for "str".`,
+		"Unsuitable value type: Unsuitable value: value must be known",
+	}
+
+	tests := []struct {
+		name     string
+		filename string
+	}{
+		{name: "unit", filename: "terragrunt.hcl"},
+		{name: "shared file", filename: "root.hcl"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := venv.MemVenv()
+
+			_, diags := tg.ParseTerragruntBuffer(
+				t.Context(),
+				testutils.NewTestLogger(t),
+				v,
+				venv.Policy{},
+				filepath.Join(testutils.WorkDir(t, v), tt.filename),
+				content,
+			)
+
+			require.Len(t, diags, len(messages))
+
+			for i, message := range messages {
+				assert.Equal(t, protocol.String(message), diags[i].Message)
+			}
+		})
+	}
+}
+
 func TestParseTerragruntBufferPathDownloadInIncludedLocals(t *testing.T) {
 	t.Parallel()
 
@@ -661,6 +709,18 @@ download_dir = "${local.root_dir}/cache"
 			messages: []string{},
 		},
 		{
+			name: "field in the terraform block of a file that reads path.download",
+			content: `terraform {
+  source = "${dirname(path.include)}/modules/x"
+}
+
+inputs = {
+  download_dir = path.download
+}
+`,
+			messages: []string{},
+		},
+		{
 			name: "unknown field in a local that a typed attribute reads",
 			content: `locals {
   root_file = path.include
@@ -717,7 +777,7 @@ download_dir = "${local.typo_dir}/cache"
 
 			v := venv.MemVenv()
 
-			_, diags := tg.ParseTerragruntBuffer(
+			cfg, diags := tg.ParseTerragruntBuffer(
 				t.Context(),
 				testutils.NewTestLogger(t),
 				v,
@@ -726,6 +786,7 @@ download_dir = "${local.typo_dir}/cache"
 				tt.content,
 			)
 
+			require.NotNil(t, cfg)
 			require.Len(t, diags, len(tt.messages))
 
 			for i, message := range tt.messages {

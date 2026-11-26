@@ -150,6 +150,7 @@ func pathDownloadDiagnostics(l logger.Logger, err error, filename, text string) 
 
 func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text string) hcl.Diagnostics {
 	filtered := hcl.Diagnostics{}
+	seen := map[diagKey]struct{}{}
 
 	var sharedPathSubjects []hcl.Range
 
@@ -169,6 +170,19 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 		if diag.Subject.Filename != filename {
 			continue
 		}
+
+		key := diagKey{severity: diag.Severity, summary: diag.Summary, detail: diag.Detail, subject: *diag.Subject}
+		if _, ok := seen[key]; ok {
+			l.Debug(
+				"Filtering repeated diag",
+				"diag", diag,
+				"filename", filename,
+			)
+
+			continue
+		}
+
+		seen[key] = struct{}{}
 
 		if isMissingOutputDiag(diag) {
 			l.Debug(
@@ -224,6 +238,14 @@ func filterHCLDiags(l logger.Logger, diags hcl.Diagnostics, filename, text strin
 	return slices.DeleteFunc(filtered, func(diag *hcl.Diagnostic) bool {
 		return followsSharedPathDiag(diag, subjects)
 	})
+}
+
+// diagKey holds the fields that make two diagnostics the same.
+type diagKey struct {
+	summary  string
+	detail   string
+	subject  hcl.Range
+	severity hcl.DiagnosticSeverity
 }
 
 const (
