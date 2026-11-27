@@ -197,6 +197,12 @@ func IsAttribute(inode *IndexedNode) bool {
 	return ok
 }
 
+// IsBlock returns TRUE if the node is an hclsyntax.Block of any type.
+func IsBlock(inode *IndexedNode) bool {
+	_, ok := inode.Node.(*hclsyntax.Block)
+	return ok
+}
+
 // GetNodeIncludeLabel returns the label of the given node, if it is an include block.
 // If the node is not an include block, returns an empty string and false.
 func GetNodeIncludeLabel(inode *IndexedNode) (string, bool) {
